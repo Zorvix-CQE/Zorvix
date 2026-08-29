@@ -203,7 +203,7 @@ const CONFIG = {
   CLIENT_ID: '148311031818-4ku0lhia6qd0fgbmi379dvi7k4vp303g.apps.googleusercontent.com'
 };
 
-let SESION = null, MEDICO_ACTIVO = null, DOC_PENDIENTE = null, MI_EXPEDIENTE = null;
+let SESION = null, MEDICO_ACTIVO = null, DOC_PENDIENTE = null, MI_EXPEDIENTE = null, URL_ACTUAL = null;
 
 async function api(action, datos = {}) {
   const token = sessionStorage.getItem('zx_token');
@@ -477,10 +477,21 @@ async function abrirDoc(credId) {
   try {
     const a = await api('cirujanos.archivo', { credId });
     document.getElementById('vi-nombre').textContent = a.nombre;
-    const src = `data:${a.mime};base64,${a.datos}`;
+
+    // Los PDF incrustados como data: los bloquea el navegador por seguridad.
+    // Un blob es un archivo real en memoria y sí se puede mostrar.
+    const bin = atob(a.datos);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    if (URL_ACTUAL) URL.revokeObjectURL(URL_ACTUAL);
+    URL_ACTUAL = URL.createObjectURL(new Blob([bytes], { type: a.mime }));
+
     cuerpo.innerHTML = a.mime.indexOf('pdf') > -1
-      ? `<iframe src="${src}" style="width:100%;height:70vh;border:0;border-radius:10px"></iframe>`
-      : `<img src="${src}" alt="${a.nombre}" style="max-width:100%;border-radius:10px">`;
+      ? `<iframe src="${URL_ACTUAL}" style="width:100%;height:70vh;border:0;border-radius:10px"></iframe>
+         <p style="margin:11px 0 0"><a href="${URL_ACTUAL}" target="_blank" rel="noopener"
+            class="zx-btn-2" style="display:inline-block;height:32px;line-height:32px;padding:0 14px;
+            font-size:12px;text-decoration:none">Abrir en pestaña nueva</a></p>`
+      : `<img src="${URL_ACTUAL}" alt="${a.nombre}" style="max-width:100%;border-radius:10px">`;
   } catch (e) {
     cuerpo.innerHTML = `<p style="color:var(--zx-error-txt)">${e.message}</p>`;
   }
@@ -491,6 +502,7 @@ function cerrarVisor(ev) {
   const v = document.getElementById('visor');
   v.classList.add('oculto'); v.style.display = 'none';
   document.getElementById('vi-cuerpo').innerHTML = '';
+  if (URL_ACTUAL) { URL.revokeObjectURL(URL_ACTUAL); URL_ACTUAL = null; }
 }
 
 function pedirArchivo(tipo, vence) {
