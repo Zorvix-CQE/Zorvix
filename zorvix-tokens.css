@@ -1,0 +1,420 @@
+/* ============================================================
+   ZORVIX · Sistema de tokens
+   Version 1.2
+
+   Un solo archivo de marca para todo el ecosistema.
+   Cambia los hex del bloque MARCA y las seis apps cambian de piel
+   sin tocar una linea de logica.
+
+   Tres registros visuales:
+     [data-tema="oscuro"]  cristal y glow   -> login, portada, paneles
+     [data-tema="claro"]   claro con marca  -> portal medico
+     [data-densidad="compacta"] modificador -> consola interna
+   ============================================================ */
+
+/* ---------- Fuentes ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+
+  /* ---------- MARCA · unica fuente de verdad del color ---------- */
+  --zx-violeta-900: #33236B;
+  --zx-violeta-800: #4B3392;
+  --zx-violeta-700: #5B3EAD;
+  --zx-violeta-600: #6B51B8;
+  --zx-violeta-500: #7B5FC7;
+  --zx-violeta-400: #8B6FD4;
+  --zx-violeta-300: #A98FE0;
+  --zx-violeta-200: #C6B4F0;
+  --zx-violeta-100: #E2DEEF;
+  --zx-violeta-050: #F1EDFB;
+
+  --zx-grafito:     #535353;  /* color real del wordmark */
+  --zx-tinta:       #1C1B22;
+  --zx-noche:       #07050E;
+
+  /* ---------- Estado · gana sobre el color de marca ---------- */
+  --zx-ok:      #1D9E75;
+  --zx-ok-bg:   #E4F0EA;
+  --zx-ok-txt:  #0F6E56;
+  --zx-alerta:      #BA7517;
+  --zx-alerta-bg:   #FAEEDA;
+  --zx-alerta-txt:  #854F0B;
+  --zx-error:      #E24B4A;
+  --zx-error-bg:   #FCEBEB;
+  --zx-error-txt:  #A32D2D;
+
+  /* ---------- Tipografia ---------- */
+  --zx-display: 'Space Grotesk', system-ui, sans-serif;
+  --zx-texto:   'Inter', system-ui, sans-serif;
+  --zx-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --zx-track-marca: 0.24em;  /* wordmark, heredado del logo */
+  --zx-track-eyebrow: 0.14em;
+
+  /* ---------- Geometria ---------- */
+  --zx-r-control: 8px;
+  --zx-r-tarjeta: 12px;
+  --zx-r-cristal: 18px;
+  --zx-hairline: 0.5px;
+
+  /* ---------- Densidad · comoda por defecto ---------- */
+  --zx-alto-control: 40px;
+  --zx-alto-fila:    38px;
+  --zx-pad-tarjeta:  20px;
+  --zx-txt-cuerpo:   14px;
+  --zx-txt-dato:     15px;
+  --zx-gap:          14px;
+
+  /* ---------- Movimiento ---------- */
+  --zx-rapido: .18s;
+  --zx-base:   .28s;
+  --zx-suave:  cubic-bezier(.22,.61,.36,1);
+}
+
+/* ============================================================
+   REGISTRO CLARO · portal medico, cotizador, documentos
+   Es el tema por defecto: es el unico que sobrevive impreso.
+   ============================================================ */
+:root,
+[data-tema="claro"] {
+  --zx-lienzo:      #E9E7F1;
+  --zx-superficie:  #FFFFFF;
+  --zx-superficie-2:#F7F6FB;
+  --zx-hover:       #F9F7FD;
+
+  --zx-borde:        #DCD8EA;
+  --zx-borde-fuerte: #CFC4E8;
+
+  --zx-txt:      #1C1B22;
+  --zx-txt-2:    #6E6980;
+  --zx-txt-3:    #8B849C;
+  --zx-txt-marca:#5B3EAD;
+
+  --zx-acento:       #5B3EAD;
+  --zx-acento-hover: #4B3392;
+  --zx-acento-tenue: #F1EDFB;
+  --zx-sobre-acento: #FFFFFF;
+
+  /* en claro el objeto no emite luz: proyecta sombra */
+  --zx-glow-boton: 0 1px 2px rgba(91,62,173,.18), 0 4px 12px rgba(91,62,173,.14);
+  --zx-glow-boton-hover: 0 2px 4px rgba(91,62,173,.22), 0 8px 22px rgba(91,62,173,.22);
+  --zx-glow-icono: drop-shadow(2px 3px 5px rgba(91,62,173,.28));
+
+  --zx-grad-trazo-a: #A98FE0;
+  --zx-grad-trazo-b: #6B51B8;
+  --zx-grad-trazo-c: #33236B;
+
+  --zx-reticula: rgba(91,62,173,.05);
+}
+
+/* ============================================================
+   REGISTRO OSCURO · login, portada, paneles de sintesis
+   ============================================================ */
+[data-tema="oscuro"] {
+  --zx-lienzo:      #07050E;
+  --zx-superficie:  rgba(255,255,255,.055);
+  --zx-superficie-2:rgba(255,255,255,.03);
+  --zx-hover:       rgba(255,255,255,.09);
+
+  --zx-borde:        rgba(255,255,255,.15);
+  --zx-borde-fuerte: rgba(198,180,240,.5);
+
+  --zx-txt:      #FFFFFF;
+  --zx-txt-2:    rgba(226,219,246,.78);
+  --zx-txt-3:    rgba(206,198,232,.55);
+  --zx-txt-marca:#C6B4F0;
+
+  --zx-acento:       #5B3EAD;
+  --zx-acento-hover: #6B51B8;
+  --zx-acento-tenue: rgba(139,111,212,.14);
+  --zx-sobre-acento: #FFFFFF;
+
+  /* anillo pegado al borde + halo cerrado + halo abierto.
+     el anillo es lo que hace que se lea como filo encendido
+     y no como mancha desenfocada. */
+  --zx-glow-boton: 0 0 0 1px rgba(198,180,240,.55),
+                   0 0 12px rgba(139,111,212,.6),
+                   0 0 34px rgba(107,81,184,.45);
+  --zx-glow-boton-hover: 0 0 0 1px rgba(224,214,252,.85),
+                         0 0 18px rgba(160,132,232,.85),
+                         0 0 52px rgba(123,95,199,.6);
+  --zx-glow-icono: drop-shadow(0 0 10px rgba(150,116,235,.55));
+
+  --zx-grad-trazo-a: #FBF8FF;
+  --zx-grad-trazo-b: #B9A4EC;
+  --zx-grad-trazo-c: #5B3EAD;
+
+  --zx-reticula: rgba(255,255,255,.042);
+}
+
+/* ============================================================
+   DENSIDAD COMPACTA · consola interna
+   Un atributo, cinco variables. No es un tema aparte.
+   ============================================================ */
+[data-densidad="compacta"] {
+  --zx-alto-control: 30px;
+  --zx-alto-fila:    33px;
+  --zx-pad-tarjeta:  13px;
+  --zx-txt-cuerpo:   12.5px;
+  --zx-txt-dato:     13px;
+  --zx-gap:          10px;
+}
+
+/* ============================================================
+   DENSIDAD AMPLIA · captura en quirofano
+   Se toca con guante, de pie, con prisa. 30px no alcanza.
+   ============================================================ */
+[data-densidad="amplia"] {
+  --zx-alto-control: 52px;
+  --zx-alto-fila:    56px;
+  --zx-pad-tarjeta:  18px;
+  --zx-txt-cuerpo:   14px;
+  --zx-txt-dato:     15px;
+  --zx-gap:          14px;
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--zx-lienzo);
+  color: var(--zx-txt);
+  font-family: var(--zx-texto);
+  font-size: var(--zx-txt-cuerpo);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* La reticula es elemento de marca transversal: cuesta cero
+   y funciona igual en los dos temas. */
+.zx-reticula {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(var(--zx-reticula) .5px, transparent .5px),
+    linear-gradient(90deg, var(--zx-reticula) .5px, transparent .5px);
+  background-size: 68px 68px;
+}
+
+/* Luz volumetrica. Solo en tema oscuro: sobre blanco ensucia. */
+.zx-luz { position: absolute; inset: 0; pointer-events: none; }
+[data-tema="oscuro"] .zx-luz {
+  background:
+    radial-gradient(ellipse 440px 300px at 22% 0%, rgba(123,95,199,.42), transparent 68%),
+    radial-gradient(ellipse 380px 300px at 88% 96%, rgba(91,62,173,.32), transparent 70%);
+}
+
+/* ============================================================
+   TIPOGRAFIA
+   ============================================================ */
+.zx-wordmark {
+  font-family: var(--zx-display);
+  letter-spacing: var(--zx-track-marca);
+  color: var(--zx-txt);
+  font-weight: 400;
+}
+.zx-titulo { font-family: var(--zx-display); font-size: 22px; font-weight: 400; margin: 0; }
+.zx-eyebrow {
+  font-size: 10.5px;
+  letter-spacing: var(--zx-track-eyebrow);
+  text-transform: uppercase;
+  color: var(--zx-txt-3);
+}
+/* Folios, cifras y tiempos. La mono alineada en columna es lo que
+   permite comparar magnitudes sin leer los digitos. */
+.zx-dato { font-family: var(--zx-mono); font-size: var(--zx-txt-dato); }
+.zx-folio { font-family: var(--zx-mono); font-size: 11.5px; color: var(--zx-txt-marca); }
+
+/* ============================================================
+   SUPERFICIES
+   ============================================================ */
+.zx-tarjeta {
+  background: var(--zx-superficie);
+  border: var(--zx-hairline) solid var(--zx-borde);
+  border-radius: var(--zx-r-tarjeta);
+  padding: var(--zx-pad-tarjeta);
+}
+
+/* Cristal. Solo en oscuro y solo en superficies de sintesis:
+   seis a la vez tumban Safari en iPad. */
+.zx-cristal {
+  position: relative;
+  border-radius: var(--zx-r-cristal);
+  padding: var(--zx-pad-tarjeta);
+  background: linear-gradient(155deg, rgba(139,111,212,.18), rgba(255,255,255,.028));
+  border: var(--zx-hairline) solid var(--zx-borde);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  transition: border-color var(--zx-base) var(--zx-suave),
+              box-shadow var(--zx-base) var(--zx-suave);
+}
+.zx-cristal:hover {
+  border-color: var(--zx-borde-fuerte);
+  box-shadow: 0 0 30px rgba(123,95,199,.35);
+}
+/* Salida sin backdrop-filter para tablet. Se ve casi igual
+   y no obliga al navegador a recomponer capas en cada scroll. */
+@media (hover: none) and (pointer: coarse) {
+  .zx-cristal { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(139,111,212,.14); }
+}
+
+/* ============================================================
+   CONTROLES
+   ============================================================ */
+.zx-btn {
+  height: var(--zx-alto-control);
+  padding: 0 20px;
+  border: none;
+  border-radius: 11px;
+  background: var(--zx-acento);
+  color: var(--zx-sobre-acento);
+  font-family: var(--zx-texto);
+  font-size: 13.5px;
+  letter-spacing: .03em;
+  cursor: pointer;
+  box-shadow: var(--zx-glow-boton);
+  transition: box-shadow var(--zx-base) var(--zx-suave),
+              background var(--zx-base) var(--zx-suave);
+}
+[data-tema="oscuro"] .zx-btn { background: linear-gradient(180deg, #8B6FD4, #5B3EAD); }
+.zx-btn:hover { box-shadow: var(--zx-glow-boton-hover); }
+.zx-btn:focus-visible { outline: 2px solid var(--zx-violeta-300); outline-offset: 2px; }
+
+/* Un solo boton brillante por vista. Si dos brillan igual,
+   el glow deja de ser jerarquia y alguien cancela cuando queria confirmar. */
+.zx-btn-2 {
+  height: var(--zx-alto-control);
+  padding: 0 20px;
+  border: var(--zx-hairline) solid var(--zx-borde-fuerte);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--zx-txt-2);
+  font-family: var(--zx-texto);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--zx-base), color var(--zx-base), box-shadow var(--zx-base);
+}
+.zx-btn-2:hover { border-color: var(--zx-violeta-200); color: var(--zx-txt); }
+.zx-btn-2:focus-visible { outline: 2px solid var(--zx-violeta-300); outline-offset: 2px; }
+
+.zx-campo {
+  width: 100%;
+  height: var(--zx-alto-control);
+  padding: 0 13px;
+  border-radius: 10px;
+  border: var(--zx-hairline) solid var(--zx-borde);
+  background: var(--zx-superficie);
+  color: var(--zx-txt);
+  font-family: var(--zx-texto);
+  font-size: 13px;
+}
+[data-tema="oscuro"] .zx-campo { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.24); }
+.zx-campo::placeholder { color: var(--zx-txt-3); }
+.zx-campo:focus { outline: none; border-color: var(--zx-violeta-400); box-shadow: 0 0 0 3px var(--zx-acento-tenue); }
+
+.zx-etiqueta { display:block; font-size: 11.5px; letter-spacing:.06em; color: var(--zx-txt-2); margin-bottom: 7px; }
+
+/* ============================================================
+   ICONOS
+   El anillo repite la geometria del simbolo. Contenedor cuando el
+   icono es un destino que se toca; sin contenedor cuando acompana texto.
+   ============================================================ */
+.zx-anillo {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--zx-acento-tenue);
+  border: var(--zx-hairline) solid var(--zx-borde-fuerte);
+  color: var(--zx-txt-marca);
+  transition: box-shadow var(--zx-base), border-color var(--zx-base);
+}
+[data-tema="oscuro"] .zx-anillo { box-shadow: 0 0 14px rgba(139,111,212,.3); color: #D8CEF5; }
+
+/* La extrusion solo existe de 48px para arriba. Abajo de eso
+   el desplazamiento se vuelve borron y estorba. */
+.zx-icono-3d { filter: var(--zx-glow-icono); }
+
+/* ============================================================
+   MOSAICO · tarjeta de modulo y de destino
+   Vive aqui y no en el index de cada app: si cada app lo redefine,
+   a la tercera ya no se parecen.
+   ============================================================ */
+.zx-mosaico {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  font-family: var(--zx-texto);
+  background: var(--zx-superficie);
+  border: var(--zx-hairline) solid var(--zx-borde);
+  border-radius: 17px;
+  padding: 17px;
+  transition: border-color var(--zx-base) var(--zx-suave),
+              box-shadow var(--zx-base) var(--zx-suave),
+              background var(--zx-base) var(--zx-suave);
+}
+[data-tema="oscuro"] .zx-mosaico {
+  background: linear-gradient(155deg, rgba(139,111,212,.17), rgba(255,255,255,.028));
+}
+.zx-mosaico:hover { border-color: var(--zx-borde-fuerte); }
+[data-tema="oscuro"] .zx-mosaico:hover {
+  background: linear-gradient(155deg, rgba(139,111,212,.27), rgba(255,255,255,.05));
+  box-shadow: 0 0 28px rgba(123,95,199,.42);
+}
+[data-tema="claro"] .zx-mosaico:hover { box-shadow: 0 6px 22px rgba(91,62,173,.14); }
+/* El anillo se enciende con la tarjeta, no por separado. */
+.zx-mosaico:hover .zx-anillo { border-color: var(--zx-violeta-200); }
+[data-tema="oscuro"] .zx-mosaico:hover .zx-anillo {
+  box-shadow: 0 0 22px rgba(160,132,232,.7); color: #fff;
+}
+.zx-mosaico:focus-visible { outline: 2px solid var(--zx-violeta-300); outline-offset: 3px; }
+
+/* Bloqueado se muestra, atenuado. Del lado del staff el usuario sabe que
+   existe y a quien pedirle acceso. NUNCA en la fachada de medicos. */
+.zx-mosaico[disabled] { opacity: .32; cursor: not-allowed; }
+.zx-mosaico[disabled]:hover { border-color: var(--zx-borde); box-shadow: none; }
+[data-tema="oscuro"] .zx-mosaico[disabled]:hover {
+  background: linear-gradient(155deg, rgba(139,111,212,.17), rgba(255,255,255,.028));
+}
+.zx-mosaico-nombre { display:block; font-size: 14.5px; color: var(--zx-txt); margin-top: 13px; }
+.zx-mosaico-desc   { display:block; font-size: 11.5px; color: var(--zx-txt-3); margin-top: 4px; line-height: 1.45; }
+
+/* ============================================================
+   METRICA · cifra de sintesis
+   El degradado va sobre el dato, no sobre la tarjeta. Si la tarjeta
+   tambien brilla, el conjunto se vuelve una sopa luminosa.
+   ============================================================ */
+.zx-metrica { background: var(--zx-superficie-2); border-radius: var(--zx-r-control); padding: 13px 14px; }
+.zx-metrica-etq { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--zx-txt-3); }
+.zx-metrica-val { font-family: var(--zx-display); font-size: 24px; color: var(--zx-txt); margin-top: 4px; }
+.zx-metrica-val.dato { font-family: var(--zx-mono); font-size: 19px; }
+
+/* ============================================================
+   PILDORAS DE ESTADO
+   ============================================================ */
+.zx-pill {
+  display: inline-block;
+  font-size: 11px; padding: 3px 11px; border-radius: 99px;
+  background: var(--zx-acento-tenue); color: var(--zx-txt-marca);
+}
+.zx-pill.ok     { background: var(--zx-ok-bg);     color: var(--zx-ok-txt); }
+.zx-pill.alerta { background: var(--zx-alerta-bg); color: var(--zx-alerta-txt); }
+.zx-pill.error  { background: var(--zx-error-bg);  color: var(--zx-error-txt); }
+
+/* ============================================================
+   TABLA · listas que se escanean, no tarjetas que se contemplan
+   ============================================================ */
+.zx-tabla { width: 100%; background: var(--zx-superficie); border: var(--zx-hairline) solid var(--zx-borde); border-radius: var(--zx-r-tarjeta); overflow: hidden; }
+.zx-th { display:flex; padding: 7px 12px; background: var(--zx-superficie-2); border-bottom: var(--zx-hairline) solid var(--zx-borde); font-size: 10.5px; letter-spacing:.1em; text-transform: uppercase; color: var(--zx-txt-3); }
+.zx-tr { display:flex; align-items:center; min-height: var(--zx-alto-fila); padding: 0 12px; border-bottom: var(--zx-hairline) solid var(--zx-borde); font-size: var(--zx-txt-cuerpo); }
+.zx-tr:last-child { border-bottom: none; }
+.zx-tr:hover { background: var(--zx-hover); }
+.zx-num { font-family: var(--zx-mono); font-size: 11.5px; text-align: right; }
+
+/* ============================================================
+   ACCESIBILIDAD
+   ============================================================ */
+.zx-oculto { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
