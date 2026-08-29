@@ -13,47 +13,25 @@
   .shell { max-width: 940px; margin: 0 auto; padding: 24px 20px 48px; position: relative; }
 
   .barra { display:flex; align-items:center; gap:11px; background: var(--zx-superficie);
-           border: var(--zx-hairline) solid var(--zx-borde); border-radius: 10px;
-           padding: 11px 15px; margin-bottom: var(--zx-gap); }
+           border: var(--zx-hairline) solid var(--zx-borde); border-radius: 11px;
+           padding: 11px 15px; margin-bottom: var(--zx-gap); position: relative; }
   .volver{ background:none; border:none; padding:0; cursor:pointer; font-family:var(--zx-texto);
            font-size:12px; color: var(--zx-txt-3); }
 
-  .doc { display:flex; align-items:center; gap:11px; padding:11px 0;
-         border-bottom: var(--zx-hairline) solid var(--zx-borde); }
-  .doc:last-child { border-bottom: none; }
-  .doc-nom  { font-size: 13.5px; color: var(--zx-txt); }
-  .doc-sub  { font-size: 11.5px; color: var(--zx-txt-3); margin-top: 3px; }
+  .rejilla { display:grid; grid-template-columns:repeat(auto-fit,minmax(238px,1fr)); gap:12px; }
+  .barra-estado { height:3px; border-radius:2px; margin-top:12px; position:relative; }
+  .pie { display:flex; align-items:center; gap:8px; margin-top:12px; position:relative; }
+  .doc-nom { font-size:14px; color:var(--zx-txt); margin-top:12px; line-height:1.35; position:relative; }
+  .doc-sub { font-size:11px; color:var(--zx-txt-3); margin-top:5px; position:relative; }
 
-  .med { display:flex; align-items:center; gap:12px; padding:12px 14px; cursor:pointer;
-         border-bottom: var(--zx-hairline) solid var(--zx-borde); }
-  .med:last-child { border-bottom: none; }
-  .med:hover { background: var(--zx-hover); }
+  /* Tarjeta de médico en la cola de trabajo del staff. */
+  .med { display:flex; align-items:center; gap:14px; cursor:pointer; }
+  .med-nom { font-size:13.5px; color:var(--zx-txt); }
+  .med-esp { font-size:11px; color:var(--zx-txt-3); margin-top:4px; }
 
-  .punto { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
-  .zx-mini { width:36px; height:44px; flex-shrink:0; border-radius:6px; cursor:pointer;
-             background: var(--zx-acento-tenue); border: var(--zx-hairline) solid var(--zx-borde-fuerte);
-             color: var(--zx-txt-marca); font-size:17px; display:flex; align-items:center;
-             justify-content:center; transition: border-color .2s, box-shadow .2s; }
-  .zx-mini:hover { border-color: var(--zx-violeta-200); box-shadow: 0 0 14px rgba(139,111,212,.45); }
-
-  /* Vista del médico: es un cliente, no un trámite. Cristal y luz. */
-  .rejilla { display:grid; grid-template-columns:repeat(auto-fit,minmax(252px,1fr)); gap:13px; }
-  .tarjeta-doc { position:relative; border-radius:16px; padding:17px;
-    background:linear-gradient(158deg,rgba(155,123,224,.30) 0%,rgba(91,62,173,.17) 55%,rgba(255,255,255,.03) 100%);
-    border:.5px solid rgba(255,255,255,.20);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.18), 0 8px 26px rgba(20,8,54,.45);
-    transition:border-color .3s, box-shadow .3s, background .3s; }
-  .tarjeta-doc:hover { border-color:rgba(224,214,252,.55);
-    background:linear-gradient(158deg,rgba(178,148,242,.40) 0%,rgba(107,81,184,.24) 55%,rgba(255,255,255,.06) 100%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.30), 0 0 30px rgba(139,111,212,.45), 0 10px 30px rgba(20,8,54,.5); }
-  .tarjeta-doc:hover .zx-anillo { box-shadow:0 0 20px rgba(160,132,232,.7); border-color:rgba(224,214,252,.8); }
-  .td-nom { font-size:14.5px; color:#fff; margin-top:13px; line-height:1.35; }
-  .td-sub { font-size:11.5px; color:rgba(206,198,232,.62); margin-top:5px; }
-  .td-pie { display:flex; align-items:center; gap:8px; margin-top:14px; }
-
-  /* Validación: verde y rojo, no violeta. El color de estado gana. */
+  /* Validación: verde y rojo. El color de estado gana sobre el de marca. */
   .val-ok { background:var(--zx-ok); border:none; color:#fff; box-shadow:none; }
-  .val-no { border:.5px solid var(--zx-error); color:var(--zx-error-txt); }
+  .val-no { border:.5px solid var(--zx-error); color:var(--zx-error-txt); background:transparent; }
 
   .oculto{ display:none; }
   .aviso { font-size:12.5px; color: var(--zx-error-txt); background: var(--zx-error-bg);
@@ -64,7 +42,20 @@
 
 <div class="app">
   <div class="zx-luz"></div>
-  <div class="zx-reticula"></div>
+  <svg class="zx-nodos" viewBox="0 0 680 470" preserveAspectRatio="none" aria-hidden="true">
+    <g class="lineas">
+      <path d="M46 62 L162 34 L262 92 M262 92 L372 46 L482 104 M482 104 L612 56 L656 132"/>
+      <path d="M46 62 L98 176 L206 206 L262 92 M206 206 L336 246 L372 46"/>
+      <path d="M98 176 L64 306 L196 368 L336 246 M196 368 L426 348 L482 104 M426 348 L576 296 L656 132"/>
+    </g>
+    <g class="puntos">
+      <circle cx="46" cy="62" r="1.8"/><circle cx="162" cy="34" r="1.3"/><circle cx="262" cy="92" r="2.1"/>
+      <circle cx="372" cy="46" r="1.4"/><circle cx="482" cy="104" r="1.9"/><circle cx="612" cy="56" r="1.3"/>
+      <circle cx="656" cy="132" r="1.6"/><circle cx="98" cy="176" r="1.5"/><circle cx="206" cy="206" r="2"/>
+      <circle cx="336" cy="246" r="1.7"/><circle cx="64" cy="306" r="1.3"/><circle cx="196" cy="368" r="1.9"/>
+      <circle cx="426" cy="348" r="1.5"/><circle cx="576" cy="296" r="1.8"/>
+    </g>
+  </svg>
 
   <!-- ============ Acceso ============ -->
   <section class="centro" id="v-acceso">
@@ -97,15 +88,14 @@
       <span style="margin-left:auto;font-size:11.5px;color:var(--zx-txt-2)" id="yo"></span>
     </div>
 
-    <div class="zx-cristal" style="margin-bottom:var(--zx-gap)">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
-        <div style="min-width:0">
-          <div class="zx-titulo" style="font-size:24px" id="m-saludo">—</div>
-          <p style="font-size:13px;color:var(--zx-txt-2);margin:11px 0 0;line-height:1.6;max-width:60ch"
-             id="m-mensaje"></p>
-        </div>
-        <span class="zx-pill" id="m-estado" style="flex-shrink:0"></span>
+    <div class="zx-widget" style="padding:22px;margin-bottom:var(--zx-gap);display:flex;align-items:center;gap:26px">
+      <div style="flex:1;min-width:0;position:relative">
+        <div class="zx-widget-etq">Su documentación</div>
+        <div class="zx-titulo" style="font-size:25px;margin-top:9px" id="m-saludo">—</div>
+        <p style="font-size:12.5px;color:var(--zx-txt-2);margin:11px 0 0;line-height:1.6;max-width:56ch"
+           id="m-mensaje"></p>
       </div>
+      <div id="m-anillo" style="position:relative;flex-shrink:0"></div>
     </div>
 
     <div class="rejilla" id="m-docs"></div>
@@ -122,13 +112,13 @@
       <span style="margin-left:auto;font-size:11.5px;color:var(--zx-txt-2)" id="yo2"></span>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;margin-bottom:var(--zx-gap)">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:var(--zx-gap);position:relative">
       <button class="zx-btn" onclick="verAlta(true)">Dar de alta un médico</button>
     </div>
 
-    <div class="zx-tarjeta oculto" id="s-alta" style="margin-bottom:var(--zx-gap)">
-      <div class="zx-eyebrow" style="margin-bottom:14px">Nuevo médico</div>
-      <div style="display:grid;grid-template-columns:100px 1fr 1fr;gap:12px">
+    <div class="zx-widget oculto" id="s-alta" style="margin-bottom:var(--zx-gap)">
+      <div class="zx-widget-etq" style="margin-bottom:14px">Nuevo médico</div>
+      <div style="display:grid;grid-template-columns:100px 1fr 1fr;gap:12px;position:relative">
         <div><label class="zx-etiqueta" for="a-titulo">Título</label>
           <select class="zx-campo" id="a-titulo">
             <option value="Dr.">Dr.</option>
@@ -139,7 +129,7 @@
         <div><label class="zx-etiqueta" for="a-apellido">Apellido</label>
           <input class="zx-campo" id="a-apellido" placeholder="Rivas"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;position:relative">
         <div><label class="zx-etiqueta" for="a-tipo">Función</label>
           <select class="zx-campo" id="a-tipo">
             <option value="cirujano">Cirujano</option>
@@ -149,14 +139,14 @@
         <div><label class="zx-etiqueta" for="a-esp">Especialidad</label>
           <input class="zx-campo" id="a-esp" placeholder="Cirugía plástica"></div>
       </div>
-      <div style="margin-top:12px">
+      <div style="margin-top:12px;position:relative">
         <label class="zx-etiqueta" for="a-correo">Correo de Google</label>
         <input class="zx-campo" id="a-correo" type="email" placeholder="nombre@gmail.com">
         <p style="font-size:11px;color:var(--zx-txt-3);margin:7px 0 0">
           Tiene que ser una cuenta de Google: es con la que va a entrar.
         </p>
       </div>
-      <div style="display:flex;gap:10px;margin-top:16px;align-items:center">
+      <div style="display:flex;gap:10px;margin-top:16px;align-items:center;position:relative">
         <button class="zx-btn" onclick="darAlta()">Dar de alta</button>
         <button class="zx-btn-2" onclick="verAlta(false)">Cancelar</button>
         <span style="font-size:11.5px;color:var(--zx-txt-3);margin-left:auto" id="a-msg"></span>
@@ -164,19 +154,20 @@
     </div>
 
     <!-- Invitación lista para pegar en WhatsApp, que es como les hablan de verdad. -->
-    <div class="zx-tarjeta oculto" id="s-invita" style="margin-bottom:var(--zx-gap)">
-      <div class="zx-eyebrow" style="margin-bottom:11px">Listo · invítelo</div>
-      <p style="font-size:13px;color:var(--zx-txt-2);margin:0 0 13px;line-height:1.6" id="i-quien"></p>
+    <div class="zx-widget oculto" id="s-invita" style="margin-bottom:var(--zx-gap)">
+      <div class="zx-widget-etq" style="margin-bottom:11px">Listo · invítelo</div>
+      <p style="font-size:13px;color:var(--zx-txt-2);margin:0 0 13px;line-height:1.6;position:relative" id="i-quien"></p>
       <textarea id="i-texto" class="zx-campo" readonly
-        style="height:140px;padding:12px 13px;line-height:1.55;resize:none"></textarea>
-      <div style="display:flex;gap:10px;margin-top:13px;align-items:center">
+        style="height:140px;padding:12px 13px;line-height:1.55;resize:none;position:relative"></textarea>
+      <div style="display:flex;gap:10px;margin-top:13px;align-items:center;position:relative">
         <button class="zx-btn" onclick="copiarInvitacion()">Copiar invitación</button>
         <button class="zx-btn-2" onclick="cerrarInvita()">Cerrar</button>
         <span style="font-size:11.5px;color:var(--zx-ok-txt);margin-left:auto" id="i-msg"></span>
       </div>
     </div>
 
-    <div class="zx-tarjeta" style="padding:0"><div id="s-lista"></div></div>
+    <div class="rejilla" id="s-metricas" style="margin-bottom:var(--zx-gap)"></div>
+    <div class="rejilla" id="s-lista"></div>
   </section>
 
   <!-- ============ Detalle · staff ============ -->
@@ -185,16 +176,25 @@
       <button class="volver" onclick="verLista()">‹ Cirujanos</button>
       <span style="color:var(--zx-txt-3)">/</span>
       <span style="font-size:12.5px;color:var(--zx-txt)" id="d-nombre"></span>
-      <span style="margin-left:auto" class="zx-pill" id="d-estado"></span>
     </div>
-    <div class="zx-tarjeta" id="d-docs"></div>
+
+    <div class="zx-widget" style="padding:22px;margin-bottom:var(--zx-gap);display:flex;align-items:center;gap:26px">
+      <div style="flex:1;min-width:0;position:relative">
+        <div class="zx-widget-etq">Expediente</div>
+        <div class="zx-titulo" style="font-size:22px;margin-top:9px" id="d-titulo">Documentación del cirujano</div>
+        <p style="font-size:12.5px;color:var(--zx-txt-2);margin:9px 0 0" id="d-esp"></p>
+      </div>
+      <div id="d-anillo" style="position:relative;flex-shrink:0"></div>
+    </div>
+
+    <div class="rejilla" id="d-docs"></div>
   </section>
 </div>
 
 <input type="file" id="picker" class="oculto" accept="image/*,application/pdf">
 
 <!-- Visor: el archivo llega por el motor, nunca por enlace público de Drive. -->
-<div id="visor" class="oculto" style="display:none;position:fixed;inset:0;z-index:99;background:rgba(7,5,14,.86);
+<div id="visor" class="oculto" style="display:none;position:fixed;inset:0;z-index:99;background:rgba(6,4,13,.88);
      align-items:center;justify-content:center;padding:28px" onclick="cerrarVisor(event)">
   <div class="zx-tarjeta" style="max-width:860px;width:100%;max-height:90vh;overflow:auto;padding:18px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
@@ -271,10 +271,9 @@ async function iniciar() {
     // Una sola app, dos caras: cada rol ve su propia estética.
     const raiz = document.documentElement;
     if (SESION.esStaff) {
-      // Consola de trabajo: clara y densa. Quien revisa expedientes ocho horas
+      // Herramienta de trabajo: clara. Quien revisa expedientes ocho horas
       // no necesita espectáculo, necesita leer sin cansarse.
       raiz.dataset.tema = 'claro';
-      raiz.dataset.densidad = 'compacta';
       document.getElementById('yo2').textContent = SESION.nombre || SESION.correo;
       verLista();
     } else {
@@ -288,6 +287,42 @@ async function iniciar() {
     document.getElementById('err').classList.remove('oculto');
     ver('v-acceso');
   }
+}
+
+/* ---------- Anillo de avance ---------- */
+
+/**
+ * El anillo mide avance, no alarma. El estado lo comunican la píldora y el
+ * tinte de la tarjeta: si el anillo se pintara de rojo, el médico confundiría
+ * "voy a la mitad" con "algo está mal".
+ */
+function anillo(listos, total, tam) {
+  const r = tam === 'grande' ? 50 : 23;
+  const w = tam === 'grande' ? 10 : 6;
+  const vb = r * 2 + w + 20, c = vb / 2;
+  const largo = 2 * Math.PI * r;
+  const hecho = total ? (listos / total) * largo : 0;
+  const uid = 'ar' + Math.random().toString(36).slice(2, 8);
+  const completo = listos === total && total > 0;
+
+  const paradas = completo
+    ? '<stop offset="0" stop-color="#0F6E56"/><stop offset="1" stop-color="#4FC2A0"/>'
+    : '<stop offset="0" stop-color="#4231A6"/><stop offset="0.55" stop-color="#A98FE0"/><stop offset="1" stop-color="#E0A9D8"/>';
+
+  return `
+    <svg viewBox="0 0 ${vb} ${vb}" width="${tam === 'grande' ? 116 : 52}" height="${tam === 'grande' ? 116 : 52}"
+         style="flex-shrink:0" role="img">
+      <title>${listos} de ${total} documentos</title><desc>Anillo de avance.</desc>
+      <defs><linearGradient id="${uid}" x1="0" y1="1" x2="1" y2="0">${paradas}</linearGradient></defs>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--zx-pista)" stroke-width="${w}"/>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="url(#${uid})" stroke-width="${w}"
+              stroke-linecap="round" stroke-dasharray="${hecho} ${largo}" transform="rotate(-90 ${c} ${c})"/>
+      <text x="${c}" y="${c + (tam === 'grande' ? -2 : 4)}" text-anchor="middle"
+            font-family="${tam === 'grande' ? 'Space Grotesk, sans-serif' : 'JetBrains Mono, monospace'}"
+            font-size="${tam === 'grande' ? 30 : 12}" fill="var(--zx-txt)">${listos}/${total}</text>
+      ${tam === 'grande' ? `<text x="${c}" y="${c + 18}" text-anchor="middle" font-family="Inter, sans-serif"
+            font-size="9.5" fill="var(--zx-txt-3)">entregados</text>` : ''}
+    </svg>`;
 }
 
 /* ---------- Médico ---------- */
@@ -311,8 +346,7 @@ async function verMio() {
 function pintarSaludo(d) {
   const r = d.resumen, doc = d.medico.corto;
   const fem = /Dra/i.test(d.medico.tratamiento || '');
-  const p = document.getElementById('m-estado');
-  let titulo, mensaje, tono;
+  let titulo, mensaje;
 
   const vencidos = d.documentos.filter(x => x.estado === 'vencido');
   const porVencer = d.documentos.filter(x => x.estado === 'por_vencer')
@@ -323,37 +357,102 @@ function pintarSaludo(d) {
     mensaje = `Antes de su primera cirugía en Zorvix necesitamos tener su documentación en orden. `
             + `Son ${r.total} documentos y puede subirlos desde su celular en unos minutos. `
             + `Después no vuelve a pensar en esto: nosotros le avisamos cuando algo esté por vencer.`;
-    tono = '';
-    p.textContent = `0 de ${r.total}`;
   } else if (vencidos.length) {
     titulo = doc + ', tiene documentación vencida';
     mensaje = vencidos.length === 1
       ? `Su ${vencidos[0].nombre.toLowerCase()} venció hace ${Math.abs(vencidos[0].dias)} días. `
         + `Mientras no esté vigente no podemos programarle cirugías.`
       : `Tiene ${vencidos.length} documentos vencidos. Mientras no estén vigentes no podemos programarle cirugías.`;
-    tono = 'error';
-    p.textContent = 'Acción requerida';
   } else if (r.bloqueado) {
     const faltan = d.documentos.filter(x => x.obligatorio && x.estado === 'falta');
-    titulo = doc + ', le falta ' + (faltan.length === 1 ? 'un documento' : faltan.length + ' documentos');
+    titulo = doc + ', le falta' + (faltan.length === 1 ? ' un documento' : 'n ' + faltan.length + ' documentos');
     mensaje = faltan.length === 1
-      ? `Solo falta su ${faltan[0].nombre.toLowerCase()} y su expediente queda completo.`
-      : `Ya subió ${r.subidos} de ${r.total}. Le faltan: ` +
-        faltan.map(x => x.nombre.toLowerCase()).join(', ') + '.';
-    tono = 'alerta';
-    p.textContent = `${r.subidos} de ${r.total}`;
+      ? `Solo falta su ${faltan[0].nombre.toLowerCase()} y su expediente queda completo. `
+        + `Puede subirlo desde su celular en un minuto.`
+      : `Puede subirlos desde su celular en unos minutos. Nosotros le avisamos cuando algo esté por vencer.`;
   } else {
     titulo = 'Todo en orden, ' + doc;
     mensaje = porVencer
       ? `Su documentación está vigente. Lo próximo que vence es su ${porVencer.nombre.toLowerCase()}, en ${porVencer.dias} días.`
       : `Su documentación está vigente y completa. Le avisaremos con 60 días de anticipación cuando algo esté por vencer.`;
-    tono = 'ok';
-    p.textContent = 'Vigente';
   }
 
   document.getElementById('m-saludo').textContent = titulo;
   document.getElementById('m-mensaje').textContent = mensaje;
-  p.className = 'zx-pill ' + tono;
+  document.getElementById('m-anillo').innerHTML = anillo(r.listos, r.total, 'grande');
+}
+
+/* ---------- Documento ---------- */
+
+const ETIQUETAS = {
+  falta:        ['Falta',       'error'],
+  vencido:      ['Vencido',     'error'],
+  por_vencer:   ['Por vencer',  'alerta'],
+  por_verificar:['En revisión', 'alerta'],
+  rechazado:    ['Rechazado',   'error'],
+  vigente:      ['Vigente',     'ok']
+};
+
+// El tinte de la tarjeta separa listo, en proceso y pendiente antes de
+// que el ojo lea una sola palabra.
+const TINTES = {
+  vigente:      'zx-t-ok',
+  por_verificar:'zx-t-espera',
+  por_vencer:   'zx-t-espera',
+  vencido:      'zx-t-mal',
+  rechazado:    'zx-t-mal',
+  falta:        'zx-t-nada'
+};
+
+function sub(d) {
+  return d.estado === 'por_vencer' ? `Vence en ${d.dias} días`
+       : d.estado === 'vencido'    ? `Venció hace ${Math.abs(d.dias)} días`
+       : d.fechaVence              ? `Vence ${String(d.fechaVence).slice(0,10)}`
+       : d.obligatorio             ? 'Obligatorio' : 'Opcional';
+}
+
+/** Tarjeta de documento. La misma para médico y staff; cambia lo que puede hacer. */
+function tarjetaDoc(d) {
+  const [txt, tono] = ETIQUETAS[d.estado] || ['—',''];
+  const esStaff = SESION && SESION.esStaff;
+  const revisar = esStaff && d.estado === 'por_verificar';
+  return `
+    <div class="zx-widget ${TINTES[d.estado] || ''}">
+      <span class="zx-anillo" style="width:40px;height:40px;position:relative">
+        <i class="ti ${d.credId ? 'ti-file-check' : 'ti-file-plus'}" style="font-size:19px" aria-hidden="true"></i>
+      </span>
+      <div class="doc-nom">${d.nombre}</div>
+      <div class="doc-sub">${sub(d)}${d.nota ? ' · ' + d.nota : ''}</div>
+      <div class="barra-estado"></div>
+      <div class="pie">
+        <span class="zx-pill ${tono}" style="font-size:10px">${txt}</span>
+        ${revisar ? `
+          <button class="zx-btn val-ok" style="margin-left:auto;height:29px;padding:0 12px;font-size:12px"
+                  onclick="event.stopPropagation();validar('${d.credId}', true)">Aprobar</button>
+          <button class="zx-btn-2 val-no" style="height:29px;padding:0 12px;font-size:12px"
+                  onclick="event.stopPropagation();validar('${d.credId}', false)">Rechazar</button>` : ''}
+        ${d.credId ? `<button class="zx-btn-2" style="${revisar ? '' : 'margin-left:auto;'}height:29px;padding:0 13px;font-size:12px"
+             onclick="abrirDoc('${d.credId}')">Ver</button>` : ''}
+        <button class="${d.credId ? 'zx-btn-2' : 'zx-btn'}" style="${d.credId ? '' : 'margin-left:auto;'}height:29px;padding:0 14px;font-size:12px"
+             onclick="pedirArchivo('${d.id}', ${d.vence})">${d.credId ? 'Cambiar' : 'Subir'}</button>
+      </div>
+    </div>`;
+}
+
+/**
+ * Aprobar o rechazar. Al rechazar se pide el motivo: el médico tiene que
+ * saber qué corregir, si no vuelve a subir lo mismo.
+ */
+async function validar(credId, aprobar) {
+  let nota = '';
+  if (!aprobar) {
+    nota = prompt('¿Por qué se rechaza? El médico va a ver este mensaje.\nPor ejemplo: la foto está ilegible.');
+    if (nota === null) return;
+  }
+  try {
+    await api('cirujanos.verificar', { credId, aprobar, nota });
+    verDetalle(MEDICO_ACTIVO);
+  } catch (e) { alert(e.message); }
 }
 
 /* ---------- Staff ---------- */
@@ -410,35 +509,96 @@ function cerrarInvita() {
   document.getElementById('s-invita').classList.add('oculto');
 }
 
+/** Barras del widget de altas: una por médico, altura por avance. */
+function miniBarras(meds) {
+  const n = Math.min(meds.length, 15);
+  if (!n) return '';
+  const anc = 7, sep = 11;
+  const barras = meds.slice(-n).map((m, i) => {
+    const alto = Math.max(5, Math.round((m.listos / (m.total || 1)) * 30));
+    return `<rect x="${i * sep}" y="${34 - alto}" width="${anc}" height="${alto}" rx="3"/>`;
+  }).join('');
+  return `
+    <svg viewBox="0 0 ${n * sep} 34" width="100%" height="34" style="margin-top:12px;position:relative" role="img">
+      <title>Avance por médico</title><desc>Barras de documentación completada.</desc>
+      <defs><linearGradient id="mb" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0" stop-color="var(--zx-grad-a)"/><stop offset="1" stop-color="var(--zx-grad-b)"/>
+      </linearGradient></defs>
+      <g fill="url(#mb)">${barras}</g>
+    </svg>`;
+}
+
+function medidor(parte, total) {
+  const frac = total ? parte / total : 0;
+  return `
+    <svg viewBox="0 0 100 58" width="92" height="54" style="position:relative" role="img">
+      <title>${parte} de ${total}</title><desc>Medidor semicircular.</desc>
+      <defs><linearGradient id="md" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#5B3EAD"/><stop offset="0.6" stop-color="#B9A4EC"/>
+        <stop offset="1" stop-color="#D7A7D8"/></linearGradient></defs>
+      <path d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="var(--zx-pista)" stroke-width="9" stroke-linecap="round"/>
+      <path d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="url(#md)" stroke-width="9" stroke-linecap="round"
+            stroke-dasharray="${(frac * 126).toFixed(1)} 126"/>
+    </svg>`;
+}
+
 async function verLista() {
   ver('v-staff');
+  const met = document.getElementById('s-metricas');
   const c = document.getElementById('s-lista');
   try {
     const meds = await api('cirujanos.listar');
+
+    const porRevisar = meds.reduce((s, m) => s + m.porVerificar, 0);
+    const bloqueados = meds.filter(m => m.bloqueado);
+    const critico = bloqueados[0];
+
+    // El tablero responde primero la pregunta del staff: ¿alguien no puede
+    // operar hoy? Después viene la lista.
+    met.innerHTML = `
+      <div class="zx-widget">
+        <div class="zx-widget-etq">Cirujanos activos</div>
+        <div class="zx-widget-num">${meds.length}</div>
+        ${miniBarras(meds)}
+      </div>
+      <div class="zx-widget">
+        <div class="zx-widget-etq">Por revisar</div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between">
+          <div class="zx-widget-num" ${porRevisar ? 'style="color:var(--zx-alerta-txt)"' : ''}>${porRevisar}</div>
+          ${medidor(porRevisar, Math.max(meds.length, 1))}
+        </div>
+        <div class="zx-widget-pie">Documentos esperando validación</div>
+      </div>
+      <div class="zx-widget ${bloqueados.length ? 'zx-t-mal' : ''}">
+        <div class="zx-widget-etq">No pueden operar</div>
+        <div class="zx-widget-num" ${bloqueados.length ? 'style="color:var(--zx-error-txt)"' : ''}>${bloqueados.length}</div>
+        ${critico
+          ? `<div style="margin-top:14px;position:relative"><span class="zx-pill error" style="font-size:10px">Documentación incompleta</span></div>
+             <div class="zx-widget-pie">${critico.nombre}${bloqueados.length > 1 ? ' y ' + (bloqueados.length - 1) + ' más' : ''}</div>`
+          : '<div class="zx-widget-pie" style="margin-top:14px">Todos con documentación al día</div>'}
+      </div>`;
+
     if (!meds.length) {
-      c.innerHTML = '<p style="padding:16px;color:var(--zx-txt-3);font-size:12.5px">Aún no hay médicos dados de alta.</p>';
+      c.innerHTML = '<p style="grid-column:1/-1;color:var(--zx-txt-3);font-size:12.5px">Aún no hay médicos dados de alta.</p>';
       return;
     }
+
     c.innerHTML = meds.map(m => `
-      <div class="med" onclick="verDetalle('${m.medicoId}')">
-        <span class="punto" style="background:${colorMed(m)}"></span>
-        <span style="flex:1;min-width:0">
-          <span style="font-size:13.5px;color:var(--zx-txt)">${m.nombre}</span>
-          <br><span style="font-size:11px;color:var(--zx-txt-3)">${m.especialidad || m.tipo}</span>
-        </span>
-        ${m.porVerificar ? `<span class="zx-pill alerta" style="font-size:10px">${m.porVerificar} por revisar</span>` : ''}
-        <span class="zx-num" style="width:44px;color:${colorMed(m)}">${m.listos}/${m.total}</span>
+      <div class="zx-widget med ${m.bloqueado ? 'zx-t-mal' : m.porVerificar ? 'zx-t-espera' : 'zx-t-ok'}"
+           onclick="verDetalle('${m.medicoId}')">
+        ${anillo(m.listos, m.total)}
+        <div style="min-width:0;position:relative">
+          <div class="med-nom">${m.nombre}</div>
+          <div class="med-esp">${m.especialidad || m.tipo}</div>
+          <span class="zx-pill ${m.bloqueado ? 'error' : m.porVerificar ? 'alerta' : 'ok'}"
+                style="font-size:10px;margin-top:9px">${
+            m.bloqueado ? 'Incompleto' : m.porVerificar ? m.porVerificar + ' por revisar' : 'Vigente'}</span>
+        </div>
       </div>`).join('');
   } catch (e) {
-    c.innerHTML = `<p style="padding:16px;color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
+    met.innerHTML = '';
+    c.innerHTML = `<p style="grid-column:1/-1;color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
   }
-}
-
-// No informa: prioriza. Rojo es "hoy no puede operar".
-function colorMed(m) {
-  if (m.bloqueado) return 'var(--zx-error)';
-  if (m.proximoVence !== null && m.proximoVence < 60) return 'var(--zx-alerta)';
-  return 'var(--zx-ok)';
 }
 
 async function verDetalle(id) {
@@ -447,94 +607,12 @@ async function verDetalle(id) {
   try {
     const d = await api('cirujanos.detalle', { medicoId: id });
     document.getElementById('d-nombre').textContent = d.medico.nombre;
-    const p = document.getElementById('d-estado');
-    p.textContent = `${d.resumen.listos}/${d.resumen.total}`;
-    p.className = 'zx-pill ' + (d.resumen.bloqueado ? 'error' : 'ok');
-    document.getElementById('d-docs').innerHTML = d.documentos.map(filaDoc).join('');
+    document.getElementById('d-esp').textContent = d.medico.especialidad || d.medico.tipo;
+    document.getElementById('d-anillo').innerHTML = anillo(d.resumen.listos, d.resumen.total, 'grande');
+    document.getElementById('d-docs').innerHTML = d.documentos.map(tarjetaDoc).join('');
   } catch (e) {
-    document.getElementById('d-docs').innerHTML = `<p style="color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
+    document.getElementById('d-docs').innerHTML = `<p style="grid-column:1/-1;color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
   }
-}
-
-/* ---------- Documento ---------- */
-
-const ETIQUETAS = {
-  falta:        ['Falta',        'error'],
-  vencido:      ['Vencido',      'error'],
-  por_vencer:   ['Por vencer',   'alerta'],
-  por_verificar:['En revisión',  'alerta'],
-  rechazado:    ['Rechazado',    'error'],
-  vigente:      ['Vigente',      'ok']
-};
-
-function sub(d) {
-  return d.estado === 'por_vencer' ? `Vence en ${d.dias} días`
-       : d.estado === 'vencido'    ? `Venció hace ${Math.abs(d.dias)} días`
-       : d.fechaVence              ? `Vence ${String(d.fechaVence).slice(0,10)}`
-       : d.obligatorio             ? 'Obligatorio' : 'Opcional';
-}
-
-/** Vista del staff: fila densa, con miniatura y validación. */
-function filaDoc(d) {
-  const [txt, tono] = ETIQUETAS[d.estado] || ['—',''];
-  return `
-    <div class="doc">
-      ${d.credId
-        ? `<button class="zx-mini" onclick="abrirDoc('${d.credId}')" aria-label="Ver ${d.nombre}">
-             <i class="ti ti-file-text" aria-hidden="true"></i></button>`
-        : `<span class="zx-anillo" style="width:34px;height:34px">
-             <i class="ti ti-file-plus" style="font-size:17px" aria-hidden="true"></i></span>`}
-      <span style="flex:1;min-width:0">
-        <span class="doc-nom">${d.nombre}</span>
-        <span class="doc-sub">${sub(d)}${d.nota ? ' · ' + d.nota : ''}</span>
-      </span>
-      <span class="zx-pill ${tono}" style="font-size:10.5px">${txt}</span>
-      ${d.estado === 'por_verificar' ? `
-        <button class="zx-btn val-ok" style="height:30px;padding:0 13px;font-size:12px"
-                onclick="validar('${d.credId}', true)">Aprobar</button>
-        <button class="zx-btn-2 val-no" style="height:30px;padding:0 13px;font-size:12px"
-                onclick="validar('${d.credId}', false)">Rechazar</button>` : ''}
-      ${d.credId ? `<button class="zx-btn-2" style="height:30px;padding:0 12px;font-size:12px"
-           onclick="abrirDoc('${d.credId}')">Ver</button>` : ''}
-      <button class="zx-btn" style="height:30px;padding:0 13px;font-size:12px"
-           onclick="pedirArchivo('${d.id}', ${d.vence})">${d.credId ? 'Cambiar' : 'Subir'}</button>
-    </div>`;
-}
-
-/** Vista del médico: tarjetas de cristal, no una lista de trámites. */
-function tarjetaDoc(d) {
-  const [txt, tono] = ETIQUETAS[d.estado] || ['—',''];
-  return `
-    <div class="tarjeta-doc">
-      <span class="zx-anillo" style="width:42px;height:42px">
-        <i class="ti ${d.credId ? 'ti-file-check' : 'ti-file-plus'}" style="font-size:20px" aria-hidden="true"></i>
-      </span>
-      <div class="td-nom">${d.nombre}</div>
-      <div class="td-sub">${sub(d)}${d.nota ? ' · ' + d.nota : ''}</div>
-      <div class="td-pie">
-        <span class="zx-pill ${tono}" style="font-size:10.5px">${txt}</span>
-        ${d.credId ? `<button class="zx-btn-2" style="margin-left:auto;height:30px;padding:0 12px;font-size:12px"
-             onclick="abrirDoc('${d.credId}')">Ver</button>` : ''}
-        <button class="zx-btn" style="${d.credId ? '' : 'margin-left:auto;'}height:30px;padding:0 14px;font-size:12px"
-             onclick="pedirArchivo('${d.id}', ${d.vence})">${d.credId ? 'Cambiar' : 'Subir'}</button>
-      </div>
-    </div>`;
-}
-
-/**
- * Aprobar o rechazar. Al rechazar se pide el motivo: el médico tiene que
- * saber qué corregir, si no vuelve a subir lo mismo.
- */
-async function validar(credId, aprobar) {
-  let nota = '';
-  if (!aprobar) {
-    nota = prompt('¿Por qué se rechaza? El médico va a ver este mensaje.\nPor ejemplo: la foto está ilegible.');
-    if (nota === null) return;
-  }
-  try {
-    await api('cirujanos.verificar', { credId, aprobar, nota });
-    verDetalle(MEDICO_ACTIVO);
-  } catch (e) { alert(e.message); }
 }
 
 /* ---------- Visor ---------- */
