@@ -30,6 +30,11 @@
   .med:hover { background: var(--zx-hover); }
 
   .punto { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .zx-mini { width:38px; height:46px; flex-shrink:0; border-radius:6px; cursor:pointer;
+             background: var(--zx-acento-tenue); border: var(--zx-hairline) solid var(--zx-borde-fuerte);
+             color: var(--zx-txt-marca); font-size:18px; display:flex; align-items:center;
+             justify-content:center; transition: border-color .2s, box-shadow .2s; }
+  .zx-mini:hover { border-color: var(--zx-violeta-200); box-shadow: 0 0 14px rgba(139,111,212,.45); }
   .oculto{ display:none; }
   .aviso { font-size:12.5px; color: var(--zx-error-txt); background: var(--zx-error-bg);
            border-radius: var(--zx-r-control); padding:10px 13px; margin-top:14px; }
@@ -73,17 +78,14 @@
     </div>
 
     <div class="zx-cristal" style="margin-bottom:var(--zx-gap)">
-      <div style="display:flex;align-items:baseline;justify-content:space-between">
-        <div>
-          <div class="zx-eyebrow">Documentación</div>
-          <div class="zx-titulo" style="margin-top:7px" id="m-resumen">—</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+        <div style="min-width:0">
+          <div class="zx-titulo" style="font-size:24px" id="m-saludo">—</div>
+          <p style="font-size:13px;color:var(--zx-txt-2);margin:11px 0 0;line-height:1.6;max-width:60ch"
+             id="m-mensaje"></p>
         </div>
-        <span class="zx-pill" id="m-estado"></span>
+        <span class="zx-pill" id="m-estado" style="flex-shrink:0"></span>
       </div>
-      <p style="font-size:12px;color:var(--zx-txt-3);margin:12px 0 0;line-height:1.55">
-        Sube una foto legible o el PDF. Te avisamos 60 días antes de que algo venza,
-        para que no tengas que estar pendiente.
-      </p>
     </div>
 
     <div class="zx-tarjeta" id="m-docs"></div>
@@ -144,23 +146,36 @@
 
 <input type="file" id="picker" class="oculto" accept="image/*,application/pdf">
 
+<!-- Visor: el archivo llega por el motor, nunca por enlace público de Drive. -->
+<div id="visor" class="oculto" style="position:fixed;inset:0;z-index:99;background:rgba(7,5,14,.86);
+     display:flex;align-items:center;justify-content:center;padding:28px" onclick="cerrarVisor(event)">
+  <div class="zx-cristal" style="max-width:860px;width:100%;max-height:90vh;overflow:auto;padding:18px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <span style="font-size:13.5px;color:var(--zx-txt)" id="vi-nombre">—</span>
+      <button class="zx-btn-2" style="margin-left:auto;height:32px;padding:0 14px;font-size:12px"
+              onclick="cerrarVisor()">Cerrar</button>
+    </div>
+    <div id="vi-cuerpo" style="text-align:center;color:var(--zx-txt-3);font-size:12.5px">Abriendo…</div>
+  </div>
+</div>
+
 <script>
 window.__gsi = false;
 function gsiListo() { window.__gsi = true; if (window.arrancar) window.arrancar(); }
 function gsiFallo() {
   var e = document.getElementById('err');
-  e.textContent = 'No se pudo cargar el acceso de Google. Revisa tu conexión o desactiva el bloqueador de anuncios para este sitio.';
+  e.textContent = 'No se pudo cargar el acceso de Google. Revise su conexión o desactive el bloqueador de anuncios para este sitio.';
   e.classList.remove('oculto');
 }
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="gsiListo()" onerror="gsiFallo()"></script>
 <script>
 const CONFIG = {
-  GATEWAY:   'https://script.google.com/macros/s/AKfycbz_OAC1XzJ7htPkP5aV__8a9bJkfB3qQw_1OtYdBojgoa5sCq0MjqCfuIO5VlbaEcGm-g/exec',
+  GATEWAY:   'https://script.google.com/macros/s/AKfycbxgRepJF-r5YW0Hhzs7RQ-vhMT7KmXHatUxrOQzB1Gyj8x-v2hjN1vC-Swwk7wtqJ8aSQ/exec',
   CLIENT_ID: '148311031818-4ku0lhia6qd0fgbmi379dvi7k4vp303g.apps.googleusercontent.com'
 };
 
-let SESION = null, MEDICO_ACTIVO = null, DOC_PENDIENTE = null;
+let SESION = null, MEDICO_ACTIVO = null, DOC_PENDIENTE = null, MI_EXPEDIENTE = null;
 
 async function api(action, datos = {}) {
   const token = sessionStorage.getItem('zx_token');
@@ -221,14 +236,65 @@ async function verMio() {
   ver('v-medico');
   try {
     const d = await api('cirujanos.mios');
-    document.getElementById('m-resumen').textContent = `${d.resumen.listos} de ${d.resumen.total} al día`;
-    const p = document.getElementById('m-estado');
-    p.textContent = d.resumen.bloqueado ? 'Acción requerida' : 'Todo en orden';
-    p.className = 'zx-pill ' + (d.resumen.bloqueado ? 'error' : 'ok');
-    document.getElementById('m-docs').innerHTML = d.documentos.map(x => filaDoc(x, true)).join('');
+    MI_EXPEDIENTE = d;
+    pintarSaludo(d);
+    document.getElementById('m-docs').innerHTML = d.documentos.map(filaDoc).join('');
   } catch (e) {
     document.getElementById('m-docs').innerHTML = `<p style="color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
   }
+}
+
+/**
+ * Tres mensajes, no uno fijo. Este médico es un cliente que paga y ésta es
+ * la primera pantalla de Zorvix que ve en su vida: no puede ser un
+ * formulario de recursos humanos.
+ */
+function pintarSaludo(d) {
+  const r = d.resumen, doc = d.medico.corto;
+  const fem = /Dra/i.test(d.medico.tratamiento || '');
+  const p = document.getElementById('m-estado');
+  let titulo, mensaje, tono;
+
+  const vencidos = d.documentos.filter(x => x.estado === 'vencido');
+  const porVencer = d.documentos.filter(x => x.estado === 'por_vencer')
+    .sort((a, b) => a.dias - b.dias)[0];
+
+  if (r.subidos === 0) {
+    titulo = (fem ? 'Bienvenida' : 'Bienvenido') + ', ' + doc;
+    mensaje = `Antes de su primera cirugía en Zorvix necesitamos tener su documentación en orden. `
+            + `Son ${r.total} documentos y puede subirlos desde su celular en unos minutos. `
+            + `Después no vuelve a pensar en esto: nosotros le avisamos cuando algo esté por vencer.`;
+    tono = '';
+    p.textContent = `0 de ${r.total}`;
+  } else if (vencidos.length) {
+    titulo = doc + ', tiene documentación vencida';
+    mensaje = vencidos.length === 1
+      ? `Su ${vencidos[0].nombre.toLowerCase()} venció hace ${Math.abs(vencidos[0].dias)} días. `
+        + `Mientras no esté vigente no podemos programarle cirugías.`
+      : `Tiene ${vencidos.length} documentos vencidos. Mientras no estén vigentes no podemos programarle cirugías.`;
+    tono = 'error';
+    p.textContent = 'Acción requerida';
+  } else if (r.bloqueado) {
+    const faltan = d.documentos.filter(x => x.obligatorio && x.estado === 'falta');
+    titulo = doc + ', le falta ' + (faltan.length === 1 ? 'un documento' : faltan.length + ' documentos');
+    mensaje = faltan.length === 1
+      ? `Solo falta su ${faltan[0].nombre.toLowerCase()} y su expediente queda completo.`
+      : `Ya subió ${r.subidos} de ${r.total}. Le faltan: ` +
+        faltan.map(x => x.nombre.toLowerCase()).join(', ') + '.';
+    tono = 'alerta';
+    p.textContent = `${r.subidos} de ${r.total}`;
+  } else {
+    titulo = 'Todo en orden, ' + doc;
+    mensaje = porVencer
+      ? `Su documentación está vigente. Lo próximo que vence es su ${porVencer.nombre.toLowerCase()}, en ${porVencer.dias} días.`
+      : `Su documentación está vigente y completa. Le avisaremos con 60 días de anticipación cuando algo esté por vencer.`;
+    tono = 'ok';
+    p.textContent = 'Vigente';
+  }
+
+  document.getElementById('m-saludo').textContent = titulo;
+  document.getElementById('m-mensaje').textContent = mensaje;
+  p.className = 'zx-pill ' + tono;
 }
 
 /* ---------- Staff ---------- */
@@ -252,15 +318,7 @@ async function darAlta() {
       tipo: document.getElementById('a-tipo').value,
       correo
     });
-    // El médico no puede entrar hasta que exista en Roles. Decirlo aquí
-    // evita el "lo di de alta y no puede entrar" de la semana siguiente.
-    alert('Médico creado con el identificador ' + r.medicoId +
-          '\n\nPara que pueda entrar, agrégalo en la pestaña Roles del núcleo:' +
-          '\n\nCorreo: ' + (correo || '(falta)') +
-          '\nNombre: ' + nombre +
-          '\nRol: medico' +
-          '\nMedicoID: ' + r.medicoId +
-          '\nActivo: SI');
+    alert('Médico creado con el identificador ' + r.medicoId);
     ['a-nombre','a-esp','a-correo'].forEach(i => document.getElementById(i).value = '');
     verAlta(false);
     verLista();
@@ -307,7 +365,7 @@ async function verDetalle(id) {
     const p = document.getElementById('d-estado');
     p.textContent = `${d.resumen.listos}/${d.resumen.total}`;
     p.className = 'zx-pill ' + (d.resumen.bloqueado ? 'error' : 'ok');
-    document.getElementById('d-docs').innerHTML = d.documentos.map(x => filaDoc(x, true)).join('');
+    document.getElementById('d-docs').innerHTML = d.documentos.map(filaDoc).join('');
   } catch (e) {
     document.getElementById('d-docs').innerHTML = `<p style="color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
   }
@@ -324,27 +382,60 @@ const ETIQUETAS = {
   vigente:      ['Vigente',      'ok']
 };
 
-function filaDoc(d, editable) {
+function filaDoc(d) {
   const [txt, tono] = ETIQUETAS[d.estado] || ['—',''];
   const sub = d.estado === 'por_vencer' ? `Vence en ${d.dias} días`
             : d.estado === 'vencido'    ? `Venció hace ${Math.abs(d.dias)} días`
             : d.fechaVence              ? `Vence ${String(d.fechaVence).slice(0,10)}`
             : d.obligatorio             ? 'Obligatorio' : 'Opcional';
+
+  // El staff necesita ver el documento para verificarlo; el médico solo
+  // necesita saber que ya lo entregó. Por eso la miniatura es del staff.
+  const izq = (SESION && SESION.esStaff && d.credId)
+    ? `<button class="zx-mini" onclick="abrirDoc('${d.credId}')" aria-label="Ver ${d.nombre}">
+         <i class="ti ti-file-text" aria-hidden="true"></i></button>`
+    : `<span class="zx-anillo" style="width:34px;height:34px">
+         <i class="ti ${d.archivo ? 'ti-file-check' : 'ti-file-plus'}" style="font-size:17px" aria-hidden="true"></i></span>`;
+
   return `
     <div class="doc">
-      <span class="zx-anillo" style="width:34px;height:34px">
-        <i class="ti ${d.archivo ? 'ti-file-check' : 'ti-file-plus'}" style="font-size:17px" aria-hidden="true"></i>
-      </span>
+      ${izq}
       <span style="flex:1;min-width:0">
         <span class="doc-nom">${d.nombre}</span>
         <span class="doc-sub">${sub}${d.nota ? ' · ' + d.nota : ''}</span>
       </span>
       <span class="zx-pill ${tono}" style="font-size:10.5px">${txt}</span>
-      ${d.archivo ? `<a href="${d.archivo}" target="_blank" rel="noopener" class="zx-btn-2"
-           style="height:32px;padding:0 13px;font-size:12px;line-height:32px;text-decoration:none">Ver</a>` : ''}
-      ${editable ? `<button class="zx-btn" style="height:32px;padding:0 15px;font-size:12px"
-           onclick="pedirArchivo('${d.id}', ${d.vence})">${d.archivo ? 'Reemplazar' : 'Subir'}</button>` : ''}
+      ${d.credId ? `<button class="zx-btn-2" style="height:32px;padding:0 13px;font-size:12px"
+           onclick="abrirDoc('${d.credId}')">Ver</button>` : ''}
+      <button class="zx-btn" style="height:32px;padding:0 15px;font-size:12px"
+           onclick="pedirArchivo('${d.id}', ${d.vence})">${d.credId ? 'Reemplazar' : 'Subir'}</button>
     </div>`;
+}
+
+/* ---------- Visor ---------- */
+
+async function abrirDoc(credId) {
+  const v = document.getElementById('visor');
+  const cuerpo = document.getElementById('vi-cuerpo');
+  v.classList.remove('oculto');
+  cuerpo.textContent = 'Abriendo…';
+  document.getElementById('vi-nombre').textContent = '';
+  try {
+    const a = await api('cirujanos.archivo', { credId });
+    document.getElementById('vi-nombre').textContent = a.nombre;
+    const src = `data:${a.mime};base64,${a.datos}`;
+    cuerpo.innerHTML = a.mime.indexOf('pdf') > -1
+      ? `<iframe src="${src}" style="width:100%;height:70vh;border:0;border-radius:10px"></iframe>`
+      : `<img src="${src}" alt="${a.nombre}" style="max-width:100%;border-radius:10px">`;
+  } catch (e) {
+    cuerpo.innerHTML = `<p style="color:var(--zx-error-txt)">${e.message}</p>`;
+  }
+}
+
+function cerrarVisor(ev) {
+  if (ev && ev.target.id !== 'visor') return;
+  document.getElementById('visor').classList.add('oculto');
+  document.getElementById('vi-cuerpo').innerHTML = '';
 }
 
 function pedirArchivo(tipo, vence) {
@@ -358,13 +449,13 @@ document.getElementById('picker').onchange = async function () {
   if (!f || !DOC_PENDIENTE) return;
 
   if (f.size > 8 * 1024 * 1024) {
-    alert('El archivo pesa más de 8 MB. Comprímelo o toma la foto en menor calidad.');
+    alert('El archivo pesa más de 8 MB. Comprímalo o tome la foto en menor calidad.');
     return;
   }
 
   let vence = '';
   if (DOC_PENDIENTE.vence) {
-    vence = prompt('¿Cuándo vence este documento? Escríbelo como 2027-05-31');
+    vence = prompt('¿Cuándo vence este documento? Escríbalo como 2027-05-31');
     if (!vence) return;
   }
 
