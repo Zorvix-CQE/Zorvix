@@ -116,7 +116,17 @@
 
 <input type="file" id="picker" class="oculto" accept="image/*,application/pdf">
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+// Se define ANTES de cargar Google: si el script llega primero, ya hay quien lo reciba.
+window.__gsi = false;
+function gsiListo() { window.__gsi = true; if (window.arrancar) window.arrancar(); }
+function gsiFallo() {
+  var e = document.getElementById('err');
+  e.textContent = 'No se pudo cargar el acceso de Google. Revisa tu conexión o desactiva el bloqueador de anuncios para este sitio.';
+  e.classList.remove('oculto');
+}
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="gsiListo()" onerror="gsiFallo()"></script>
 <script>
 const CONFIG = {
   GATEWAY:   'https://script.google.com/macros/s/AKfycbz_OAC1XzJ7htPkP5aV__8a9bJkfB3qQw_1OtYdBojgoa5sCq0MjqCfuIO5VlbaEcGm-g/exec',
@@ -142,3 +152,185 @@ async function api(action, datos = {}) {
 
 function ver(id) {
   ['v-acceso','v-medico','v-staff','v-detalle'].forEach(v =>
+    document.getElementById(v).classList.toggle('oculto', v !== id));
+}
+
+let DOM_LISTO = false, YA_ARRANCO = false;
+
+// El script de Google es async: puede llegar antes o después de que la página
+// termine. Arrancamos cuando ambos estén listos, no cuando uno lo esté.
+window.arrancar = function () {
+  if (!window.__gsi || !DOM_LISTO || YA_ARRANCO) return;
+  YA_ARRANCO = true;
+
+  google.accounts.id.initialize({
+    client_id: CONFIG.CLIENT_ID,
+    callback: r => { sessionStorage.setItem('zx_token', r.credential); iniciar(); },
+    auto_select: true
+  });
+  google.accounts.id.renderButton(document.getElementById('btn-google'),
+    { theme: 'filled_black', size: 'large', width: 320, text: 'continue_with', locale: 'es' });
+
+  if (sessionStorage.getItem('zx_token')) iniciar();
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { DOM_LISTO = true; window.arrancar(); });
+} else { DOM_LISTO = true; window.arrancar(); }
+
+async function iniciar() {
+  try {
+    SESION = await api('cirujanos.sesion');
+    // Una sola app, dos caras. El médico entra y ya está adentro de lo suyo;
+    // nunca ve la lista de sus colegas.
+    if (SESION.esStaff) { document.getElementById('yo2').textContent = SESION.nombre || SESION.correo; verLista(); }
+    else { document.getElementById('yo').textContent = SESION.nombre || SESION.correo; verMio(); }
+  } catch (e) {
+    document.getElementById('err').textContent = e.message;
+    document.getElementById('err').classList.remove('oculto');
+    ver('v-acceso');
+  }
+}
+
+/* ---------- Médico ---------- */
+
+async function verMio() {
+  ver('v-medico');
+  try {
+    const d = await api('cirujanos.mios');
+    document.getElementById('m-resumen').textContent = `${d.resumen.listos} de ${d.resumen.total} al día`;
+    const p = document.getElementById('m-estado');
+    p.textContent = d.resumen.bloqueado ? 'Acción requerida' : 'Todo en orden';
+    p.className = 'zx-pill ' + (d.resumen.bloqueado ? 'error' : 'ok');
+    document.getElementById('m-docs').innerHTML = d.documentos.map(x => filaDoc(x, true)).join('');
+  } catch (e) {
+    document.getElementById('m-docs').innerHTML = `<p style="color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
+  }
+}
+
+/* ---------- Staff ---------- */
+
+async function verLista() {
+  ver('v-staff');
+  const c = document.getElementById('s-lista');
+  try {
+    const meds = await api('cirujanos.listar');
+    if (!meds.length) {
+      c.innerHTML = '<p style="padding:16px;color:var(--zx-txt-3);font-size:12.5px">Aún no hay médicos dados de alta.</p>';
+      return;
+    }
+    c.innerHTML = meds.map(m => `
+      <div class="med" onclick="verDetalle('${m.medicoId}')">
+        <span class="punto" style="background:${colorMed(m)}"></span>
+        <span style="flex:1;min-width:0">
+          <span style="font-size:13.5px;color:var(--zx-txt)">${m.nombre}</span>
+          <br><span style="font-size:11px;color:var(--zx-txt-3)">${m.especialidad || m.tipo}</span>
+        </span>
+        ${m.porVerificar ? `<span class="zx-pill alerta" style="font-size:10px">${m.porVerificar} por revisar</span>` : ''}
+        <span class="zx-num" style="width:44px;color:${colorMed(m)}">${m.listos}/${m.total}</span>
+      </div>`).join('');
+  } catch (e) {
+    c.innerHTML = `<p style="padding:16px;color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
+  }
+}
+
+// No informa: prioriza. Rojo es "hoy no puede operar".
+function colorMed(m) {
+  if (m.bloqueado) return 'var(--zx-error)';
+  if (m.proximoVence !== null && m.proximoVence < 60) return 'var(--zx-alerta)';
+  return 'var(--zx-ok)';
+}
+
+async function verDetalle(id) {
+  MEDICO_ACTIVO = id;
+  ver('v-detalle');
+  try {
+    const d = await api('cirujanos.detalle', { medicoId: id });
+    document.getElementById('d-nombre').textContent = d.medico.nombre;
+    const p = document.getElementById('d-estado');
+    p.textContent = `${d.resumen.listos}/${d.resumen.total}`;
+    p.className = 'zx-pill ' + (d.resumen.bloqueado ? 'error' : 'ok');
+    document.getElementById('d-docs').innerHTML = d.documentos.map(x => filaDoc(x, true)).join('');
+  } catch (e) {
+    document.getElementById('d-docs').innerHTML = `<p style="color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
+  }
+}
+
+/* ---------- Documento ---------- */
+
+const ETIQUETAS = {
+  falta:        ['Falta',        'error'],
+  vencido:      ['Vencido',      'error'],
+  por_vencer:   ['Por vencer',   'alerta'],
+  por_verificar:['En revisión',  'alerta'],
+  rechazado:    ['Rechazado',    'error'],
+  vigente:      ['Vigente',      'ok']
+};
+
+function filaDoc(d, editable) {
+  const [txt, tono] = ETIQUETAS[d.estado] || ['—',''];
+  const sub = d.estado === 'por_vencer' ? `Vence en ${d.dias} días`
+            : d.estado === 'vencido'    ? `Venció hace ${Math.abs(d.dias)} días`
+            : d.fechaVence              ? `Vence ${String(d.fechaVence).slice(0,10)}`
+            : d.obligatorio             ? 'Obligatorio' : 'Opcional';
+  return `
+    <div class="doc">
+      <span class="zx-anillo" style="width:34px;height:34px">
+        <i class="ti ${d.archivo ? 'ti-file-check' : 'ti-file-plus'}" style="font-size:17px" aria-hidden="true"></i>
+      </span>
+      <span style="flex:1;min-width:0">
+        <span class="doc-nom">${d.nombre}</span>
+        <span class="doc-sub">${sub}${d.nota ? ' · ' + d.nota : ''}</span>
+      </span>
+      <span class="zx-pill ${tono}" style="font-size:10.5px">${txt}</span>
+      ${d.archivo ? `<a href="${d.archivo}" target="_blank" rel="noopener" class="zx-btn-2"
+           style="height:32px;padding:0 13px;font-size:12px;line-height:32px;text-decoration:none">Ver</a>` : ''}
+      ${editable ? `<button class="zx-btn" style="height:32px;padding:0 15px;font-size:12px"
+           onclick="pedirArchivo('${d.id}', ${d.vence})">${d.archivo ? 'Reemplazar' : 'Subir'}</button>` : ''}
+    </div>`;
+}
+
+function pedirArchivo(tipo, vence) {
+  DOC_PENDIENTE = { tipo, vence };
+  document.getElementById('picker').click();
+}
+
+document.getElementById('picker').onchange = async function () {
+  const f = this.files[0];
+  this.value = '';
+  if (!f || !DOC_PENDIENTE) return;
+
+  // Se valida aquí y también en el servidor: nunca confíes solo en el navegador.
+  if (f.size > 8 * 1024 * 1024) {
+    alert('El archivo pesa más de 8 MB. Comprímelo o toma la foto en menor calidad.');
+    return;
+  }
+
+  let vence = '';
+  if (DOC_PENDIENTE.vence) {
+    vence = prompt('¿Cuándo vence este documento? Escríbelo como 2027-05-31');
+    if (!vence) return;
+  }
+
+  const base64 = await new Promise((ok, mal) => {
+    const r = new FileReader();
+    r.onload = () => ok(r.result.split(',')[1]);
+    r.onerror = () => mal(new Error('No se pudo leer el archivo.'));
+    r.readAsDataURL(f);
+  });
+
+  try {
+    await api('cirujanos.subir', {
+      medicoId: MEDICO_ACTIVO || undefined,
+      tipo: DOC_PENDIENTE.tipo,
+      vence, archivo: base64,
+      nombreArchivo: f.name, mime: f.type
+    });
+    SESION.esStaff ? verDetalle(MEDICO_ACTIVO) : verMio();
+  } catch (e) {
+    alert(e.message);
+  }
+};
+</script>
+</body>
+</html>
