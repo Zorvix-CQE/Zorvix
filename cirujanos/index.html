@@ -108,24 +108,52 @@
 
     <div class="zx-cristal oculto" id="s-alta" style="margin-bottom:var(--zx-gap)">
       <div class="zx-eyebrow" style="margin-bottom:14px">Nuevo médico</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div><label class="zx-etiqueta" for="a-nombre">Nombre completo</label>
-          <input class="zx-campo" id="a-nombre" placeholder="Dra. Sofía Rivas"></div>
-        <div><label class="zx-etiqueta" for="a-esp">Especialidad</label>
-          <input class="zx-campo" id="a-esp" placeholder="Cirugía plástica"></div>
+      <div style="display:grid;grid-template-columns:100px 1fr 1fr;gap:12px">
+        <div><label class="zx-etiqueta" for="a-titulo">Título</label>
+          <select class="zx-campo" id="a-titulo">
+            <option value="Dr.">Dr.</option>
+            <option value="Dra.">Dra.</option>
+          </select></div>
+        <div><label class="zx-etiqueta" for="a-nombre">Nombre</label>
+          <input class="zx-campo" id="a-nombre" placeholder="Sofía"></div>
+        <div><label class="zx-etiqueta" for="a-apellido">Apellido</label>
+          <input class="zx-campo" id="a-apellido" placeholder="Rivas"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
         <div><label class="zx-etiqueta" for="a-tipo">Función</label>
           <select class="zx-campo" id="a-tipo">
             <option value="cirujano">Cirujano</option>
             <option value="anestesiologo">Anestesiólogo</option>
-            <option value="ayudante">Ayudante</option>
+            <option value="especialista">Otro especialista</option>
           </select></div>
-        <div><label class="zx-etiqueta" for="a-correo">Correo</label>
-          <input class="zx-campo" id="a-correo" type="email" placeholder="nombre@correo.com"></div>
+        <div><label class="zx-etiqueta" for="a-esp">Especialidad</label>
+          <input class="zx-campo" id="a-esp" placeholder="Cirugía plástica"></div>
+      </div>
+      <div style="margin-top:12px">
+        <label class="zx-etiqueta" for="a-correo">Correo de Google</label>
+        <input class="zx-campo" id="a-correo" type="email" placeholder="nombre@gmail.com">
+        <p style="font-size:11px;color:var(--zx-txt-3);margin:7px 0 0">
+          Tiene que ser una cuenta de Google: es con la que va a entrar.
+          Un correo de otro proveedor no le va a funcionar.
+        </p>
       </div>
       <div style="display:flex;gap:10px;margin-top:16px;align-items:center">
-        <button class="zx-btn" onclick="darAlta()">Guardar</button>
+        <button class="zx-btn" onclick="darAlta()">Dar de alta</button>
         <button class="zx-btn-2" onclick="verAlta(false)">Cancelar</button>
         <span style="font-size:11.5px;color:var(--zx-txt-3);margin-left:auto" id="a-msg"></span>
+      </div>
+    </div>
+
+    <!-- Invitación lista para pegar en WhatsApp, que es como les hablan de verdad. -->
+    <div class="zx-cristal oculto" id="s-invita" style="margin-bottom:var(--zx-gap)">
+      <div class="zx-eyebrow" style="margin-bottom:11px">Listo · invítelo</div>
+      <p style="font-size:13px;color:var(--zx-txt-2);margin:0 0 13px;line-height:1.6" id="i-quien"></p>
+      <textarea id="i-texto" class="zx-campo" readonly
+        style="height:140px;padding:12px 13px;line-height:1.55;resize:none"></textarea>
+      <div style="display:flex;gap:10px;margin-top:13px;align-items:center">
+        <button class="zx-btn" onclick="copiarInvitacion()">Copiar invitación</button>
+        <button class="zx-btn-2" onclick="cerrarInvita()">Cerrar</button>
+        <span style="font-size:11.5px;color:var(--zx-ok-txt);margin-left:auto" id="i-msg"></span>
       </div>
     </div>
 
@@ -147,8 +175,8 @@
 <input type="file" id="picker" class="oculto" accept="image/*,application/pdf">
 
 <!-- Visor: el archivo llega por el motor, nunca por enlace público de Drive. -->
-<div id="visor" class="oculto" style="position:fixed;inset:0;z-index:99;background:rgba(7,5,14,.86);
-     display:flex;align-items:center;justify-content:center;padding:28px" onclick="cerrarVisor(event)">
+<div id="visor" class="oculto" style="display:none;position:fixed;inset:0;z-index:99;background:rgba(7,5,14,.86);
+     align-items:center;justify-content:center;padding:28px" onclick="cerrarVisor(event)">
   <div class="zx-cristal" style="max-width:860px;width:100%;max-height:90vh;overflow:auto;padding:18px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <span style="font-size:13.5px;color:var(--zx-txt)" id="vi-nombre">—</span>
@@ -171,7 +199,7 @@ function gsiFallo() {
 <script src="https://accounts.google.com/gsi/client" async defer onload="gsiListo()" onerror="gsiFallo()"></script>
 <script>
 const CONFIG = {
-  GATEWAY:   'https://script.google.com/macros/s/AKfycbxgRepJF-r5YW0Hhzs7RQ-vhMT7KmXHatUxrOQzB1Gyj8x-v2hjN1vC-Swwk7wtqJ8aSQ/exec',
+  GATEWAY:   'https://script.google.com/macros/s/AKfycbw8NKRDlqc2R6ElDouCn62KYUTadUUW_xFBZ2e2gofjK6SsdM1HtxKgyR4KRMk4ZzrVrA/exec',
   CLIENT_ID: '148311031818-4ku0lhia6qd0fgbmi379dvi7k4vp303g.apps.googleusercontent.com'
 };
 
@@ -306,23 +334,49 @@ function verAlta(mostrar) {
 }
 
 async function darAlta() {
-  const nombre = document.getElementById('a-nombre').value.trim();
-  const correo = document.getElementById('a-correo').value.trim().toLowerCase();
+  const g = i => document.getElementById(i).value.trim();
+  const titulo = document.getElementById('a-titulo').value;
+  const nombre = g('a-nombre'), apellido = g('a-apellido'), correo = g('a-correo').toLowerCase();
   const msg = document.getElementById('a-msg');
-  if (!nombre) { msg.textContent = 'Falta el nombre.'; return; }
+  if (!nombre || !apellido) { msg.textContent = 'Faltan nombre y apellido.'; return; }
+  if (!correo) { msg.textContent = 'Falta el correo de Google.'; return; }
 
+  msg.textContent = 'Guardando…';
   try {
-    const r = await api('cirujanos.alta', {
-      nombre,
-      especialidad: document.getElementById('a-esp').value.trim(),
-      tipo: document.getElementById('a-tipo').value,
-      correo
+    await api('cirujanos.alta', {
+      tratamiento: titulo, nombre, apellido, correo,
+      especialidad: g('a-esp'),
+      tipo: document.getElementById('a-tipo').value
     });
-    alert('Médico creado con el identificador ' + r.medicoId);
-    ['a-nombre','a-esp','a-correo'].forEach(i => document.getElementById(i).value = '');
+
+    // El sistema ya lo registró en Roles: nadie tiene que abrir la hoja.
+    const doc = titulo + ' ' + apellido;
+    const enlace = location.origin + location.pathname;
+    document.getElementById('i-quien').textContent =
+      doc + ' ya puede entrar con ' + correo + '. Mándele este mensaje:';
+    document.getElementById('i-texto').value =
+      doc + ', le comparto el acceso al portal de Zorvix para su documentación.\n\n' +
+      enlace + '\n\n' +
+      'Entre con su cuenta de Google ' + correo + '. Ahí puede subir sus documentos ' +
+      'desde el celular y nosotros le avisamos cuando algo esté por vencer.';
+    document.getElementById('s-invita').classList.remove('oculto');
+
+    ['a-nombre','a-apellido','a-esp','a-correo'].forEach(i => document.getElementById(i).value = '');
     verAlta(false);
     verLista();
   } catch (e) { msg.textContent = e.message; }
+}
+
+function copiarInvitacion() {
+  const t = document.getElementById('i-texto');
+  navigator.clipboard.writeText(t.value).then(function () {
+    document.getElementById('i-msg').textContent = 'Copiado';
+    setTimeout(function () { document.getElementById('i-msg').textContent = ''; }, 2500);
+  });
+}
+
+function cerrarInvita() {
+  document.getElementById('s-invita').classList.add('oculto');
 }
 
 async function verLista() {
@@ -395,7 +449,7 @@ function filaDoc(d) {
     ? `<button class="zx-mini" onclick="abrirDoc('${d.credId}')" aria-label="Ver ${d.nombre}">
          <i class="ti ti-file-text" aria-hidden="true"></i></button>`
     : `<span class="zx-anillo" style="width:34px;height:34px">
-         <i class="ti ${d.archivo ? 'ti-file-check' : 'ti-file-plus'}" style="font-size:17px" aria-hidden="true"></i></span>`;
+         <i class="ti ${d.credId ? 'ti-file-check' : 'ti-file-plus'}" style="font-size:17px" aria-hidden="true"></i></span>`;
 
   return `
     <div class="doc">
@@ -417,7 +471,7 @@ function filaDoc(d) {
 async function abrirDoc(credId) {
   const v = document.getElementById('visor');
   const cuerpo = document.getElementById('vi-cuerpo');
-  v.classList.remove('oculto');
+  v.classList.remove('oculto'); v.style.display = 'flex';
   cuerpo.textContent = 'Abriendo…';
   document.getElementById('vi-nombre').textContent = '';
   try {
@@ -434,7 +488,8 @@ async function abrirDoc(credId) {
 
 function cerrarVisor(ev) {
   if (ev && ev.target.id !== 'visor') return;
-  document.getElementById('visor').classList.add('oculto');
+  const v = document.getElementById('visor');
+  v.classList.add('oculto'); v.style.display = 'none';
   document.getElementById('vi-cuerpo').innerHTML = '';
 }
 
