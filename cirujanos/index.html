@@ -18,10 +18,10 @@
   .volver{ background:none; border:none; padding:0; cursor:pointer; font-family:var(--zx-texto);
            font-size:12px; color: var(--zx-txt-3); }
 
-  .doc { display:flex; align-items:center; gap:13px; padding:13px 0;
+  .doc { display:flex; align-items:center; gap:11px; padding:11px 0;
          border-bottom: var(--zx-hairline) solid var(--zx-borde); }
   .doc:last-child { border-bottom: none; }
-  .doc-nom  { font-size: 14px; color: var(--zx-txt); }
+  .doc-nom  { font-size: 13.5px; color: var(--zx-txt); }
   .doc-sub  { font-size: 11.5px; color: var(--zx-txt-3); margin-top: 3px; }
 
   .med { display:flex; align-items:center; gap:12px; padding:12px 14px; cursor:pointer;
@@ -30,11 +30,31 @@
   .med:hover { background: var(--zx-hover); }
 
   .punto { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
-  .zx-mini { width:38px; height:46px; flex-shrink:0; border-radius:6px; cursor:pointer;
+  .zx-mini { width:36px; height:44px; flex-shrink:0; border-radius:6px; cursor:pointer;
              background: var(--zx-acento-tenue); border: var(--zx-hairline) solid var(--zx-borde-fuerte);
-             color: var(--zx-txt-marca); font-size:18px; display:flex; align-items:center;
+             color: var(--zx-txt-marca); font-size:17px; display:flex; align-items:center;
              justify-content:center; transition: border-color .2s, box-shadow .2s; }
   .zx-mini:hover { border-color: var(--zx-violeta-200); box-shadow: 0 0 14px rgba(139,111,212,.45); }
+
+  /* Vista del médico: es un cliente, no un trámite. Cristal y luz. */
+  .rejilla { display:grid; grid-template-columns:repeat(auto-fit,minmax(252px,1fr)); gap:13px; }
+  .tarjeta-doc { position:relative; border-radius:16px; padding:17px;
+    background:linear-gradient(158deg,rgba(155,123,224,.30) 0%,rgba(91,62,173,.17) 55%,rgba(255,255,255,.03) 100%);
+    border:.5px solid rgba(255,255,255,.20);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.18), 0 8px 26px rgba(20,8,54,.45);
+    transition:border-color .3s, box-shadow .3s, background .3s; }
+  .tarjeta-doc:hover { border-color:rgba(224,214,252,.55);
+    background:linear-gradient(158deg,rgba(178,148,242,.40) 0%,rgba(107,81,184,.24) 55%,rgba(255,255,255,.06) 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.30), 0 0 30px rgba(139,111,212,.45), 0 10px 30px rgba(20,8,54,.5); }
+  .tarjeta-doc:hover .zx-anillo { box-shadow:0 0 20px rgba(160,132,232,.7); border-color:rgba(224,214,252,.8); }
+  .td-nom { font-size:14.5px; color:#fff; margin-top:13px; line-height:1.35; }
+  .td-sub { font-size:11.5px; color:rgba(206,198,232,.62); margin-top:5px; }
+  .td-pie { display:flex; align-items:center; gap:8px; margin-top:14px; }
+
+  /* Validación: verde y rojo, no violeta. El color de estado gana. */
+  .val-ok { background:var(--zx-ok); border:none; color:#fff; box-shadow:none; }
+  .val-no { border:.5px solid var(--zx-error); color:var(--zx-error-txt); }
+
   .oculto{ display:none; }
   .aviso { font-size:12.5px; color: var(--zx-error-txt); background: var(--zx-error-bg);
            border-radius: var(--zx-r-control); padding:10px 13px; margin-top:14px; }
@@ -88,7 +108,7 @@
       </div>
     </div>
 
-    <div class="zx-tarjeta" id="m-docs"></div>
+    <div class="rejilla" id="m-docs"></div>
   </section>
 
   <!-- ============ Lista · staff ============ -->
@@ -106,7 +126,7 @@
       <button class="zx-btn" onclick="verAlta(true)">Dar de alta un médico</button>
     </div>
 
-    <div class="zx-cristal oculto" id="s-alta" style="margin-bottom:var(--zx-gap)">
+    <div class="zx-tarjeta oculto" id="s-alta" style="margin-bottom:var(--zx-gap)">
       <div class="zx-eyebrow" style="margin-bottom:14px">Nuevo médico</div>
       <div style="display:grid;grid-template-columns:100px 1fr 1fr;gap:12px">
         <div><label class="zx-etiqueta" for="a-titulo">Título</label>
@@ -134,7 +154,6 @@
         <input class="zx-campo" id="a-correo" type="email" placeholder="nombre@gmail.com">
         <p style="font-size:11px;color:var(--zx-txt-3);margin:7px 0 0">
           Tiene que ser una cuenta de Google: es con la que va a entrar.
-          Un correo de otro proveedor no le va a funcionar.
         </p>
       </div>
       <div style="display:flex;gap:10px;margin-top:16px;align-items:center">
@@ -145,7 +164,7 @@
     </div>
 
     <!-- Invitación lista para pegar en WhatsApp, que es como les hablan de verdad. -->
-    <div class="zx-cristal oculto" id="s-invita" style="margin-bottom:var(--zx-gap)">
+    <div class="zx-tarjeta oculto" id="s-invita" style="margin-bottom:var(--zx-gap)">
       <div class="zx-eyebrow" style="margin-bottom:11px">Listo · invítelo</div>
       <p style="font-size:13px;color:var(--zx-txt-2);margin:0 0 13px;line-height:1.6" id="i-quien"></p>
       <textarea id="i-texto" class="zx-campo" readonly
@@ -177,7 +196,7 @@
 <!-- Visor: el archivo llega por el motor, nunca por enlace público de Drive. -->
 <div id="visor" class="oculto" style="display:none;position:fixed;inset:0;z-index:99;background:rgba(7,5,14,.86);
      align-items:center;justify-content:center;padding:28px" onclick="cerrarVisor(event)">
-  <div class="zx-cristal" style="max-width:860px;width:100%;max-height:90vh;overflow:auto;padding:18px">
+  <div class="zx-tarjeta" style="max-width:860px;width:100%;max-height:90vh;overflow:auto;padding:18px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <span style="font-size:13.5px;color:var(--zx-txt)" id="vi-nombre">—</span>
       <button class="zx-btn-2" style="margin-left:auto;height:32px;padding:0 14px;font-size:12px"
@@ -249,8 +268,21 @@ if (document.readyState === 'loading') {
 async function iniciar() {
   try {
     SESION = await api('cirujanos.sesion');
-    if (SESION.esStaff) { document.getElementById('yo2').textContent = SESION.nombre || SESION.correo; verLista(); }
-    else { document.getElementById('yo').textContent = SESION.nombre || SESION.correo; verMio(); }
+    // Una sola app, dos caras: cada rol ve su propia estética.
+    const raiz = document.documentElement;
+    if (SESION.esStaff) {
+      // Consola de trabajo: clara y densa. Quien revisa expedientes ocho horas
+      // no necesita espectáculo, necesita leer sin cansarse.
+      raiz.dataset.tema = 'claro';
+      raiz.dataset.densidad = 'compacta';
+      document.getElementById('yo2').textContent = SESION.nombre || SESION.correo;
+      verLista();
+    } else {
+      // El médico es un cliente y ésta es su primera impresión de Zorvix.
+      raiz.dataset.tema = 'oscuro';
+      document.getElementById('yo').textContent = SESION.nombre || SESION.correo;
+      verMio();
+    }
   } catch (e) {
     document.getElementById('err').textContent = e.message;
     document.getElementById('err').classList.remove('oculto');
@@ -266,7 +298,7 @@ async function verMio() {
     const d = await api('cirujanos.mios');
     MI_EXPEDIENTE = d;
     pintarSaludo(d);
-    document.getElementById('m-docs').innerHTML = d.documentos.map(filaDoc).join('');
+    document.getElementById('m-docs').innerHTML = d.documentos.map(tarjetaDoc).join('');
   } catch (e) {
     document.getElementById('m-docs').innerHTML = `<p style="color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
   }
@@ -274,8 +306,7 @@ async function verMio() {
 
 /**
  * Tres mensajes, no uno fijo. Este médico es un cliente que paga y ésta es
- * la primera pantalla de Zorvix que ve en su vida: no puede ser un
- * formulario de recursos humanos.
+ * la primera pantalla de Zorvix que ve en su vida.
  */
 function pintarSaludo(d) {
   const r = d.resumen, doc = d.medico.corto;
@@ -436,34 +467,74 @@ const ETIQUETAS = {
   vigente:      ['Vigente',      'ok']
 };
 
+function sub(d) {
+  return d.estado === 'por_vencer' ? `Vence en ${d.dias} días`
+       : d.estado === 'vencido'    ? `Venció hace ${Math.abs(d.dias)} días`
+       : d.fechaVence              ? `Vence ${String(d.fechaVence).slice(0,10)}`
+       : d.obligatorio             ? 'Obligatorio' : 'Opcional';
+}
+
+/** Vista del staff: fila densa, con miniatura y validación. */
 function filaDoc(d) {
   const [txt, tono] = ETIQUETAS[d.estado] || ['—',''];
-  const sub = d.estado === 'por_vencer' ? `Vence en ${d.dias} días`
-            : d.estado === 'vencido'    ? `Venció hace ${Math.abs(d.dias)} días`
-            : d.fechaVence              ? `Vence ${String(d.fechaVence).slice(0,10)}`
-            : d.obligatorio             ? 'Obligatorio' : 'Opcional';
-
-  // El staff necesita ver el documento para verificarlo; el médico solo
-  // necesita saber que ya lo entregó. Por eso la miniatura es del staff.
-  const izq = (SESION && SESION.esStaff && d.credId)
-    ? `<button class="zx-mini" onclick="abrirDoc('${d.credId}')" aria-label="Ver ${d.nombre}">
-         <i class="ti ti-file-text" aria-hidden="true"></i></button>`
-    : `<span class="zx-anillo" style="width:34px;height:34px">
-         <i class="ti ${d.credId ? 'ti-file-check' : 'ti-file-plus'}" style="font-size:17px" aria-hidden="true"></i></span>`;
-
   return `
     <div class="doc">
-      ${izq}
+      ${d.credId
+        ? `<button class="zx-mini" onclick="abrirDoc('${d.credId}')" aria-label="Ver ${d.nombre}">
+             <i class="ti ti-file-text" aria-hidden="true"></i></button>`
+        : `<span class="zx-anillo" style="width:34px;height:34px">
+             <i class="ti ti-file-plus" style="font-size:17px" aria-hidden="true"></i></span>`}
       <span style="flex:1;min-width:0">
         <span class="doc-nom">${d.nombre}</span>
-        <span class="doc-sub">${sub}${d.nota ? ' · ' + d.nota : ''}</span>
+        <span class="doc-sub">${sub(d)}${d.nota ? ' · ' + d.nota : ''}</span>
       </span>
       <span class="zx-pill ${tono}" style="font-size:10.5px">${txt}</span>
-      ${d.credId ? `<button class="zx-btn-2" style="height:32px;padding:0 13px;font-size:12px"
+      ${d.estado === 'por_verificar' ? `
+        <button class="zx-btn val-ok" style="height:30px;padding:0 13px;font-size:12px"
+                onclick="validar('${d.credId}', true)">Aprobar</button>
+        <button class="zx-btn-2 val-no" style="height:30px;padding:0 13px;font-size:12px"
+                onclick="validar('${d.credId}', false)">Rechazar</button>` : ''}
+      ${d.credId ? `<button class="zx-btn-2" style="height:30px;padding:0 12px;font-size:12px"
            onclick="abrirDoc('${d.credId}')">Ver</button>` : ''}
-      <button class="zx-btn" style="height:32px;padding:0 15px;font-size:12px"
-           onclick="pedirArchivo('${d.id}', ${d.vence})">${d.credId ? 'Reemplazar' : 'Subir'}</button>
+      <button class="zx-btn" style="height:30px;padding:0 13px;font-size:12px"
+           onclick="pedirArchivo('${d.id}', ${d.vence})">${d.credId ? 'Cambiar' : 'Subir'}</button>
     </div>`;
+}
+
+/** Vista del médico: tarjetas de cristal, no una lista de trámites. */
+function tarjetaDoc(d) {
+  const [txt, tono] = ETIQUETAS[d.estado] || ['—',''];
+  return `
+    <div class="tarjeta-doc">
+      <span class="zx-anillo" style="width:42px;height:42px">
+        <i class="ti ${d.credId ? 'ti-file-check' : 'ti-file-plus'}" style="font-size:20px" aria-hidden="true"></i>
+      </span>
+      <div class="td-nom">${d.nombre}</div>
+      <div class="td-sub">${sub(d)}${d.nota ? ' · ' + d.nota : ''}</div>
+      <div class="td-pie">
+        <span class="zx-pill ${tono}" style="font-size:10.5px">${txt}</span>
+        ${d.credId ? `<button class="zx-btn-2" style="margin-left:auto;height:30px;padding:0 12px;font-size:12px"
+             onclick="abrirDoc('${d.credId}')">Ver</button>` : ''}
+        <button class="zx-btn" style="${d.credId ? '' : 'margin-left:auto;'}height:30px;padding:0 14px;font-size:12px"
+             onclick="pedirArchivo('${d.id}', ${d.vence})">${d.credId ? 'Cambiar' : 'Subir'}</button>
+      </div>
+    </div>`;
+}
+
+/**
+ * Aprobar o rechazar. Al rechazar se pide el motivo: el médico tiene que
+ * saber qué corregir, si no vuelve a subir lo mismo.
+ */
+async function validar(credId, aprobar) {
+  let nota = '';
+  if (!aprobar) {
+    nota = prompt('¿Por qué se rechaza? El médico va a ver este mensaje.\nPor ejemplo: la foto está ilegible.');
+    if (nota === null) return;
+  }
+  try {
+    await api('cirujanos.verificar', { credId, aprobar, nota });
+    verDetalle(MEDICO_ACTIVO);
+  } catch (e) { alert(e.message); }
 }
 
 /* ---------- Visor ---------- */
