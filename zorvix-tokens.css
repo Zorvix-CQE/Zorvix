@@ -1,15 +1,15 @@
 /* ============================================================
    ZORVIX · Sistema de tokens
-   Version 1.4
+   Version 1.5
 
    Un solo archivo de marca para todo el ecosistema.
    Cambia los hex del bloque MARCA y las apps cambian de piel
    sin tocar una linea de logica.
 
    Registros visuales:
-     [data-tema="oscuro"]  cristal, nodos y glow  -> cliente
-     [data-tema="claro"]   claro con marca        -> staff
-     [data-densidad="..."] compacta | amplia      -> modificadores
+     [data-tema="oscuro"]  negro con nubes de luz lavanda  -> cliente
+     [data-tema="claro"]   claro con marca                 -> staff
+     [data-densidad="..."] compacta | amplia               -> modificadores
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -28,13 +28,14 @@
   --zx-violeta-100: #E2DEEF;
   --zx-violeta-050: #F1EDFB;
 
-  --zx-indigo:  #4231A6;   /* sombra del degradado */
-  --zx-lavanda: #D8C6FC;   /* alto del degradado */
-  --zx-rosa:    #E0A9D8;   /* acento, con reserva */
+  --zx-lavanda:   #D9CBFA;
+  --zx-lavanda-2: #B79BF0;
+  --zx-lavanda-3: #EFE4FF;
+  --zx-rosa:      #E8C4EE;
 
-  --zx-grafito: #535353;   /* color real del wordmark */
+  --zx-grafito: #535353;
   --zx-tinta:   #1C1B22;
-  --zx-noche:   #06040D;
+  --zx-noche:   #05030B;
 
   /* ---------- Estado · gana sobre el color de marca ---------- */
   --zx-ok:      #1D9E75;
@@ -58,7 +59,7 @@
   /* ---------- Geometria ---------- */
   --zx-r-control: 8px;
   --zx-r-tarjeta: 12px;
-  --zx-r-cristal: 18px;
+  --zx-r-cristal: 20px;
   --zx-r-widget:  20px;
   --zx-hairline: 0.5px;
 
@@ -72,7 +73,7 @@
 
   /* ---------- Movimiento ---------- */
   --zx-rapido: .18s;
-  --zx-base:   .28s;
+  --zx-base:   .32s;
   --zx-suave:  cubic-bezier(.22,.61,.36,1);
 }
 
@@ -96,7 +97,6 @@
   --zx-txt-marca:#5B3EAD;
 
   --zx-acento:       #5B3EAD;
-  --zx-acento-hover: #4B3392;
   --zx-acento-tenue: #F1EDFB;
   --zx-sobre-acento: #FFFFFF;
 
@@ -104,10 +104,6 @@
   --zx-glow-boton: 0 1px 2px rgba(91,62,173,.18), 0 4px 12px rgba(91,62,173,.14);
   --zx-glow-boton-hover: 0 2px 4px rgba(91,62,173,.22), 0 8px 22px rgba(91,62,173,.22);
   --zx-glow-icono: drop-shadow(2px 3px 5px rgba(91,62,173,.28));
-
-  --zx-grad-trazo-a: #A98FE0;
-  --zx-grad-trazo-b: #6B51B8;
-  --zx-grad-trazo-c: #33236B;
 
   --zx-pista:  #EFEDF6;
   --zx-grad-a: #C6B4F0;
@@ -118,46 +114,41 @@
 
 /* ============================================================
    REGISTRO OSCURO · cliente, login, portada
+   Negro de base; el color lo ponen las nubes de luz.
    ============================================================ */
 [data-tema="oscuro"] {
-  --zx-lienzo:      #06040D;
-  --zx-superficie:  rgba(255,255,255,.055);
-  --zx-superficie-2:rgba(255,255,255,.03);
-  --zx-hover:       rgba(255,255,255,.09);
+  --zx-lienzo:      #05030B;
+  --zx-superficie:  rgba(255,255,255,.07);
+  --zx-superficie-2:rgba(255,255,255,.04);
+  --zx-hover:       rgba(255,255,255,.11);
 
-  --zx-borde:        rgba(255,255,255,.20);
-  --zx-borde-fuerte: rgba(240,232,255,.62);
+  --zx-borde:        rgba(224,214,252,.32);
+  --zx-borde-fuerte: rgba(240,232,255,.70);
 
   --zx-txt:      #FFFFFF;
-  --zx-txt-2:    rgba(226,219,246,.78);
-  --zx-txt-3:    rgba(226,216,255,.62);
-  --zx-txt-marca:#C6B4F0;
+  --zx-txt-2:    rgba(237,228,255,.84);
+  --zx-txt-3:    rgba(224,214,252,.72);
+  --zx-txt-marca:#E8DEFF;
 
-  --zx-acento:       #5B3EAD;
-  --zx-acento-hover: #6B51B8;
-  --zx-acento-tenue: rgba(139,111,212,.14);
-  --zx-sobre-acento: #FFFFFF;
+  --zx-acento:       #FFFFFF;
+  --zx-acento-tenue: rgba(255,255,255,.10);
+  --zx-sobre-acento: #2A1B55;
 
-  /* anillo pegado al borde + halo cerrado + halo abierto.
-     el anillo es lo que hace que se lea como filo encendido
-     y no como mancha desenfocada. */
-  --zx-glow-boton: 0 0 0 1px rgba(232,222,255,.50),
-                   0 0 12px rgba(168,140,232,.60),
-                   0 0 30px rgba(107,81,184,.42);
-  --zx-glow-boton-hover: 0 0 0 1px rgba(240,232,255,.85),
-                         0 0 18px rgba(180,150,255,.85),
-                         0 0 52px rgba(123,95,199,.60);
-  --zx-glow-icono: drop-shadow(0 0 10px rgba(150,116,235,.55));
+  /* Anillo pegado al borde + halo cerrado + halo abierto. El anillo es lo
+     que hace que se lea como filo encendido y no como mancha borrosa. */
+  --zx-glow-boton: 0 0 0 1px rgba(255,255,255,.50),
+                   0 0 18px rgba(198,180,240,.70),
+                   0 0 44px rgba(150,116,235,.45);
+  --zx-glow-boton-hover: 0 0 0 1px rgba(255,255,255,.85),
+                         0 0 26px rgba(224,214,252,.90),
+                         0 0 62px rgba(168,140,232,.60);
+  --zx-glow-icono: drop-shadow(0 0 10px rgba(198,180,240,.75));
 
-  --zx-grad-trazo-a: #FBF8FF;
-  --zx-grad-trazo-b: #B9A4EC;
-  --zx-grad-trazo-c: #5B3EAD;
+  --zx-pista:  rgba(255,255,255,.13);
+  --zx-grad-a: #8E6FE0;
+  --zx-grad-b: #F2E6FF;
 
-  --zx-pista:  rgba(255,255,255,.09);
-  --zx-grad-a: #4231A6;
-  --zx-grad-b: #D8C6FC;
-
-  --zx-reticula: rgba(255,255,255,.042);
+  --zx-reticula: rgba(255,255,255,.03);
 }
 
 /* ============================================================
@@ -197,6 +188,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.zx-luz { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+          background: var(--zx-lienzo); }
+
+/* ============================================================
+   NUBES DE LUZ
+   Formas desenfocadas, no degradados radiales. Un degradado radial se ve
+   como halo simetrico; una forma con blur se ve como luz cayendo.
+   ============================================================ */
+.zx-nube { position: absolute; border-radius: 50%; filter: blur(78px); pointer-events: none; }
+[data-tema="claro"] .zx-nube { filter: blur(92px); opacity: .45; }
+
 .zx-reticula {
   position: absolute; inset: 0; pointer-events: none;
   background-image:
@@ -204,32 +206,6 @@ body {
     linear-gradient(90deg, var(--zx-reticula) .5px, transparent .5px);
   background-size: 68px 68px;
 }
-
-/* Luz volumetrica. Cuatro capas en oscuro; en claro solo dos lavados. */
-.zx-luz { position: absolute; inset: 0; pointer-events: none; }
-[data-tema="oscuro"] .zx-luz {
-  background:
-    radial-gradient(ellipse 520px 320px at 20% -8%,  rgba(168,140,232,.40), transparent 62%),
-    radial-gradient(ellipse 400px 280px at 92% 30%,  rgba(215,167,216,.16), transparent 66%),
-    radial-gradient(ellipse 540px 400px at 62% 110%, rgba(66,49,166,.44),  transparent 70%),
-    linear-gradient(168deg, #150D31 0%, #0B0720 54%, #06040D 100%);
-}
-[data-tema="claro"] .zx-luz {
-  background:
-    radial-gradient(ellipse 460px 260px at 16% -10%, rgba(169,143,224,.24), transparent 64%),
-    radial-gradient(ellipse 380px 240px at 94% 8%,   rgba(215,167,216,.16), transparent 66%);
-}
-
-/* ============================================================
-   FONDO DE NODOS
-   Constelacion tenue. Da profundidad sin decorar de mas y ata las
-   dos caras del sistema: existe igual en claro y en oscuro.
-   ============================================================ */
-.zx-nodos { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
-[data-tema="oscuro"] .zx-nodos { opacity:.42; --nodo-linea: rgba(198,180,240,.28); --nodo-punto: rgba(216,198,252,.70); }
-[data-tema="claro"]  .zx-nodos { opacity:.50; --nodo-linea: rgba(91,62,173,.14);  --nodo-punto: rgba(91,62,173,.28); }
-.zx-nodos .lineas { stroke: var(--nodo-linea); stroke-width:.5; fill:none; }
-.zx-nodos .puntos { fill: var(--nodo-punto); }
 
 /* ============================================================
    TIPOGRAFIA
@@ -247,11 +223,11 @@ body {
   text-transform: uppercase;
   color: var(--zx-txt-3);
 }
-/* Folios, cifras y tiempos. La mono alineada en columna permite
-   comparar magnitudes sin leer los digitos. */
-.zx-dato { font-family: var(--zx-mono); font-size: var(--zx-txt-dato); }
+/* Folios y cifras. La mono alineada en columna permite comparar
+   magnitudes sin leer los digitos. */
+.zx-dato  { font-family: var(--zx-mono); font-size: var(--zx-txt-dato); }
 .zx-folio { font-family: var(--zx-mono); font-size: 11.5px; color: var(--zx-txt-marca); }
-.zx-num { font-family: var(--zx-mono); font-size: 11.5px; text-align: right; }
+.zx-num   { font-family: var(--zx-mono); font-size: 11.5px; text-align: right; }
 
 /* ============================================================
    SUPERFICIES
@@ -263,54 +239,37 @@ body {
   padding: var(--zx-pad-tarjeta);
 }
 
-/* Cristal. Solo en oscuro y solo en superficies de sintesis:
-   seis a la vez tumban Safari en iPad. */
-.zx-cristal {
+/* Cristal: deja pasar la luz de las nubes que quedan detras. */
+.zx-cristal, .zx-widget {
   position: relative;
   border-radius: var(--zx-r-cristal);
   padding: var(--zx-pad-tarjeta);
-  background: linear-gradient(158deg, rgba(155,123,224,.26) 0%, rgba(91,62,173,.16) 55%, rgba(255,255,255,.04) 100%);
-  border: var(--zx-hairline) solid rgba(255,255,255,.22);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 24px 60px rgba(20,8,54,.6);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  transition: border-color var(--zx-base) var(--zx-suave),
-              box-shadow var(--zx-base) var(--zx-suave);
-}
-.zx-cristal:hover {
-  border-color: var(--zx-borde-fuerte);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.32), 0 0 30px rgba(123,95,199,.35);
-}
-/* Sin backdrop-filter en tactil: obliga a recomponer capas en cada scroll. */
-@media (hover: none) and (pointer: coarse) {
-  .zx-cristal { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(139,111,212,.16); }
-}
-
-/* ============================================================
-   WIDGET · tarjeta de dato con degradado y escala de luz
-   El brillo de la esquina superior es lo que separa "rectangulo con
-   degradado" de "objeto de cristal". Cuesta una linea.
-   ============================================================ */
-.zx-widget {
-  position: relative; border-radius: var(--zx-r-widget); padding: 16px 17px; overflow: hidden;
+  overflow: hidden;
   border: var(--zx-hairline) solid var(--zx-borde);
-  transition: all .32s var(--zx-suave);
+  transition: all var(--zx-base) var(--zx-suave);
 }
-.zx-widget::after {
-  content:''; position:absolute; top:0; left:0; right:0; height:60px; pointer-events:none;
-}
+.zx-widget { padding: 16px 17px; }
+.zx-widget::after { content:''; position:absolute; top:0; left:0; right:0; height:60px; pointer-events:none; }
+
+[data-tema="oscuro"] .zx-cristal,
 [data-tema="oscuro"] .zx-widget {
-  background: linear-gradient(158deg, rgba(168,140,232,.32), rgba(66,49,166,.22) 55%, rgba(255,255,255,.03));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.26), 0 12px 32px rgba(14,6,42,.6);
+  background: linear-gradient(158deg, rgba(198,180,240,.20) 0%, rgba(124,98,196,.13) 52%, rgba(255,255,255,.04) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.34), 0 12px 34px rgba(10,4,30,.60);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 [data-tema="oscuro"] .zx-widget::after {
-  background: radial-gradient(ellipse 130px 54px at 24% 0%, rgba(240,232,255,.24), transparent 70%);
+  background: radial-gradient(ellipse 140px 56px at 24% 0%, rgba(240,232,255,.22), transparent 70%);
 }
+[data-tema="oscuro"] .zx-cristal:hover,
 [data-tema="oscuro"] .zx-widget:hover {
-  border-color: rgba(240,232,255,.62);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.42), 0 0 38px rgba(150,116,235,.5), 0 14px 36px rgba(14,6,42,.65);
+  border-color: var(--zx-borde-fuerte);
+  background: linear-gradient(158deg, rgba(214,200,250,.30) 0%, rgba(150,120,222,.20) 52%, rgba(255,255,255,.07) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 0 42px rgba(186,158,246,.42), 0 14px 40px rgba(10,4,30,.65);
 }
+
 /* En claro el objeto no emite luz: se eleva y proyecta sombra de color. */
+[data-tema="claro"] .zx-cristal,
 [data-tema="claro"] .zx-widget {
   background: #FFFFFF;
   box-shadow: 0 1px 2px rgba(91,62,173,.05), 0 8px 24px rgba(91,62,173,.09);
@@ -318,9 +277,19 @@ body {
 [data-tema="claro"] .zx-widget::after {
   background: radial-gradient(ellipse 180px 90px at 82% -10%, rgba(169,143,224,.16), transparent 68%);
 }
+[data-tema="claro"] .zx-cristal:hover,
 [data-tema="claro"] .zx-widget:hover {
   border-color: var(--zx-violeta-300); transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(91,62,173,.08), 0 12px 30px rgba(91,62,173,.16);
+}
+
+/* Sin backdrop-filter en tactil: obliga a recomponer capas en cada scroll. */
+@media (hover: none) and (pointer: coarse) {
+  [data-tema="oscuro"] .zx-cristal,
+  [data-tema="oscuro"] .zx-widget {
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    background: rgba(198,180,240,.16);
+  }
 }
 
 .zx-widget-etq { position:relative; font-size:10.5px; letter-spacing:.14em;
@@ -330,8 +299,8 @@ body {
   color: var(--zx-txt); margin-top:9px; letter-spacing:-.02em; }
 .zx-widget-pie { position:relative; font-size:11px; color: var(--zx-txt-3); margin-top:8px; }
 
-.zx-widget:hover .zx-anillo { border-color: var(--zx-violeta-200); }
-[data-tema="oscuro"] .zx-widget:hover .zx-anillo { box-shadow: 0 0 22px rgba(160,132,232,.75); color:#fff; }
+.zx-widget:hover .zx-anillo { border-color: var(--zx-borde-fuerte); }
+[data-tema="oscuro"] .zx-widget:hover .zx-anillo { box-shadow: 0 0 22px rgba(224,214,252,.7); color:#fff; }
 
 /* ============================================================
    MOSAICO · tarjeta de modulo y de destino
@@ -343,39 +312,31 @@ body {
   font-family: var(--zx-texto);
   background: var(--zx-superficie);
   border: var(--zx-hairline) solid var(--zx-borde);
-  border-radius: 17px;
+  border-radius: var(--zx-r-widget);
   padding: 17px;
   transition: all var(--zx-base) var(--zx-suave);
 }
 [data-tema="oscuro"] .zx-mosaico {
-  background: linear-gradient(158deg, rgba(155,123,224,.34) 0%, rgba(91,62,173,.20) 52%, rgba(255,255,255,.03) 100%);
-  border-color: rgba(255,255,255,.22);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.20), 0 8px 30px rgba(20,8,54,.55);
+  background: linear-gradient(158deg, rgba(198,180,240,.20) 0%, rgba(124,98,196,.13) 52%, rgba(255,255,255,.04) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.34), 0 12px 34px rgba(10,4,30,.6);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
 }
 .zx-mosaico:hover { border-color: var(--zx-borde-fuerte); }
 [data-tema="oscuro"] .zx-mosaico:hover {
-  background: linear-gradient(158deg, rgba(178,148,242,.46) 0%, rgba(107,81,184,.30) 52%, rgba(255,255,255,.06) 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.32), 0 0 34px rgba(139,111,212,.55), 0 10px 34px rgba(20,8,54,.6);
+  background: linear-gradient(158deg, rgba(214,200,250,.30) 0%, rgba(150,120,222,.20) 52%, rgba(255,255,255,.07) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 0 42px rgba(186,158,246,.42);
 }
-[data-tema="claro"] .zx-mosaico:hover { box-shadow: 0 6px 22px rgba(91,62,173,.14); }
-.zx-mosaico:hover .zx-anillo { border-color: var(--zx-violeta-200); }
-[data-tema="oscuro"] .zx-mosaico:hover .zx-anillo { box-shadow: 0 0 22px rgba(160,132,232,.7); color: #fff; }
+[data-tema="claro"] .zx-mosaico:hover { box-shadow: 0 6px 22px rgba(91,62,173,.14); transform: translateY(-1px); }
+.zx-mosaico:hover .zx-anillo { border-color: var(--zx-borde-fuerte); }
+[data-tema="oscuro"] .zx-mosaico:hover .zx-anillo { box-shadow: 0 0 22px rgba(224,214,252,.7); color:#fff; }
 .zx-mosaico:focus-visible { outline: 2px solid var(--zx-violeta-300); outline-offset: 3px; }
 
 /* Bloqueado se muestra, atenuado: del lado del staff el usuario sabe que
    existe y a quien pedirle acceso. NUNCA en la fachada de clientes. */
 .zx-mosaico[disabled] { opacity: .32; cursor: not-allowed; }
-.zx-mosaico[disabled]:hover { border-color: var(--zx-borde); box-shadow: none; }
-.zx-mosaico-nombre { display:block; font-size: 14.5px; color: var(--zx-txt); margin-top: 13px; }
-.zx-mosaico-desc   { display:block; font-size: 11.5px; color: var(--zx-txt-3); margin-top: 4px; line-height: 1.45; }
-
-/* ============================================================
-   METRICA · cifra de sintesis simple
-   ============================================================ */
-.zx-metrica { background: var(--zx-superficie-2); border-radius: var(--zx-r-control); padding: 13px 14px; }
-.zx-metrica-etq { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--zx-txt-3); }
-.zx-metrica-val { font-family: var(--zx-display); font-size: 24px; color: var(--zx-txt); margin-top: 4px; }
-.zx-metrica-val.dato { font-family: var(--zx-mono); font-size: 19px; }
+.zx-mosaico[disabled]:hover { border-color: var(--zx-borde); box-shadow: none; transform: none; }
+.zx-mosaico-nombre { display:block; font-size: 14.5px; color: var(--zx-txt); margin-top: 13px; position:relative; }
+.zx-mosaico-desc   { display:block; font-size: 11.5px; color: var(--zx-txt-3); margin-top: 4px; line-height: 1.45; position:relative; }
 
 /* ============================================================
    CONTROLES
@@ -392,19 +353,19 @@ body {
   letter-spacing: .03em;
   cursor: pointer;
   box-shadow: var(--zx-glow-boton);
-  transition: box-shadow var(--zx-base) var(--zx-suave),
-              background var(--zx-base) var(--zx-suave);
+  transition: all var(--zx-base) var(--zx-suave);
 }
-[data-tema="oscuro"] .zx-btn { background: linear-gradient(180deg, #A88CE8, #5B3EAD); }
+/* Sobre nubes de luz el violeta se pierde; el blanco encendido jala la mirada. */
+[data-tema="oscuro"] .zx-btn { background: linear-gradient(180deg, #FFFFFF, #E9DEFF); }
 .zx-btn:hover { box-shadow: var(--zx-glow-boton-hover); }
 .zx-btn:focus-visible { outline: 2px solid var(--zx-violeta-300); outline-offset: 2px; }
 
-/* Un solo boton brillante por vista. Si dos brillan igual, el glow deja
-   de ser jerarquia y alguien cancela cuando queria confirmar. */
+/* Un solo boton brillante por vista. Si dos brillan igual, el glow deja de
+   ser jerarquia y alguien cancela cuando queria confirmar. */
 .zx-btn-2 {
   height: var(--zx-alto-control);
   padding: 0 20px;
-  border: var(--zx-hairline) solid var(--zx-borde-fuerte);
+  border: var(--zx-hairline) solid var(--zx-borde);
   border-radius: 11px;
   background: transparent;
   color: var(--zx-txt-2);
@@ -413,7 +374,8 @@ body {
   cursor: pointer;
   transition: all var(--zx-base) var(--zx-suave);
 }
-.zx-btn-2:hover { border-color: var(--zx-violeta-200); color: var(--zx-txt); }
+[data-tema="oscuro"] .zx-btn-2 { background: rgba(255,255,255,.07); color: #EDE4FF; }
+.zx-btn-2:hover { border-color: var(--zx-borde-fuerte); color: var(--zx-txt); }
 .zx-btn-2:focus-visible { outline: 2px solid var(--zx-violeta-300); outline-offset: 2px; }
 
 .zx-campo {
@@ -427,35 +389,36 @@ body {
   font-family: var(--zx-texto);
   font-size: 13px;
 }
-[data-tema="oscuro"] .zx-campo { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.24); }
+[data-tema="oscuro"] .zx-campo { background: rgba(255,255,255,.08); }
 .zx-campo::placeholder { color: var(--zx-txt-3); }
-.zx-campo:focus { outline: none; border-color: var(--zx-violeta-400); box-shadow: 0 0 0 3px var(--zx-acento-tenue); }
+.zx-campo:focus { outline: none; border-color: var(--zx-borde-fuerte); box-shadow: 0 0 0 3px var(--zx-acento-tenue); }
 
 .zx-etiqueta { display:block; font-size: 11.5px; letter-spacing:.06em; color: var(--zx-txt-2); margin-bottom: 7px; }
 
 /* ============================================================
    ICONOS
-   El anillo repite la geometria del simbolo. Contenedor cuando el
-   icono es un destino que se toca; sin contenedor cuando acompana texto.
+   El anillo repite la geometria del simbolo. Contenedor cuando el icono
+   es un destino que se toca; sin contenedor cuando acompana texto.
    ============================================================ */
 .zx-anillo {
-  width: 40px; height: 40px; flex-shrink: 0;
+  width: 40px; height: 40px; flex-shrink: 0; position: relative;
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
   background: var(--zx-acento-tenue);
-  border: var(--zx-hairline) solid var(--zx-borde-fuerte);
+  border: var(--zx-hairline) solid var(--zx-borde);
   color: var(--zx-txt-marca);
   transition: all var(--zx-base) var(--zx-suave);
 }
 [data-tema="oscuro"] .zx-anillo {
-  background: linear-gradient(150deg, rgba(216,198,252,.32), rgba(66,49,166,.26));
+  background: rgba(255,255,255,.14);
   border-color: rgba(232,222,255,.46);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.32), 0 0 15px rgba(150,116,235,.4);
-  color: #F0EAFF;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.42), 0 0 18px rgba(198,180,240,.35);
+  color: #F4EDFF;
 }
+[data-tema="claro"] .zx-anillo { color: var(--zx-violeta-700); }
 
-/* La extrusion solo existe de 48px para arriba. Abajo de eso
-   el desplazamiento se vuelve borron y estorba. */
+/* La extrusion solo existe de 48px para arriba. Abajo de eso el
+   desplazamiento se vuelve borron y estorba. */
 .zx-icono-3d { filter: var(--zx-glow-icono); }
 
 /* ============================================================
@@ -469,28 +432,28 @@ body {
 .zx-pill.ok     { background: var(--zx-ok-bg);     color: var(--zx-ok-txt); }
 .zx-pill.alerta { background: var(--zx-alerta-bg); color: var(--zx-alerta-txt); }
 .zx-pill.error  { background: var(--zx-error-bg);  color: var(--zx-error-txt); }
-[data-tema="oscuro"] .zx-pill.ok     { background: rgba(29,158,117,.24);  color: #9BE1CB; }
-[data-tema="oscuro"] .zx-pill.alerta { background: rgba(186,117,23,.24);  color: #F0C98A; }
-[data-tema="oscuro"] .zx-pill.error  { background: rgba(226,75,74,.24);   color: #F0A9A8; }
+[data-tema="oscuro"] .zx-pill.ok     { background: rgba(168,236,214,.20); color: #C8F4E4; }
+[data-tema="oscuro"] .zx-pill.alerta { background: rgba(255,231,184,.22); color: #FFEDC8; }
+[data-tema="oscuro"] .zx-pill.error  { background: rgba(255,170,170,.22); color: #FFD6D6; }
 
 /* ============================================================
    TABLA · listas que se escanean, no tarjetas que se contemplan
    ============================================================ */
-.zx-tabla { width: 100%; background: var(--zx-superficie); border: var(--zx-hairline) solid var(--zx-borde); border-radius: var(--zx-r-tarjeta); overflow: hidden; }
-.zx-th { display:flex; padding: 7px 12px; background: var(--zx-superficie-2); border-bottom: var(--zx-hairline) solid var(--zx-borde); font-size: 10.5px; letter-spacing:.1em; text-transform: uppercase; color: var(--zx-txt-3); }
-.zx-tr { display:flex; align-items:center; min-height: var(--zx-alto-fila); padding: 0 12px; border-bottom: var(--zx-hairline) solid var(--zx-borde); font-size: var(--zx-txt-cuerpo); }
-.zx-tr:last-child { border-bottom: none; }
+.zx-tabla { width:100%; background: var(--zx-superficie); border: var(--zx-hairline) solid var(--zx-borde); border-radius: var(--zx-r-tarjeta); overflow:hidden; }
+.zx-th { display:flex; padding:7px 12px; background: var(--zx-superficie-2); border-bottom: var(--zx-hairline) solid var(--zx-borde); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color: var(--zx-txt-3); }
+.zx-tr { display:flex; align-items:center; min-height: var(--zx-alto-fila); padding:0 12px; border-bottom: var(--zx-hairline) solid var(--zx-borde); font-size: var(--zx-txt-cuerpo); }
+.zx-tr:last-child { border-bottom:none; }
 .zx-tr:hover { background: var(--zx-hover); }
 
 /* ============================================================
    TINTES DE ESTADO
-   El color del degradado separa listo, en proceso y pendiente antes
-   de que el ojo lea una palabra.
+   El color del degradado separa listo, en proceso y pendiente antes de
+   que el ojo lea una palabra.
    ============================================================ */
-[data-tema="oscuro"] .zx-t-ok     { background:linear-gradient(158deg,rgba(29,158,117,.20),rgba(15,80,70,.15) 55%,rgba(255,255,255,.03)); }
-[data-tema="oscuro"] .zx-t-espera { background:linear-gradient(158deg,rgba(186,117,23,.20),rgba(110,66,20,.15) 55%,rgba(255,255,255,.03)); }
-[data-tema="oscuro"] .zx-t-mal    { background:linear-gradient(158deg,rgba(226,75,74,.22),rgba(120,32,60,.18) 55%,rgba(255,255,255,.03)); border-color:rgba(226,75,74,.42); }
-[data-tema="oscuro"] .zx-t-nada   { background:linear-gradient(158deg,rgba(168,140,232,.13),rgba(66,49,166,.09) 55%,rgba(255,255,255,.02)); }
+[data-tema="oscuro"] .zx-t-ok     { background:linear-gradient(158deg,rgba(168,236,214,.18),rgba(46,158,124,.12) 55%,rgba(255,255,255,.04)); border-color:rgba(168,236,214,.34); }
+[data-tema="oscuro"] .zx-t-espera { background:linear-gradient(158deg,rgba(255,231,184,.18),rgba(201,162,74,.12) 55%,rgba(255,255,255,.04)); border-color:rgba(255,231,184,.34); }
+[data-tema="oscuro"] .zx-t-mal    { background:linear-gradient(158deg,rgba(255,170,170,.18),rgba(180,70,80,.13) 55%,rgba(255,255,255,.04)); border-color:rgba(255,170,170,.38); }
+[data-tema="oscuro"] .zx-t-nada   { background:linear-gradient(158deg,rgba(198,180,240,.10),rgba(124,98,196,.07) 55%,rgba(255,255,255,.02)); border-color:rgba(224,214,252,.20); }
 
 [data-tema="claro"] .zx-t-ok     { background:linear-gradient(158deg,#F1FAF6,#FFFFFF 58%); border-color:#CFE9DE; }
 [data-tema="claro"] .zx-t-espera { background:linear-gradient(158deg,#FFF9EF,#FFFFFF 58%); border-color:#F0DFC0; }
@@ -499,9 +462,9 @@ body {
 
 /* La barra de la tarjeta es una escala de luz en miniatura. */
 .barra-estado { background: var(--zx-pista); }
-.zx-t-ok     .barra-estado { background:linear-gradient(90deg,#0F6E56,#4FC2A0); }
-.zx-t-espera .barra-estado { background:linear-gradient(90deg,#9B7BE0,#E0A9D8); }
-.zx-t-mal    .barra-estado { background:linear-gradient(90deg,#8C2A3A,#E24B4A); }
+.zx-t-ok     .barra-estado { background:linear-gradient(90deg,#2E9E7C,#A8ECD6); }
+.zx-t-espera .barra-estado { background:linear-gradient(90deg,#C9A24A,#FFE7B8); }
+.zx-t-mal    .barra-estado { background:linear-gradient(90deg,#B44650,#FFAAAA); }
 .zx-t-nada   .barra-estado { background: var(--zx-pista); }
 
 /* ============================================================
