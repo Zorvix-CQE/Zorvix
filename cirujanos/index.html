@@ -280,39 +280,108 @@ async function iniciar() {
   }
 }
 
+/* ---------- Escala de datos ---------- */
+
+/**
+ * La direccion del color no la decide el grafico: la decide la polaridad
+ * declarada de la metrica, en la pestana Metricas del nucleo.
+ *
+ *   alto_bueno -> mas es mejor. El arco crece hacia aqua y cierra en palomita.
+ *   alto_malo  -> mas es peor.  El arco crece hacia magenta.
+ *   neutra     -> no hay extremo deseable. Solo magnitud, sin halo de color.
+ *
+ * Regla de marcas: si el grafico tiene varias marcas comparables, la rampa es
+ * textura identica en todas y el dato lo lleva el tamano. Variar el color por
+ * valor ahi crearia agrupaciones falsas: dos barras que caen en azul se leen
+ * como si fueran del mismo tipo, y no lo son.
+ *
+ * Hoy la polaridad va escrita en cada llamada. Cuando Pulso necesite leerla
+ * del Sheet, este objeto se llena desde el motor y no cambia nada mas.
+ */
+const ZX_ESCALA = {
+  alto_malo:  [[0,'#00D2BE'],[0.26,'#2E9BD8'],[0.55,'#7B5FC7'],[0.80,'#B15FD8'],[1,'#F26FCB']],
+  alto_bueno: [[0,'#F26FCB'],[0.20,'#B15FD8'],[0.45,'#7B5FC7'],[0.74,'#2E9BD8'],[1,'#00D2BE']],
+  neutra:     [[0,'#00D2BE'],[0.26,'#2E9BD8'],[0.55,'#7B5FC7'],[0.80,'#B15FD8'],[1,'#F26FCB']]
+};
+
+function zxMezcla(a, b, t) {
+  const h = s => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)];
+  const [r1,g1,b1] = h(a), [r2,g2,b2] = h(b);
+  const v = (x,y) => Math.round(x + (y - x) * t).toString(16).padStart(2,'0');
+  return '#' + v(r1,r2) + v(g1,g2) + v(b1,b2);
+}
+
+/* Color exacto donde termina el arco. Es el que toma el halo. */
+function zxColorEn(frac, pol) {
+  const e = ZX_ESCALA[pol] || ZX_ESCALA.neutra;
+  const f = Math.max(0, Math.min(1, frac));
+  for (let i = 1; i < e.length; i++) {
+    if (f <= e[i][0]) return zxMezcla(e[i-1][1], e[i][1], (f - e[i-1][0]) / (e[i][0] - e[i-1][0]));
+  }
+  return e[e.length - 1][1];
+}
+
+/* Paradas recortadas al tramo que se dibuja y reescaladas a 0-1. Sin esto el
+   arco ensena la rampa completa comprimida y el 20% ya se ve magenta. */
+function zxParadas(frac, pol) {
+  const e = ZX_ESCALA[pol] || ZX_ESCALA.neutra;
+  const f = Math.max(0.001, Math.min(1, frac));
+  const out = [];
+  for (const [p, col] of e) if (p < f) out.push([p / f, col]);
+  out.push([1, zxColorEn(f, pol)]);
+  return out.map(([p, col]) => `<stop offset="${p.toFixed(3)}" stop-color="${col}"/>`).join('');
+}
+
+/* El halo solo existe en oscuro. Sobre el lienzo claro del staff se vuelve
+   una mancha sucia alrededor del trazo. */
+function zxHalo(color, radio) {
+  return document.documentElement.dataset.tema === 'oscuro'
+    ? `filter:drop-shadow(0 0 ${radio}px ${color}b3)`
+    : '';
+}
+
 /* ---------- Anillo de avance ---------- */
 
 /**
- * El anillo mide avance, no alarma. El estado lo comunican la píldora y el
- * tinte de la tarjeta: si el anillo se pintara de rojo, el médico confundiría
- * "voy a la mitad" con "algo está mal".
+ * Metrica docs_entregados: alto_bueno. Arranca en magenta y termina en aqua.
+ * Al completarse, la palomita blanca carga el estado y el arco deja de opinar
+ * en tono: dos verdes concentricos serian redundancia, no enfasis.
  */
 function anillo(listos, total, tam) {
-  const r = tam === 'grande' ? 50 : 23;
-  const w = tam === 'grande' ? 10 : 6;
+  const grande = tam === 'grande';
+  const r = grande ? 50 : 23;
+  const w = grande ? 10 : 6;
   const vb = r * 2 + w + 20, c = vb / 2;
   const largo = 2 * Math.PI * r;
-  const hecho = total ? (listos / total) * largo : 0;
+  const frac = total ? listos / total : 0;
+  const hecho = frac * largo;
   const uid = 'ar' + Math.random().toString(36).slice(2, 8);
   const completo = listos === total && total > 0;
+  const fin = zxColorEn(frac, 'alto_bueno');
+  const s = grande ? 1 : 0.56;
 
-  const paradas = completo
-    ? '<stop offset="0" stop-color="#2E9E7C"/><stop offset="1" stop-color="#C8F4E4"/>'
-    : '<stop offset="0" stop-color="#8E6FE0"/><stop offset="0.55" stop-color="#D9CBFA"/><stop offset="1" stop-color="#F6E4FA"/>';
+  const centro = completo
+    ? `<path d="M ${(c - 13 * s).toFixed(1)} ${(c + 1 * s).toFixed(1)}
+                l ${(9 * s).toFixed(1)} ${(9 * s).toFixed(1)}
+                l ${(20 * s).toFixed(1)} ${(-22 * s).toFixed(1)}"
+             fill="none" stroke="#FFFFFF" stroke-width="${(7 * s).toFixed(1)}"
+             stroke-linecap="round" stroke-linejoin="round"/>`
+    : `<text x="${c}" y="${c + (grande ? -2 : 4)}" text-anchor="middle"
+             font-family="${grande ? 'Space Grotesk, sans-serif' : 'JetBrains Mono, monospace'}"
+             font-size="${grande ? 30 : 12}" fill="var(--zx-txt)">${listos}/${total}</text>
+       ${grande ? `<text x="${c}" y="${c + 18}" text-anchor="middle" font-family="Inter, sans-serif"
+             font-size="9.5" fill="var(--zx-txt-3)">entregados</text>` : ''}`;
 
   return `
-    <svg viewBox="0 0 ${vb} ${vb}" width="${tam === 'grande' ? 116 : 52}" height="${tam === 'grande' ? 116 : 52}"
-         style="flex-shrink:0" role="img">
-      <title>${listos} de ${total} documentos</title><desc>Anillo de avance.</desc>
-      <defs><linearGradient id="${uid}" x1="0" y1="1" x2="1" y2="0">${paradas}</linearGradient></defs>
+    <svg viewBox="0 0 ${vb} ${vb}" width="${grande ? 116 : 52}" height="${grande ? 116 : 52}"
+         style="flex-shrink:0;${zxHalo(fin, grande ? 14 : 8)}" role="img">
+      <title>${listos} de ${total} documentos entregados</title>
+      <desc>${completo ? 'Documentación completa.' : 'Anillo de avance.'}</desc>
+      <defs><linearGradient id="${uid}" x1="0" y1="1" x2="1" y2="0">${zxParadas(frac, 'alto_bueno')}</linearGradient></defs>
       <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--zx-pista)" stroke-width="${w}"/>
       <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="url(#${uid})" stroke-width="${w}"
               stroke-linecap="round" stroke-dasharray="${hecho} ${largo}" transform="rotate(-90 ${c} ${c})"/>
-      <text x="${c}" y="${c + (tam === 'grande' ? -2 : 4)}" text-anchor="middle"
-            font-family="${tam === 'grande' ? 'Space Grotesk, sans-serif' : 'JetBrains Mono, monospace'}"
-            font-size="${tam === 'grande' ? 30 : 12}" fill="var(--zx-txt)">${listos}/${total}</text>
-      ${tam === 'grande' ? `<text x="${c}" y="${c + 18}" text-anchor="middle" font-family="Inter, sans-serif"
-            font-size="9.5" fill="var(--zx-txt-3)">entregados</text>` : ''}
+      ${centro}
     </svg>`;
 }
 
@@ -513,20 +582,22 @@ function miniBarras(meds) {
     <svg viewBox="0 0 ${n * sep} 34" width="100%" height="34" style="margin-top:12px;position:relative" role="img">
       <title>Avance por médico</title><desc>Barras de documentación completada.</desc>
       <defs><linearGradient id="mb" x1="0" y1="1" x2="0" y2="0">
-        <stop offset="0" stop-color="var(--zx-grad-a)"/><stop offset="1" stop-color="var(--zx-grad-b)"/>
+        <stop offset="0" stop-color="var(--zx-d-0)"/><stop offset="0.30" stop-color="var(--zx-d-26)"/>
+        <stop offset="0.62" stop-color="var(--zx-d-55)"/><stop offset="1" stop-color="var(--zx-d-100)"/>
       </linearGradient></defs>
       <g fill="url(#mb)">${barras}</g>
     </svg>`;
 }
 
+/* Metrica docs_por_revisar: alto_malo. Cero pendientes se ve aqua y casi
+   vacio; la cola creciendo empuja el medidor hacia magenta. */
 function medidor(parte, total) {
-  const frac = total ? parte / total : 0;
+  const frac = total ? Math.min(parte / total, 1) : 0;
+  const fin = zxColorEn(frac, 'alto_malo');
   return `
-    <svg viewBox="0 0 100 58" width="92" height="54" style="position:relative" role="img">
-      <title>${parte} de ${total}</title><desc>Medidor semicircular.</desc>
-      <defs><linearGradient id="md" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0" stop-color="var(--zx-grad-a)"/><stop offset="1" stop-color="var(--zx-grad-b)"/>
-      </linearGradient></defs>
+    <svg viewBox="0 0 100 58" width="92" height="54" style="position:relative;${zxHalo(fin, 10)}" role="img">
+      <title>${parte} de ${total} por revisar</title><desc>Medidor semicircular.</desc>
+      <defs><linearGradient id="md" x1="0" y1="0" x2="1" y2="0">${zxParadas(frac, 'alto_malo')}</linearGradient></defs>
       <path d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="var(--zx-pista)" stroke-width="9" stroke-linecap="round"/>
       <path d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="url(#md)" stroke-width="9" stroke-linecap="round"
             stroke-dasharray="${(frac * 126).toFixed(1)} 126"/>
