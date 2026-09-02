@@ -1,6 +1,6 @@
 /* ============================================================
    ZORVIX · Sistema de tokens
-   Version 1.5
+   Version 1.6
 
    Un solo archivo de marca para todo el ecosistema.
    Cambia los hex del bloque MARCA y las apps cambian de piel
@@ -10,6 +10,9 @@
      [data-tema="oscuro"]  negro con nubes de luz lavanda  -> cliente
      [data-tema="claro"]   claro con marca                 -> staff
      [data-densidad="..."] compacta | amplia               -> modificadores
+
+   La escala de datos vive en :root y no se redefine por tema: un dato
+   no cambia de significado porque el fondo sea negro.
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -38,15 +41,33 @@
   --zx-noche:   #05030B;
 
   /* ---------- Estado · gana sobre el color de marca ---------- */
-  --zx-ok:      #1D9E75;
-  --zx-ok-bg:   #E4F0EA;
-  --zx-ok-txt:  #0F6E56;
+  --zx-ok:      #12876B;
+  --zx-ok-bg:   #E2EFEA;
+  --zx-ok-txt:  #0B6350;
   --zx-alerta:      #BA7517;
   --zx-alerta-bg:   #FAEEDA;
   --zx-alerta-txt:  #854F0B;
   --zx-error:      #E24B4A;
   --zx-error-bg:   #FCEBEB;
   --zx-error-txt:  #A32D2D;
+
+  /* ---------- ESCALA DE DATOS ----------
+     Anillos, barras, medidores y lineas. Nunca en botones, bordes,
+     fondos, pildoras de estado ni marca. El violeta de marca es el
+     punto medio: la escala ancla en Zorvix en vez de competirle. */
+  --zx-d-0:   #00D2BE;   /* aqua Petronas       0%  */
+  --zx-d-26:  #2E9BD8;   /* azul puente        26%  */
+  --zx-d-55:  #7B5FC7;   /* violeta de marca   55%  */
+  --zx-d-80:  #B15FD8;   /* violeta claro      80%  */
+  --zx-d-100: #F26FCB;   /* magenta           100%  */
+
+  /* Barras y medidores de CSS puro. Los SVG usan las paradas sueltas. */
+  --zx-escala: linear-gradient(90deg,
+    var(--zx-d-0) 0%, var(--zx-d-26) 26%, var(--zx-d-55) 55%,
+    var(--zx-d-80) 80%, var(--zx-d-100) 100%);
+  --zx-escala-v: linear-gradient(0deg,
+    var(--zx-d-0) 0%, var(--zx-d-26) 30%, var(--zx-d-55) 62%,
+    var(--zx-d-100) 100%);
 
   /* ---------- Tipografia ---------- */
   --zx-display: 'Space Grotesk', system-ui, sans-serif;
@@ -197,7 +218,8 @@ body {
    como halo simetrico; una forma con blur se ve como luz cayendo.
    ============================================================ */
 .zx-nube { position: absolute; border-radius: 50%; filter: blur(78px); pointer-events: none; }
-[data-tema="claro"] .zx-nube { filter: blur(92px); opacity: .45; }
+/* El staff no lleva nubes: el claro es lienzo de trabajo, no portada. */
+[data-tema="claro"] .zx-nube { display: none; }
 
 .zx-reticula {
   position: absolute; inset: 0; pointer-events: none;
@@ -432,7 +454,7 @@ body {
 .zx-pill.ok     { background: var(--zx-ok-bg);     color: var(--zx-ok-txt); }
 .zx-pill.alerta { background: var(--zx-alerta-bg); color: var(--zx-alerta-txt); }
 .zx-pill.error  { background: var(--zx-error-bg);  color: var(--zx-error-txt); }
-[data-tema="oscuro"] .zx-pill.ok     { background: rgba(168,236,214,.20); color: #C8F4E4; }
+[data-tema="oscuro"] .zx-pill.ok     { background: rgba(150,225,200,.20); color: #B8EED9; }
 [data-tema="oscuro"] .zx-pill.alerta { background: rgba(255,231,184,.22); color: #FFEDC8; }
 [data-tema="oscuro"] .zx-pill.error  { background: rgba(255,170,170,.22); color: #FFD6D6; }
 
@@ -450,19 +472,19 @@ body {
    El color del degradado separa listo, en proceso y pendiente antes de
    que el ojo lea una palabra.
    ============================================================ */
-[data-tema="oscuro"] .zx-t-ok     { background:linear-gradient(158deg,rgba(168,236,214,.18),rgba(46,158,124,.12) 55%,rgba(255,255,255,.04)); border-color:rgba(168,236,214,.34); }
+[data-tema="oscuro"] .zx-t-ok     { background:linear-gradient(158deg,rgba(150,225,200,.18),rgba(18,135,107,.13) 55%,rgba(255,255,255,.04)); border-color:rgba(150,225,200,.34); }
 [data-tema="oscuro"] .zx-t-espera { background:linear-gradient(158deg,rgba(255,231,184,.18),rgba(201,162,74,.12) 55%,rgba(255,255,255,.04)); border-color:rgba(255,231,184,.34); }
 [data-tema="oscuro"] .zx-t-mal    { background:linear-gradient(158deg,rgba(255,170,170,.18),rgba(180,70,80,.13) 55%,rgba(255,255,255,.04)); border-color:rgba(255,170,170,.38); }
 [data-tema="oscuro"] .zx-t-nada   { background:linear-gradient(158deg,rgba(198,180,240,.10),rgba(124,98,196,.07) 55%,rgba(255,255,255,.02)); border-color:rgba(224,214,252,.20); }
 
-[data-tema="claro"] .zx-t-ok     { background:linear-gradient(158deg,#F1FAF6,#FFFFFF 58%); border-color:#CFE9DE; }
+[data-tema="claro"] .zx-t-ok     { background:linear-gradient(158deg,#EFF8F4,#FFFFFF 58%); border-color:#C9E5DA; }
 [data-tema="claro"] .zx-t-espera { background:linear-gradient(158deg,#FFF9EF,#FFFFFF 58%); border-color:#F0DFC0; }
 [data-tema="claro"] .zx-t-mal    { background:linear-gradient(158deg,#FFF5F5,#FFFFFF 55%); border-color:#F0C9C9; }
 [data-tema="claro"] .zx-t-nada   { background:#FFFFFF; }
 
 /* La barra de la tarjeta es una escala de luz en miniatura. */
 .barra-estado { background: var(--zx-pista); }
-.zx-t-ok     .barra-estado { background:linear-gradient(90deg,#2E9E7C,#A8ECD6); }
+.zx-t-ok     .barra-estado { background:linear-gradient(90deg,#12876B,#7ED9BC); }
 .zx-t-espera .barra-estado { background:linear-gradient(90deg,#C9A24A,#FFE7B8); }
 .zx-t-mal    .barra-estado { background:linear-gradient(90deg,#B44650,#FFAAAA); }
 .zx-t-nada   .barra-estado { background: var(--zx-pista); }
