@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zorvix · Cirugías</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>">
+<style>
+:root{
+  --tinta:#101828; --tinta2:#475467; --tinta3:#98a2b3;
+  --linea:#e4e7ec; --fondo:#f7f8fa; --papel:#fff;
+  --marca:#1f3864; --marca-cl:#eef2f9;
+  --ok:#067647; --ok-bg:#ecfdf3; --alerta:#b54708; --alerta-bg:#fffaeb;
+  --malo:#b42318; --malo-bg:#fef3f2;
+  --r:12px; --sombra:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+     color:var(--tinta);background:var(--fondo);-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
+button{font:inherit}
+
+/* ── Estructura ─────────────────────────────────────────────── */
+#barra{position:sticky;top:0;z-index:20;background:var(--papel);border-bottom:1px solid var(--linea);
+       padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#marca{font-weight:700;color:var(--marca);letter-spacing:.02em}
+#marca small{font-weight:500;color:var(--tinta3);letter-spacing:0}
+#quien{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--tinta2)}
+#tabs{display:flex;gap:4px;padding:10px 16px 0;flex-wrap:wrap;max-width:1100px;margin:0 auto;width:100%}
+.tab{padding:8px 14px;border-radius:8px 8px 0 0;border:1px solid transparent;border-bottom:none;
+     background:none;color:var(--tinta2);cursor:pointer}
+.tab[aria-selected=true]{background:var(--papel);border-color:var(--linea);color:var(--marca);font-weight:600}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.tarjeta{background:var(--papel);border:1px solid var(--linea);border-radius:var(--r);
+         box-shadow:var(--sombra);padding:18px;margin-bottom:16px}
+.tarjeta h2{font-size:16px;margin-bottom:4px}
+.sub{color:var(--tinta2);font-size:13px;margin-bottom:14px}
+
+/* ── Controles ──────────────────────────────────────────────── */
+.rejilla{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+label{display:block;font-size:12px;font-weight:600;color:var(--tinta2);margin-bottom:5px}
+input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--linea);border-radius:8px;
+  font:inherit;background:var(--papel);color:var(--tinta)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--marca);outline-offset:-1px;border-color:var(--marca)}
+textarea{min-height:70px;resize:vertical}
+.btn{padding:9px 16px;border:1px solid var(--marca);border-radius:8px;background:var(--marca);
+     color:#fff;cursor:pointer;font-weight:600}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sec{background:var(--papel);color:var(--marca)}
+.btn.txt{background:none;border:none;color:var(--marca);text-decoration:underline;padding:4px}
+.fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+
+/* ── Avisos ─────────────────────────────────────────────────── */
+.aviso{padding:11px 13px;border-radius:8px;font-size:13px;margin:10px 0;border:1px solid}
+.aviso.ok{background:var(--ok-bg);border-color:#abefc6;color:var(--ok)}
+.aviso.warn{background:var(--alerta-bg);border-color:#fedf89;color:var(--alerta)}
+.aviso.malo{background:var(--malo-bg);border-color:#fecdca;color:var(--malo)}
+.pastilla{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;
+          background:var(--marca-cl);color:var(--marca)}
+.pastilla.warn{background:var(--alerta-bg);color:var(--alerta)}
+.pastilla.ok{background:var(--ok-bg);color:var(--ok)}
+
+/* ── Listas ─────────────────────────────────────────────────── */
+.caso{border:1px solid var(--linea);border-radius:10px;padding:13px;margin-bottom:10px;cursor:pointer;background:var(--papel)}
+.caso:hover{border-color:var(--marca);background:var(--marca-cl)}
+.caso .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.caso .folio{font-weight:600;color:var(--marca);font-size:13px}
+.caso .nom{font-weight:600}
+.caso .meta{color:var(--tinta2);font-size:13px;margin-top:3px}
+.vacio{color:var(--tinta3);text-align:center;padding:28px 10px;font-size:14px}
+
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--linea)}
+th{font-size:12px;color:var(--tinta2);text-transform:uppercase;letter-spacing:.04em}
+.tabla-scroll{overflow-x:auto}
+
+#cargando{position:fixed;inset:0;background:rgba(255,255,255,.7);display:none;
+          align-items:center;justify-content:center;z-index:50;font-weight:600;color:var(--marca)}
+#cargando.on{display:flex}
+.oculto{display:none !important}
+
+@media (max-width:520px){
+  main{padding:12px}
+  .tarjeta{padding:14px}
+  #tabs{padding:8px 10px 0}
+}
+</style>
+</head>
+<body>
+
+<div id="cargando">Un momento…</div>
+
+<div id="barra">
+  <div id="marca">ZORVIX <small>· Cirugías</small></div>
+  <div id="quien">
+    <span id="quien-txt"></span>
+    <button class="btn sec oculto" id="salir" type="button">Salir</button>
+  </div>
+</div>
+
+<!-- ── Entrada ─────────────────────────────────────────────── -->
+<main id="pantalla-entrada">
+  <div class="tarjeta" style="max-width:440px;margin:8vh auto 0;text-align:center">
+    <h2>Agenda quirúrgica de Zorvix</h2>
+    <p class="sub">Entre con la cuenta de Google que le dieron de alta.</p>
+    <div id="boton-google" style="display:flex;justify-content:center;margin:18px 0"></div>
+    <div id="entrada-error"></div>
+  </div>
+</main>
+
+<!-- ── Aplicación ──────────────────────────────────────────── -->
+<div id="app" class="oculto">
+  <div id="tabs" role="tablist"></div>
+  <main>
+    <div id="aviso-credenciales"></div>
+
+    <!-- Mi agenda -->
+    <section id="vista-agenda" class="vista">
+      <div class="tarjeta">
+        <h2>Casos</h2>
+        <p class="sub" id="agenda-sub"></p>
+        <div id="lista-casos"></div>
+      </div>
+    </section>
+
+    <!-- Reservar -->
+    <section id="vista-reservar" class="vista oculto">
+      <div class="tarjeta">
+        <h2>Reservar tiempo quirúrgico</h2>
+        <p class="sub">El espacio queda apartado en cuanto se guarda. Se libera solo si nadie lo confirma.</p>
+        <div class="rejilla">
+          <div><label>Paquete</label><select id="r-paquete"></select></div>
+          <div><label>Quirófano</label><select id="r-quirofano"></select></div>
+          <div><label>Fecha</label><input type="date" id="r-fecha"></div>
+          <div><label>Hora de inicio</label><input type="time" id="r-hora" step="900"></div>
+          <div><label>Duración estimada (min)</label><input type="number" id="r-duracion" min="30" step="15" value="120"></div>
+          <div><label>Tipo de anestesia</label>
+            <select id="r-anestesia">
+              <option value="">—</option><option>General</option><option>Regional</option>
+              <option>Sedación</option><option>Local</option>
+            </select></div>
+        </div>
+        <div class="fila"><button class="btn sec" id="r-ver" type="button">Ver qué está ocupado</button></div>
+        <div id="r-ocupado"></div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Paciente</h2>
+        <p class="sub">Con estos cuatro datos basta para cerrar el compromiso. La ficha completa la termina Zorvix.</p>
+        <div class="fila" style="margin:0 0 12px">
+          <input id="r-buscar" placeholder="Buscar paciente ya registrado (nombre o teléfono)" style="flex:1;min-width:220px">
+          <button class="btn sec" id="r-buscar-btn" type="button">Buscar</button>
+        </div>
+        <div id="r-resultados"></div>
+        <div class="rejilla" id="r-nuevo">
+          <div><label>Nombre completo</label><input id="p-nombre"></div>
+          <div><label>Fecha de nacimiento</label><input type="date" id="p-nacimiento"></div>
+          <div><label>Teléfono</label><input id="p-telefono" inputmode="tel"></div>
+          <div><label>Correo</label><input id="p-correo" type="email"></div>
+        </div>
+        <div id="r-elegido"></div>
+        <div class="fila">
+          <button class="btn" id="r-guardar" type="button">Apartar el espacio</button>
+          <span id="r-msg"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pendientes -->
+    <section id="vista-pendientes" class="vista oculto">
+      <div class="tarjeta">
+        <h2>Fichas incompletas</h2>
+        <p class="sub">Pacientes con cirugía apartada a los que les falta la ficha de identificación.</p>
+        <div id="p-ficha"></div>
+      </div>
+      <div class="tarjeta">
+        <h2>Preapartos vencidos</h2>
+        <p class="sub">Nadie los confirmó y están ocupando quirófano.</p>
+        <div id="p-preaparto"></div>
+      </div>
+      <div class="tarjeta">
+        <h2>Sin valoración preanestésica</h2>
+        <div id="p-preanestesica"></div>
+      </div>
+    </section>
+
+    <!-- Ficha del paciente -->
+    <section id="vista-ficha" class="vista oculto">
+      <div class="tarjeta">
+        <h2 id="f-titulo">Ficha de identificación</h2>
+        <p class="sub">Los campos marcados son los que la NOM-004 pide en la hoja frontal. La ficha se marca
+          completa sola cuando ya no falta ninguno.</p>
+        <div id="f-estado"></div>
+        <div class="rejilla">
+          <div><label>Nombre completo *</label><input id="f-Nombre_Completo"></div>
+          <div><label>Fecha de nacimiento *</label><input type="date" id="f-Fecha_Nacimiento"></div>
+          <div><label>Sexo *</label><select id="f-Sexo"><option value=""></option><option>Femenino</option><option>Masculino</option></select></div>
+          <div><label>CURP *</label><input id="f-CURP" maxlength="18" style="text-transform:uppercase"></div>
+          <div><label>Teléfono *</label><input id="f-Telefono" inputmode="tel"></div>
+          <div><label>Correo</label><input id="f-Correo" type="email"></div>
+          <div><label>Calle y número *</label><input id="f-Calle_Numero"></div>
+          <div><label>Colonia *</label><input id="f-Colonia"></div>
+          <div><label>Alcaldía o municipio</label><input id="f-Alcaldia_Municipio"></div>
+          <div><label>CP *</label><input id="f-CP" inputmode="numeric"></div>
+          <div><label>Estado civil</label><input id="f-Estado_Civil"></div>
+          <div><label>Ocupación</label><input id="f-Ocupacion"></div>
+        </div>
+        <h3 style="font-size:14px;margin:18px 0 10px">Contacto de urgencia</h3>
+        <div class="rejilla">
+          <div><label>Nombre *</label><input id="f-Contacto_Urgencia_Nombre"></div>
+          <div><label>Parentesco</label><input id="f-Contacto_Urgencia_Parentesco"></div>
+          <div><label>Teléfono *</label><input id="f-Contacto_Urgencia_Telefono" inputmode="tel"></div>
+        </div>
+        <h3 style="font-size:14px;margin:18px 0 10px">Datos que se usan en quirófano</h3>
+        <div class="rejilla">
+          <div><label>Grupo sanguíneo</label>
+            <select id="f-Grupo_Sanguineo"><option value=""></option>
+              <option>O+</option><option>O-</option><option>A+</option><option>A-</option>
+              <option>B+</option><option>B-</option><option>AB+</option><option>AB-</option>
+              <option>Se desconoce</option></select></div>
+          <div><label>¿Tiene alergias?</label>
+            <select id="f-Alergias_Tiene"><option value=""></option><option>No</option>
+              <option>Si</option><option>Se desconoce</option></select></div>
+          <div style="grid-column:1/-1"><label>¿Cuáles?</label><input id="f-Alergias_Cuales"
+            placeholder="Si no se interrogó, déjelo vacío. Nunca escriba «ninguna» por omisión."></div>
+        </div>
+        <div class="fila">
+          <button class="btn" id="f-guardar" type="button">Guardar ficha</button>
+          <button class="btn sec" id="f-volver" type="button">Volver</button>
+          <span id="f-msg"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Detalle del caso -->
+    <section id="vista-caso" class="vista oculto">
+      <div class="tarjeta">
+        <h2 id="c-titulo">Caso</h2>
+        <p class="sub" id="c-sub"></p>
+        <div id="c-detalle"></div>
+        <div class="fila">
+          <button class="btn sec" id="c-ficha" type="button">Abrir ficha del paciente</button>
+          <button class="btn sec" id="c-confirmar" type="button">Confirmar el caso</button>
+          <button class="btn sec" id="c-volver" type="button">Volver</button>
+          <span id="c-msg"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+/* ===========================================================================
+   AltaZorvix — frontend del módulo `cirugias`
+
+   DOS COSAS QUE NO SE PUEDEN CAMBIAR SIN ROMPER LA APP:
+
+   1. credentials:'omit' en TODA llamada al backend. Con varias cuentas de
+      Google abiertas, Google redirige /macros/s/.../exec a /macros/u/<N>/s/…
+      y devuelve 404. Verificado: con omit responde 200, sin omit da 404.
+
+   2. Content-Type 'text/plain'. Con application/json el navegador manda un
+      preflight OPTIONS que Apps Script no contesta, y la llamada muere en CORS.
+      Apps Script recibe el cuerpo igual en e.postData.contents.
+   =========================================================================== */
+
+const API = 'https://script.google.com/macros/s/AKfycbyplldJRxqP20tkrVqOsRUV6dHKBJDJQ2MIE1Fg_-Z1nB34bZYUsJ6TuwlXJxZTlHM/exec';
+const CLIENTE = '148311031818-4ku0lhia6qd0fgbmi379dvi7k4vp303g.apps.googleusercontent.com';
+
+let TOKEN = null, YO = null, PAQUETES = [], CASOS = [], PACIENTE_SEL = null, CASO_SEL = null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function cargando(on){ $('cargando').classList.toggle('on', !!on); }
+
+async function api(accion, datos){
+  cargando(true);
+  try{
+    const r = await fetch(API, {
+      method: 'POST',
+      credentials: 'omit',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify(Object.assign({accion: accion, id_token: TOKEN}, datos || {}))
+    });
+    const txt = await r.text();
+    let j;
+    try { j = JSON.parse(txt); }
+    catch(e){ throw new Error('El servidor respondió algo que no es JSON. ¿Está publicada la versión correcta?'); }
+    if (!j.ok) throw new Error(j.mensaje || j.error || 'Error desconocido');
+    return j;
+  } finally { cargando(false); }
+}
+
+function aviso(destino, clase, texto){
+  $(destino).innerHTML = texto ? '<div class="aviso ' + clase + '">' + esc(texto) + '</div>' : '';
+}
+
+/* ── Entrada ──────────────────────────────────────────────── */
+window.onload = function(){
+  const esperar = setInterval(function(){
+    if (!(window.google && google.accounts && google.accounts.id)) return;
+    clearInterval(esperar);
+    google.accounts.id.initialize({ client_id: CLIENTE, callback: entro });
+    google.accounts.id.renderButton($('boton-google'),
+      {theme:'outline', size:'large', text:'signin_with', locale:'es', width:280});
+  }, 150);
+};
+
+async function entro(resp){
+  TOKEN = resp.credential;
+  try{
+    const s = await api('sesion');
+    YO = s;
+    $('pantalla-entrada').classList.add('oculto');
+    $('app').classList.remove('oculto');
+    $('salir').classList.remove('oculto');
+    $('quien-txt').textContent = s.nombre + ' · ' + s.rol;
+    if (s.rol === 'medico' && !s.credenciales_vigentes){
+      aviso('aviso-credenciales','warn',
+        'No va a poder reservar hasta que sus documentos estén al día. ' + (s.credenciales_motivo||''));
+    }
+    pintaTabs();
+    await Promise.all([cargaPaquetes(), cargaCasos()]);
+  }catch(e){
+    aviso('entrada-error','malo', e.message);
+    TOKEN = null;
+  }
+}
+
+$('salir').onclick = function(){
+  try{ google.accounts.id.disableAutoSelect(); }catch(e){}
+  location.reload();
+};
+
+/* ── Navegación ───────────────────────────────────────────── */
+const VISTAS = {
+  agenda:      {tab:'Casos',      el:'vista-agenda'},
+  reservar:    {tab:'Reservar',   el:'vista-reservar'},
+  pendientes:  {tab:'Pendientes', el:'vista-pendientes'}
+};
+
+function pintaTabs(){
+  const cont = $('tabs'); cont.innerHTML = '';
+  Object.keys(VISTAS).forEach(function(k){
+    if (k === 'pendientes' && !YO.ve_todo) return;
+    if (k === 'reservar' && YO.nivel !== 'escritura') return;
+    const b = document.createElement('button');
+    b.className = 'tab'; b.type = 'button'; b.textContent = VISTAS[k].tab;
+    b.setAttribute('role','tab'); b.dataset.vista = k;
+    b.onclick = function(){ muestra(k); };
+    cont.appendChild(b);
+  });
+  muestra('agenda');
+}
+
+function muestra(k){
+  document.querySelectorAll('.vista').forEach(v => v.classList.add('oculto'));
+  const destino = VISTAS[k] ? VISTAS[k].el : k;
+  $(destino).classList.remove('oculto');
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.setAttribute('aria-selected', String(t.dataset.vista === k));
+  });
+  if (k === 'pendientes') cargaPendientes();
+}
+
+/* ── Casos ────────────────────────────────────────────────── */
+async function cargaCasos(){
+  const r = await api('misCasos', {});
+  CASOS = r.casos || [];
+  $('agenda-sub').textContent = YO.ve_todo
+    ? 'Todos los casos del centro.'
+    : 'Sólo los casos en los que usted participa.';
+  const c = $('lista-casos');
+  if (!CASOS.length){ c.innerHTML = '<div class="vacio">Todavía no hay casos.</div>'; return; }
+  CASOS.sort((a,b) => String(a.Fecha_Cirugia).localeCompare(String(b.Fecha_Cirugia)));
+  c.innerHTML = CASOS.map(function(x){
+    const est = String(x.Estatus_Agenda||'');
+    const clase = est === 'Confirmado' ? 'ok' : (est === 'Preaparto' ? 'warn' : '');
+    return '<div class="caso" data-id="'+esc(x.Caso_ID)+'">' +
+      '<div class="top"><span class="folio">'+esc(x.Folio_Caso)+'</span>' +
+      '<span class="pastilla '+clase+'">'+esc(est)+'</span></div>' +
+      '<div class="nom">'+esc(x.Procedimiento_Principal || 'Procedimiento por definir')+'</div>' +
+      '<div class="meta">'+esc(x.Fecha_Cirugia||'sin fecha')+' · '+esc(x.Hora_Inicio||'')+
+        ' · '+esc(x.Quirofano||'')+'</div></div>';
+  }).join('');
+  c.querySelectorAll('.caso').forEach(function(el){
+    el.onclick = function(){ abreCaso(el.dataset.id); };
+  });
+}
+
+async function abreCaso(id){
+  const r = await api('obtenerCaso', {caso_id:id});
+  CASO_SEL = r.caso; PACIENTE_SEL = r.paciente;
+  $('c-titulo').textContent = r.caso.Folio_Caso;
+  $('c-sub').textContent = (r.paciente ? r.paciente.Nombre_Completo : 'Paciente sin ficha') +
+    ' · ' + (r.caso.Estatus_Agenda||'');
+  const campos = [
+    ['Procedimiento', r.caso.Procedimiento_Principal], ['Fecha', r.caso.Fecha_Cirugia],
+    ['Hora', (r.caso.Hora_Inicio||'') + ' – ' + (r.caso.Hora_Fin||'')],
+    ['Quirófano', r.caso.Quirofano], ['Cama', r.caso.Cama_Asignada],
+    ['Cirujano', r.caso.Cirujano_Email], ['Anestesiólogo', r.caso.Anestesiologo_Email],
+    ['Tipo de anestesia', r.caso.Tipo_Anestesia], ['Paquete', r.caso.Paquete_ID]
+  ];
+  $('c-detalle').innerHTML = '<div class="tabla-scroll"><table>' + campos.map(function(f){
+    return '<tr><th style="width:180px">'+esc(f[0])+'</th><td>'+esc(f[1]||'—')+'</td></tr>';
+  }).join('') + '</table></div>';
+  $('c-confirmar').classList.toggle('oculto',
+    !(r.puedo_editar && String(r.caso.Estatus_Agenda) === 'Preaparto'));
+  $('c-ficha').classList.toggle('oculto', !r.paciente);
+  $('c-msg').textContent = '';
+  muestra('vista-caso');
+}
+
+$('c-volver').onclick = function(){ muestra('agenda'); };
+$('c-ficha').onclick  = function(){ abreFicha(PACIENTE_SEL); };
+$('c-confirmar').onclick = async function(){
+  try{
+    await api('actualizarCaso', {caso_id: CASO_SEL.Caso_ID,
+      cambios: {Estatus_Agenda:'Confirmado', Timestamp_Confirmacion: new Date().toISOString()}});
+    $('c-msg').innerHTML = '<span class="pastilla ok">Confirmado</span>';
+    await cargaCasos();
+  }catch(e){ $('c-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>'; }
+};
+
+/* ── Reservar ─────────────────────────────────────────────── */
+async function cargaPaquetes(){
+  try{
+    const r = await api('paquetes');
+    PAQUETES = r.paquetes || [];
+  }catch(e){ PAQUETES = []; }
+  const s = $('r-paquete');
+  s.innerHTML = '<option value="">— elija el procedimiento —</option>' + PAQUETES.map(function(p){
+    return '<option value="'+esc(p.Paquete_ID)+'" data-min="'+esc(p.Minutos_Quirofano_Incluidos||'')+
+           '" data-q="'+esc(p.Quirofano_Elegible||'')+'">'+esc(p.Nombre||p.Paquete_ID)+'</option>';
+  }).join('');
+  s.onchange = function(){
+    const o = s.selectedOptions[0];
+    if (o && o.dataset.min) $('r-duracion').value = o.dataset.min;
+  };
+  try{
+    const d = await api('disponibilidad', {dias: 30});
+    $('r-quirofano').innerHTML = '<option value="">— quirófano —</option>' +
+      (d.quirofanos||[]).map(function(q){
+        return '<option value="'+esc(q.id)+'">'+esc(q.nombre)+
+               (q.minutos_max ? ' (hasta '+esc(q.minutos_max)+' min)' : '')+'</option>';
+      }).join('');
+  }catch(e){ /* el backend ya avisó */ }
+}
+
+$('r-ver').onclick = async function(){
+  try{
+    const d = await api('disponibilidad', {dias: 30});
+    const q = $('r-quirofano').value;
+    const items = (d.ocupado||[]).filter(o => !q || o.quirofano === q);
+    $('r-ocupado').innerHTML = items.length
+      ? '<div class="tabla-scroll"><table><tr><th>Quirófano</th><th>Desde</th><th>Hasta</th><th>Qué</th></tr>' +
+        items.map(o => '<tr><td>'+esc(o.quirofano)+'</td><td>'+esc(o.inicio.replace('T',' '))+
+          '</td><td>'+esc(o.fin.replace('T',' '))+'</td><td>'+esc(o.motivo)+'</td></tr>').join('') +
+        '</table></div>'
+      : '<div class="aviso ok">Sin nada ocupado en los próximos 30 días.</div>';
+  }catch(e){ aviso('r-ocupado','malo', e.message); }
+};
+
+$('r-buscar-btn').onclick = async function(){
+  const q = $('r-buscar').value.trim();
+  if (q.length < 3){ aviso('r-resultados','warn','Escriba al menos tres letras.'); return; }
+  try{
+    const r = await api('buscarPaciente', {q:q});
+    if (!r.pacientes.length){ aviso('r-resultados','warn','Sin coincidencias. Capture los datos abajo.'); return; }
+    $('r-resultados').innerHTML = r.pacientes.map(function(p){
+      return '<div class="caso" data-pid="'+esc(p.Paciente_ID)+'"><div class="nom">'+
+        esc(p.Nombre_Completo)+'</div><div class="meta">'+esc(p.Paciente_ID)+' · '+
+        esc(p.Telefono||'')+'</div></div>';
+    }).join('');
+    $('r-resultados').querySelectorAll('[data-pid]').forEach(function(el){
+      el.onclick = function(){
+        PACIENTE_SEL = {Paciente_ID: el.dataset.pid};
+        $('r-elegido').innerHTML = '<div class="aviso ok">Paciente seleccionado: ' +
+          esc(el.querySelector('.nom').textContent) + '</div>';
+        $('r-nuevo').classList.add('oculto');
+        $('r-resultados').innerHTML = '';
+      };
+    });
+  }catch(e){ aviso('r-resultados','malo', e.message); }
+};
+
+$('r-guardar').onclick = async function(){
+  const datos = {
+    Quirofano: $('r-quirofano').value,
+    Fecha_Cirugia: $('r-fecha').value,
+    Hora_Inicio: $('r-hora').value,
+    Duracion_Estimada_Min: $('r-duracion').value,
+    Tiempo_Bloqueado_Min: $('r-duracion').value,
+    Paquete_ID: $('r-paquete').value,
+    Procedimiento_Principal: ($('r-paquete').selectedOptions[0]||{}).textContent || '',
+    Tipo_Anestesia: $('r-anestesia').value
+  };
+  if (PACIENTE_SEL && PACIENTE_SEL.Paciente_ID){
+    datos.Paciente_ID = PACIENTE_SEL.Paciente_ID;
+  } else {
+    datos.Nombre_Completo = $('p-nombre').value.trim();
+    datos.Fecha_Nacimiento = $('p-nacimiento').value;
+    datos.Telefono = $('p-telefono').value.trim();
+    datos.Correo = $('p-correo').value.trim();
+  }
+  /* El anestesiólogo es obligatorio del lado del backend: sin él no puede
+     entrar después a escribir su preanestésica. Aquí sólo se avisa antes. */
+  if (!datos.Quirofano || !datos.Fecha_Cirugia || !datos.Hora_Inicio){
+    aviso('r-msg','warn','Faltan quirófano, fecha u hora.'); return;
+  }
+  try{
+    const r = await api('crearCaso', datos);
+    $('r-msg').innerHTML = '<span class="pastilla ok">Apartado: ' + esc(r.folio) + '</span>';
+    PACIENTE_SEL = null;
+    ['p-nombre','p-nacimiento','p-telefono','p-correo','r-buscar'].forEach(i => $(i).value = '');
+    $('r-elegido').innerHTML = ''; $('r-nuevo').classList.remove('oculto');
+    await cargaCasos();
+  }catch(e){ $('r-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>'; }
+};
+
+/* ── Pendientes ───────────────────────────────────────────── */
+async function cargaPendientes(){
+  try{
+    const r = await api('pendientes');
+    pinta('p-ficha', r.ficha_incompleta, function(x){
+      return '<div class="caso" data-id="'+esc(x.Caso_ID)+'"><div class="nom">'+esc(x.paciente)+
+        '</div><div class="meta">'+esc(x.Folio_Caso)+' · cirugía '+esc(x.Fecha_Cirugia||'sin fecha')+'</div></div>';
+    });
+    pinta('p-preaparto', r.preaparto_vencido, function(x){
+      return '<div class="caso" data-id="'+esc(x.Caso_ID)+'"><div class="nom">'+esc(x.Folio_Caso)+
+        '</div><div class="meta">venció '+esc(x.vencio)+'</div></div>';
+    });
+    pinta('p-preanestesica', r.sin_preanestesica, function(x){
+      return '<div class="caso" data-id="'+esc(x.Caso_ID)+'"><div class="nom">'+esc(x.Folio_Caso)+
+        '</div><div class="meta">cirugía '+esc(x.Fecha_Cirugia||'sin fecha')+'</div></div>';
+    });
+  }catch(e){ aviso('p-ficha','malo', e.message); }
+}
+
+function pinta(destino, lista, fn){
+  const c = $(destino);
+  c.innerHTML = (lista && lista.length) ? lista.map(fn).join('')
+    : '<div class="vacio">Nada pendiente.</div>';
+  c.querySelectorAll('[data-id]').forEach(function(el){
+    el.onclick = function(){ abreCaso(el.dataset.id); };
+  });
+}
+
+/* ── Ficha ────────────────────────────────────────────────── */
+const CAMPOS_FICHA = ['Nombre_Completo','Fecha_Nacimiento','Sexo','CURP','Telefono','Correo',
+  'Calle_Numero','Colonia','Alcaldia_Municipio','CP','Estado_Civil','Ocupacion',
+  'Contacto_Urgencia_Nombre','Contacto_Urgencia_Parentesco','Contacto_Urgencia_Telefono',
+  'Grupo_Sanguineo','Alergias_Tiene','Alergias_Cuales'];
+
+async function abreFicha(pac){
+  if (!pac) return;
+  const r = await api('obtenerPaciente', {paciente_id: pac.Paciente_ID});
+  PACIENTE_SEL = r.paciente;
+  $('f-titulo').textContent = 'Ficha · ' + (r.paciente.Nombre_Completo || r.paciente.Paciente_ID);
+  CAMPOS_FICHA.forEach(function(k){
+    const el = $('f-' + k);
+    if (el) el.value = r.paciente[k] == null ? '' : r.paciente[k];
+  });
+  $('f-estado').innerHTML = String(r.paciente.Ficha_Completa).toLowerCase() === 'si'
+    ? '<div class="aviso ok">Ficha completa.</div>'
+    : '<div class="aviso warn">Ficha incompleta.</div>';
+  $('f-msg').textContent = '';
+  muestra('vista-ficha');
+}
+
+$('f-volver').onclick = function(){ muestra('agenda'); };
+$('f-guardar').onclick = async function(){
+  const cambios = {};
+  CAMPOS_FICHA.forEach(function(k){
+    const el = $('f-' + k);
+    if (el && el.value !== '') cambios[k] = k === 'CURP' ? el.value.toUpperCase() : el.value;
+  });
+  try{
+    const r = await api('completarFicha', {paciente_id: PACIENTE_SEL.Paciente_ID, cambios: cambios});
+    $('f-estado').innerHTML = r.ficha_completa
+      ? '<div class="aviso ok">Ficha completa.</div>'
+      : '<div class="aviso warn">Todavía falta: ' + esc(r.faltan.join(', ')) + '</div>';
+    $('f-msg').innerHTML = '<span class="pastilla ok">Guardado</span>';
+  }catch(e){ $('f-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>'; }
+};
+</script>
+</body>
+</html>
