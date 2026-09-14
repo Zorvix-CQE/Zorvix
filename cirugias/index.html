@@ -477,6 +477,7 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
           <div><label>Anestesiólogo</label><input id="r-anestesiologo" placeholder="correo@gmail.com"></div>
         </div>
         <div id="r-aviso-medicos"></div>
+        <div id="r-aviso-papeles"></div>
         <div class="fila"><button class="btn sec" id="r-ver" type="button">Ver qué está ocupado</button></div>
         <div id="r-ocupado"></div>
       </div>
@@ -505,6 +506,13 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
 
     <!-- Pendientes -->
     <section id="vista-pendientes" class="vista oculto">
+      <div class="tarjeta">
+        <h2>Credenciales pendientes</h2>
+        <p class="sub">Casos apartados a nombre de un médico al que le faltan documentos. El espacio
+          está apartado, pero el caso no se puede confirmar hasta que su expediente esté completo;
+          si no llegan, el preaparto vence y el quirófano se libera solo.</p>
+        <div id="p-credenciales"></div>
+      </div>
       <div class="tarjeta">
         <h2>Fichas incompletas</h2>
         <p class="sub">Pacientes con cirugía apartada a los que les falta la ficha de identificación.</p>
@@ -716,12 +724,38 @@ function listaDeMedicos(id, lista, vacia){
   const sel = document.createElement('select');
   sel.id = id;
   sel.innerHTML = '<option value="">' + esc(vacia) + '</option>' + lista.map(function(m){
-    const texto = m.nombre + (m.especialidad ? ' \u00b7 ' + m.especialidad : '') +
-                  (m.disponible ? '' : '  [' + (m.motivo || 'no disponible') + ']');
+    /* Un médico sin papeles SÍ aparece y SÍ se puede elegir: apartar no
+       requiere credenciales, confirmar sí. Sólo se bloquea a quien no podría
+       ni entrar a ver su caso. */
+    const nota = !m.disponible ? '  [' + (m.motivo || 'sin acceso') + ']'
+               : (m.credenciales_ok === false ? '  \u00b7 papeles pendientes' : '');
+    const texto = m.nombre + (m.especialidad ? ' \u00b7 ' + m.especialidad : '') + nota;
     return '<option value="' + esc(m.correo) + '"' + (m.disponible ? '' : ' disabled') +
            '>' + esc(texto) + '</option>';
   }).join('');
   viejo.parentNode.replaceChild(sel, viejo);
+  sel.onchange = avisaPapeles;
+}
+
+/* Se avisa al elegirlo, no al guardar: el quirófano se aparta igual, pero
+   quien captura tiene que saber desde ya que ese caso no se va a poder
+   confirmar hasta que lleguen los documentos. */
+function avisaPapeles(){
+  if (!MEDICOS) return;
+  const pendientes = [];
+  [['r-cirujano', MEDICOS.cirujanos], ['r-anestesiologo', MEDICOS.anestesiologos]]
+    .forEach(function(par){
+      const el = $(par[0]); if (!el || !el.value) return;
+      const m = (par[1] || []).filter(function(x){ return x.correo === el.value; })[0];
+      if (m && m.credenciales_ok === false) pendientes.push(m.nombre + ': ' + (m.motivo || 'faltan documentos'));
+    });
+  if (pendientes.length){
+    aviso('r-aviso-papeles','warn','Se puede apartar el quirófano, pero el caso no se va a poder ' +
+      'confirmar hasta que el expediente del médico esté completo. ' + pendientes.join(' · ') +
+      ' Si los documentos no llegan, el preaparto vence y el espacio se libera solo.');
+  } else {
+    aviso('r-aviso-papeles','', '');
+  }
 }
 
 /* Un cirujano siempre reserva a su propio nombre: el backend se lo impone de
@@ -958,6 +992,13 @@ $('r-guardar').onclick = async function(){
 async function cargaPendientes(){
   try{
     const r = await api('pendientes');
+    pinta('p-credenciales', r.credenciales_pendientes, function(x){
+      return '<div class="caso" data-id="'+esc(x.Caso_ID)+'"><div class="top">'+
+        '<span class="folio">'+esc(x.Folio_Caso)+'</span>'+
+        '<span class="pastilla warn">no se puede confirmar</span></div>'+
+        '<div class="nom">'+esc(x.quien)+'</div>'+
+        '<div class="meta">'+esc(x.motivo)+' \u00b7 cirugía '+esc(x.Fecha_Cirugia||'sin fecha')+'</div></div>';
+    });
     pinta('p-ficha', r.ficha_incompleta, function(x){
       return '<div class="caso" data-id="'+esc(x.Caso_ID)+'"><div class="nom">'+esc(x.paciente)+
         '</div><div class="meta">'+esc(x.Folio_Caso)+' · cirugía '+esc(x.Fecha_Cirugia||'sin fecha')+'</div></div>';
