@@ -473,9 +473,10 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
               <option value="">—</option><option>General</option><option>Regional</option>
               <option>Sedación</option><option>Local</option>
             </select></div>
-          <div><label>Cirujano (correo) *</label><input id="r-cirujano" placeholder="correo@gmail.com"></div>
-          <div><label>Anestesiólogo (correo) *</label><input id="r-anestesiologo" placeholder="correo@gmail.com"></div>
+          <div><label>Cirujano *</label><input id="r-cirujano" placeholder="correo@gmail.com"></div>
+          <div><label>Anestesiólogo</label><input id="r-anestesiologo" placeholder="correo@gmail.com"></div>
         </div>
+        <div id="r-aviso-medicos"></div>
         <div class="fila"><button class="btn sec" id="r-ver" type="button">Ver qué está ocupado</button></div>
         <div id="r-ocupado"></div>
       </div>
@@ -688,12 +689,9 @@ async function entro(resp){
       aviso('aviso-credenciales','warn',
         'No va a poder reservar hasta que sus documentos estén al día. ' + (s.credenciales_motivo||''));
     }
-    if (s.rol === 'medico'){
-      $('r-cirujano').value = s.correo;
-      $('r-cirujano').readOnly = true;
-    }
+    fijaCirujano();
     pintaTabs();
-    await Promise.all([cargaPaquetes(), cargaCasos()]);
+    await Promise.all([cargaPaquetes(), cargaCasos(), cargaMedicos()]);
   }catch(e){
     aviso('entrada-error','malo', e.message);
     TOKEN = null;
@@ -704,6 +702,53 @@ $('salir').onclick = function(){
   try{ google.accounts.id.disableAutoSelect(); }catch(e){}
   location.reload();
 };
+
+/* ── Padrón de médicos ─────────────────────────────────────
+   Los dos campos nacen como texto en el HTML y se convierten en lista en
+   cuanto el backend contesta la acción `medicos`. Si el backend desplegado
+   todavía no la conoce, el catch deja el texto y la app sigue sirviendo: así
+   este archivo se puede publicar antes que el backend sin romper nada. */
+let MEDICOS = null;
+
+function listaDeMedicos(id, lista, vacia){
+  const viejo = $(id);
+  if (!viejo || viejo.tagName === 'SELECT') return;
+  const sel = document.createElement('select');
+  sel.id = id;
+  sel.innerHTML = '<option value="">' + esc(vacia) + '</option>' + lista.map(function(m){
+    const texto = m.nombre + (m.especialidad ? ' \u00b7 ' + m.especialidad : '') +
+                  (m.disponible ? '' : '  [' + (m.motivo || 'no disponible') + ']');
+    return '<option value="' + esc(m.correo) + '"' + (m.disponible ? '' : ' disabled') +
+           '>' + esc(texto) + '</option>';
+  }).join('');
+  viejo.parentNode.replaceChild(sel, viejo);
+}
+
+/* Un cirujano siempre reserva a su propio nombre: el backend se lo impone de
+   todos modos, aquí sólo se refleja para que no parezca que puede elegir. */
+function fijaCirujano(){
+  const el = $('r-cirujano');
+  if (!el || !YO || YO.rol !== 'medico') return;
+  el.value = YO.correo;
+  if (el.tagName === 'SELECT') el.disabled = true; else el.readOnly = true;
+}
+
+async function cargaMedicos(){
+  try { MEDICOS = await api('medicos'); }
+  catch(e){ MEDICOS = null; return; }
+  listaDeMedicos('r-cirujano', MEDICOS.cirujanos || [], '\u2014 elija al cirujano \u2014');
+  listaDeMedicos('r-anestesiologo', MEDICOS.anestesiologos || [], '\u2014 por definir \u2014');
+  fijaCirujano();
+
+  if (!(MEDICOS.anestesiologos || []).length){
+    aviso('r-aviso-medicos','warn','Todavía no hay ningún anestesiólogo en el padrón de Zorvix. ' +
+      'Los casos se van a apartar sin anestesiólogo asignado, y mientras no lo tengan él no puede ' +
+      'entrar a escribir su valoración preanestésica.');
+  } else if (MEDICOS.papel_deducido){
+    aviso('r-aviso-medicos','warn','La hoja Medicos no dice quién es cirujano y quién anestesiólogo: ' +
+      'se está deduciendo de la especialidad. Agregue la columna Papel para que deje de adivinarse.');
+  }
+}
 
 /* ── Navegación ───────────────────────────────────────────── */
 const VISTAS = {
@@ -892,16 +937,16 @@ $('r-guardar').onclick = async function(){
     aviso('r-msg','warn','Faltan quirófano, fecha u hora.'); return;
   }
   if (!datos.Cirujano_Email){
-    aviso('r-msg','warn','Falta el correo del cirujano: es quien va a poder abrir el caso.'); return;
+    aviso('r-msg','warn','Falta el cirujano: es quien va a poder abrir el caso.'); return;
   }
-  /* El anestesiólogo se fija AQUÍ, al nacer el caso, y no después: si el caso no
-     lo trae, el anestesiólogo no puede abrirlo para escribir su preanestésica. */
-  if (!datos.Anestesiologo_Email){
-    aviso('r-msg','warn','Falta el correo del anestesiólogo: sin él no va a poder abrir el caso para su preanestésica.'); return;
-  }
+  /* El anestesiólogo no bloquea la reserva —no siempre se sabe quién va a
+     estar—, pero mientras el caso no lo traiga, él no puede abrirlo para
+     escribir su preanestésica. Por eso se dice en el acuse, no se calla. */
   try{
     const r = await api('crearCaso', datos);
-    $('r-msg').innerHTML = '<span class="pastilla ok">Apartado: ' + esc(r.folio) + '</span>';
+    $('r-msg').innerHTML = '<span class="pastilla ok">Apartado: ' + esc(r.folio) + '</span>' +
+      (datos.Anestesiologo_Email ? ''
+        : ' <span class="pastilla warn">falta asignar anestesiólogo</span>');
     PACIENTE_SEL = null;
     ['p-nombre','p-nacimiento','p-telefono','p-correo','r-buscar'].forEach(i => $(i).value = '');
     $('r-elegido').innerHTML = ''; $('r-nuevo').classList.remove('oculto');
