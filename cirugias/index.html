@@ -140,6 +140,8 @@ th{font-size:12px;color:var(--tinta2);text-transform:uppercase;letter-spacing:.0
               <option value="">—</option><option>General</option><option>Regional</option>
               <option>Sedación</option><option>Local</option>
             </select></div>
+          <div><label>Cirujano (correo) *</label><input id="r-cirujano" placeholder="correo@gmail.com"></div>
+          <div><label>Anestesiólogo (correo) *</label><input id="r-anestesiologo" placeholder="correo@gmail.com"></div>
         </div>
         <div class="fila"><button class="btn sec" id="r-ver" type="button">Ver qué está ocupado</button></div>
         <div id="r-ocupado"></div>
@@ -323,6 +325,11 @@ async function entro(resp){
       aviso('aviso-credenciales','warn',
         'No va a poder reservar hasta que sus documentos estén al día. ' + (s.credenciales_motivo||''));
     }
+    if (s.rol === 'medico'){
+      $('r-cirujano').value = s.correo;
+      $('r-cirujano').readOnly = true;
+      $('r-cirujano').style.background = 'var(--fondo)';
+    }
     pintaTabs();
     await Promise.all([cargaPaquetes(), cargaCasos()]);
   }catch(e){
@@ -497,7 +504,9 @@ $('r-guardar').onclick = async function(){
     Tiempo_Bloqueado_Min: $('r-duracion').value,
     Paquete_ID: $('r-paquete').value,
     Procedimiento_Principal: ($('r-paquete').selectedOptions[0]||{}).textContent || '',
-    Tipo_Anestesia: $('r-anestesia').value
+    Tipo_Anestesia: $('r-anestesia').value,
+    Cirujano_Email: $('r-cirujano').value.trim().toLowerCase(),
+    Anestesiologo_Email: $('r-anestesiologo').value.trim().toLowerCase()
   };
   if (PACIENTE_SEL && PACIENTE_SEL.Paciente_ID){
     datos.Paciente_ID = PACIENTE_SEL.Paciente_ID;
@@ -507,10 +516,16 @@ $('r-guardar').onclick = async function(){
     datos.Telefono = $('p-telefono').value.trim();
     datos.Correo = $('p-correo').value.trim();
   }
-  /* El anestesiólogo es obligatorio del lado del backend: sin él no puede
-     entrar después a escribir su preanestésica. Aquí sólo se avisa antes. */
   if (!datos.Quirofano || !datos.Fecha_Cirugia || !datos.Hora_Inicio){
     aviso('r-msg','warn','Faltan quirófano, fecha u hora.'); return;
+  }
+  if (!datos.Cirujano_Email){
+    aviso('r-msg','warn','Falta el correo del cirujano: es quien va a poder abrir el caso.'); return;
+  }
+  /* El anestesiólogo se fija AQUÍ, al nacer el caso, y no después: si el caso no
+     lo trae, el anestesiólogo no puede abrirlo para escribir su preanestésica. */
+  if (!datos.Anestesiologo_Email){
+    aviso('r-msg','warn','Falta el correo del anestesiólogo: sin él no va a poder abrir el caso para su preanestésica.'); return;
   }
   try{
     const r = await api('crearCaso', datos);
