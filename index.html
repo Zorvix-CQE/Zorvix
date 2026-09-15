@@ -1,189 +1,468 @@
 <!DOCTYPE html>
-<html lang="es" data-tema="oscuro">
+<html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zorvix · Portal</title>
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
-<link rel="stylesheet" href="zorvix-tokens.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zorvix · Tus datos</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Completa tus datos para tu cirugía en Zorvix">
+<meta name="theme-color" content="#7B5DC2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16131F" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/png" href="../assets/zorvix-favicon.png">
+<link rel="apple-touch-icon" href="../assets/zorvix-iso.png">
+<link rel="stylesheet" href="../zorvix-tokens.css">
+<script>
+/* El tema antes de pintar, para no enseñar el destello blanco. */
+(function(){
+  var t=null; try{ t=localStorage.getItem('zorvix-tema'); }catch(e){}
+  if(!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro';
+  document.documentElement.setAttribute('data-tema', t);
+})();
+</script>
 <style>
-  .app { min-height: 100vh; position: relative; }
-  .centro { max-width: 400px; margin: 0 auto; padding: 56px 20px; position: relative; }
-  .shell  { max-width: 900px; margin: 0 auto; padding: 28px 20px 48px; position: relative; }
+/* Los colores y tipos vienen de ../zorvix-tokens.css, que es la fuente de
+   verdad de la marca. Aquí sólo van alias con los nombres de esta pantalla.
+   Esta página se ve en un teléfono, de pie, con prisa: todo está pensado
+   para un pulgar y para letra grande. */
+:root{
+  color-scheme: light;
+  --morado-700:var(--zx-violeta-700); --morado-600:var(--zx-violeta-600);
+  --morado-500:var(--zx-violeta-500); --morado-300:var(--zx-violeta-300);
+  --morado-50:var(--zx-violeta-050);
+  --tinta:var(--zx-txt); --tinta2:var(--zx-txt-2); --tinta3:var(--zx-txt-3);
+  --papel:var(--zx-superficie); --papel-2:var(--zx-superficie-2); --fondo:var(--zx-lienzo);
+  --linea:var(--zx-borde);
+  --ok:var(--zx-ok-txt); --ok-bg:var(--zx-ok-bg); --ok-linea:var(--zx-ok);
+  --alerta:var(--zx-alerta-txt); --alerta-bg:var(--zx-alerta-bg); --alerta-linea:var(--zx-alerta);
+  --malo:var(--zx-error-txt); --malo-bg:var(--zx-error-bg); --malo-linea:var(--zx-error);
+  --r:var(--zx-r-tarjeta); --r-sm:var(--zx-r-control); --r-full:999px;
+  --sombra:0 1px 2px rgba(28,27,34,.05);
+  --anillo:0 0 0 3px rgba(123,95,199,.22);
+}
+html[data-tema="oscuro"]{ color-scheme: dark; }
 
-  .cabecera { display: flex; align-items: center; gap: 13px; margin-bottom: 26px; }
-  .mosaicos { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 13px; }
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--fondo); color:var(--tinta);
+  font-family:var(--zx-cuerpo, "Inter", system-ui, -apple-system, sans-serif);
+  font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  padding:0 0 env(safe-area-inset-bottom,0px);
+}
+h1,h2{font-family:var(--zx-titulo, "Space Grotesk", system-ui, sans-serif);letter-spacing:-.01em}
+.oculto{display:none !important}
+button{font:inherit}
 
-  .pie { display: flex; gap: 14px; margin-top: 22px; padding-top: 14px;
-         border-top: var(--zx-hairline) solid var(--zx-borde);
-         font-family: var(--zx-mono); font-size: 10.5px; color: var(--zx-txt-3); }
+.envoltura{max-width:560px;margin:0 auto;padding:0 16px 40px}
 
-  .oculto { display: none; }
-  .aviso { font-size: 12.5px; color: var(--zx-error-txt); background: var(--zx-error-bg);
-           border-radius: var(--zx-r-control); padding: 10px 13px; margin-top: 14px; }
+header{text-align:center;padding:28px 16px 18px}
+header img{height:52px;width:auto}
+header h1{margin:16px 0 4px;font-size:21px}
+header p{margin:0;color:var(--tinta2);font-size:14px}
+
+.tarjeta{background:var(--papel);border:1px solid var(--linea);border-radius:var(--r);
+  box-shadow:var(--sombra);padding:18px;margin-bottom:14px}
+.tarjeta h2{margin:0 0 3px;font-size:16px}
+.tarjeta .sub{margin:0 0 14px;color:var(--tinta3);font-size:13.5px}
+
+.paso{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:var(--r-full);
+  background:var(--morado-600);color:#fff;font-size:12px;font-weight:700;margin-right:8px}
+
+label{display:block;font-size:13px;color:var(--tinta2);font-weight:500;margin:0 0 5px}
+.campo{margin-bottom:14px}
+input,select{
+  width:100%;border:1px solid var(--linea);background:var(--papel);color:var(--tinta);
+  border-radius:var(--r-sm);padding:12px 13px;font:inherit;
+  /* 16px reales: abajo de eso, Safari en iPhone hace zoom al enfocar y la
+     paciente se pierde en la página. */
+  font-size:16px;
+}
+input:focus,select:focus{outline:none;border-color:var(--morado-500);box-shadow:var(--anillo)}
+input::placeholder{color:var(--tinta3)}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pista{font-size:12px;color:var(--tinta3);margin-top:5px}
+
+.btn{border:1px solid var(--linea);background:var(--papel);color:var(--tinta);
+  border-radius:var(--r-sm);padding:13px 16px;cursor:pointer;font-size:15px;width:100%;
+  transition:.15s}
+.btn:hover{background:var(--papel-2)}
+.btn.primario{background:var(--morado-600);border-color:var(--morado-600);color:#fff;font-weight:600}
+.btn.primario:disabled{opacity:.5;cursor:not-allowed}
+
+/* Subir la INE: el objetivo es un botón grande que abra la cámara. */
+.ine{display:grid;gap:10px}
+.ine .casilla{border:1.5px dashed var(--linea);border-radius:var(--r-sm);padding:16px;
+  text-align:center;cursor:pointer;transition:.15s;background:var(--papel)}
+.ine .casilla:hover{border-color:var(--morado-300);background:var(--morado-50)}
+.ine .casilla.listo{border-style:solid;border-color:var(--ok-linea);background:var(--ok-bg);color:var(--ok)}
+.ine .casilla .t{font-weight:600;font-size:14.5px}
+.ine .casilla .d{font-size:12.5px;color:var(--tinta3);margin-top:2px}
+.ine .casilla.listo .d{color:var(--ok)}
+.ine input[type=file]{display:none}
+
+.marca{display:flex;gap:10px;align-items:flex-start;padding:13px;border:1px solid var(--linea);
+  border-radius:var(--r-sm);background:var(--papel-2);margin-bottom:10px;cursor:pointer}
+.marca input{width:20px;height:20px;flex:0 0 auto;margin:1px 0 0;accent-color:var(--morado-600)}
+.marca span{font-size:13.5px;color:var(--tinta2);line-height:1.5}
+
+details{border:1px solid var(--linea);border-radius:var(--r-sm);padding:11px 13px;
+  margin-bottom:12px;background:var(--papel-2)}
+summary{cursor:pointer;font-size:13.5px;color:var(--morado-700);font-weight:500}
+details p{font-size:13px;color:var(--tinta2);margin:10px 0 0}
+details ul{font-size:13px;color:var(--tinta2);margin:8px 0 0;padding-left:18px}
+
+.aviso{border-radius:var(--r-sm);padding:12px 14px;font-size:14px;margin-bottom:12px;border:1px solid}
+.aviso.ok{background:var(--ok-bg);border-color:var(--ok-linea);color:var(--ok)}
+.aviso.warn{background:var(--alerta-bg);border-color:var(--alerta-linea);color:var(--alerta)}
+.aviso.malo{background:var(--malo-bg);border-color:var(--malo-linea);color:var(--malo)}
+
+.centro{text-align:center;padding:50px 20px;color:var(--tinta2)}
+.pie{text-align:center;font-size:12px;color:var(--tinta3);padding:8px 16px 0;line-height:1.6}
+
+#barra-guardar{position:sticky;bottom:0;background:var(--papel);border-top:1px solid var(--linea);
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));margin-top:6px}
+#barra-guardar .envoltura{padding:0}
 </style>
 </head>
 <body>
 
-<div class="app">
-  <div class="zx-luz"></div>
-  <div class="zx-reticula"></div>
+<div id="cargando" class="centro">Abriendo tus datos…</div>
 
-  <!-- ============ Acceso ============ -->
-  <section class="centro" id="vista-acceso">
-    <div class="zx-cristal">
-      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:28px">
-        <svg viewBox="0 0 256 256" width="62" height="62" class="zx-icono-3d" role="img" aria-label="Zorvix">
-          <defs><linearGradient id="zx-g" x1=".1" y1=".06" x2=".9" y2=".94">
-            <stop offset="0" stop-color="#F2ECFD"/><stop offset=".2" stop-color="#7F62C4"/>
-            <stop offset=".42" stop-color="#BEAEE3"/><stop offset=".62" stop-color="#8F75CC"/>
-            <stop offset=".82" stop-color="#D6CAEF"/><stop offset="1" stop-color="#8468C7"/>
-          </linearGradient></defs>
-          <path fill="url(#zx-g)" fill-rule="evenodd" d="M118.82 255.41C94.51 253.72 70.91 244.94 51.29 230.28C45.14 225.69 34.40 215.44 29.14 209.15C18.12 195.97 8.53 177.24 4.12 160.30C0.63 146.88 -0.81 129.22 0.51 116.03C3.55 85.72 16.23 58.85 37.54 37.54C57.26 17.81 81.47 5.64 109.63 1.30C117.54 0.08 136.90 -0.07 144.42 1.03C163.92 3.88 182.10 10.68 197.84 21.01C209.49 28.64 220.71 39.03 229.17 50.00C242.65 67.49 251.73 89.43 254.59 111.47C255.66 119.73 255.69 136.33 254.64 144.14C252.37 161.02 246.99 177.02 238.73 191.42C219.75 224.53 186.76 247.50 148.83 254.02C144.08 254.84 129.38 256.07 126.33 255.91C125.57 255.87 122.18 255.65 118.82 255.41ZM133.02 216.54C144.07 208.20 153.23 199.14 163.47 186.43C169.07 179.48 185.92 154.34 191.17 145.11C197.82 133.42 203.27 119.32 206.28 106.02C207.62 100.09 209.80 86.64 209.81 84.25C209.81 83.32 208.80 82.62 204.77 80.77C194.69 76.15 182.06 72.35 168.63 69.90C146.73 65.89 110.34 64.51 93.50 67.05C81.38 68.87 68.27 72.73 54.65 78.49L47.81 81.38L48.17 85.35C49.58 100.65 54.07 117.56 61.27 134.68C64.51 142.37 73.43 160.12 78.61 169.18C90.14 189.34 101.67 202.25 121.31 216.98C124.21 219.16 126.72 220.94 126.89 220.94C127.05 220.94 129.81 218.96 133.02 216.54Z"/>
-        </svg>
-        <div class="zx-wordmark" style="font-size:17px;margin-top:15px">ZORVIX</div>
-        <div class="zx-eyebrow" style="margin-top:7px">Centro quirúrgico especializado</div>
-      </div>
-
-      <div id="boton-google" style="display:flex;justify-content:center"></div>
-
-      <p style="text-align:center;font-size:11.5px;color:var(--zx-txt-3);margin:18px 0 0">
-        Acceso del personal
-      </p>
-      <div class="aviso oculto" id="error-acceso" role="alert"></div>
-    </div>
-  </section>
-
-  <!-- ============ Lanzador ============ -->
-  <section class="shell oculto" id="vista-lanzador">
-    <div class="cabecera">
-      <svg viewBox="0 0 256 256" width="34" height="34" class="zx-icono-3d" aria-hidden="true">
-        <defs><linearGradient id="zx-g2" x1=".1" y1=".06" x2=".9" y2=".94">
-          <stop offset="0" stop-color="#F2ECFD"/><stop offset=".2" stop-color="#7F62C4"/>
-          <stop offset=".42" stop-color="#BEAEE3"/><stop offset=".62" stop-color="#8F75CC"/>
-          <stop offset=".82" stop-color="#D6CAEF"/><stop offset="1" stop-color="#8468C7"/>
-        </linearGradient></defs>
-        <path fill="url(#zx-g2)" fill-rule="evenodd" d="M118.82 255.41C94.51 253.72 70.91 244.94 51.29 230.28C45.14 225.69 34.40 215.44 29.14 209.15C18.12 195.97 8.53 177.24 4.12 160.30C0.63 146.88 -0.81 129.22 0.51 116.03C3.55 85.72 16.23 58.85 37.54 37.54C57.26 17.81 81.47 5.64 109.63 1.30C117.54 0.08 136.90 -0.07 144.42 1.03C163.92 3.88 182.10 10.68 197.84 21.01C209.49 28.64 220.71 39.03 229.17 50.00C242.65 67.49 251.73 89.43 254.59 111.47C255.66 119.73 255.69 136.33 254.64 144.14C252.37 161.02 246.99 177.02 238.73 191.42C219.75 224.53 186.76 247.50 148.83 254.02C144.08 254.84 129.38 256.07 126.33 255.91C125.57 255.87 122.18 255.65 118.82 255.41ZM133.02 216.54C144.07 208.20 153.23 199.14 163.47 186.43C169.07 179.48 185.92 154.34 191.17 145.11C197.82 133.42 203.27 119.32 206.28 106.02C207.62 100.09 209.80 86.64 209.81 84.25C209.81 83.32 208.80 82.62 204.77 80.77C194.69 76.15 182.06 72.35 168.63 69.90C146.73 65.89 110.34 64.51 93.50 67.05C81.38 68.87 68.27 72.73 54.65 78.49L47.81 81.38L48.17 85.35C49.58 100.65 54.07 117.56 61.27 134.68C64.51 142.37 73.43 160.12 78.61 169.18C90.14 189.34 101.67 202.25 121.31 216.98C124.21 219.16 126.72 220.94 126.89 220.94C127.05 220.94 129.81 218.96 133.02 216.54Z"/></svg>
-      <div>
-        <div class="zx-wordmark" style="font-size:15px">ZORVIX</div>
-        <div class="zx-eyebrow" style="margin-top:4px">Centro quirúrgico especializado</div>
-      </div>
-      <div style="margin-left:auto;text-align:right">
-        <div style="font-size:12.5px;color:var(--zx-txt-2)" id="quien"></div>
-        <button id="salir" style="background:none;border:none;padding:0;margin-top:3px;cursor:pointer;
-                font-family:var(--zx-texto);font-size:10.5px;color:var(--zx-txt-3)">Cerrar sesión</button>
-      </div>
-    </div>
-
-    <div class="mosaicos" id="mosaicos"></div>
-    <div class="pie"><span id="conteo"></span><span style="margin-left:auto">portal.zorvix.mx</span></div>
-  </section>
+<!-- Liga inválida, vencida o revocada. -->
+<div id="pantalla-error" class="oculto">
+  <header>
+    <img src="../assets/zorvix-iso.png" alt="Zorvix">
+    <h1>No pudimos abrir tus datos</h1>
+  </header>
+  <div class="envoltura">
+    <div class="aviso malo" id="error-texto"></div>
+    <p class="pie">Escríbele a Zorvix por WhatsApp y con gusto te mandamos una liga nueva.</p>
+  </div>
 </div>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- Formulario. -->
+<div id="pantalla-form" class="oculto">
+  <header>
+    <img src="../assets/zorvix-iso.png" alt="Zorvix">
+    <h1 id="saludo">Tus datos</h1>
+    <p>Zorvix · Centro Quirúrgico Especializado</p>
+  </header>
+
+  <div class="envoltura">
+
+    <div id="mensaje"></div>
+
+    <div class="tarjeta">
+      <h2><span class="paso">1</span>Tu identificación</h2>
+      <p class="sub">Con una foto de tu INE tomamos casi todos tus datos. Cuida que se lea
+        completa, sin reflejos y con las cuatro esquinas dentro.</p>
+      <div class="ine">
+        <label class="casilla" id="caja-frente" for="ine-frente">
+          <div class="t">Foto del frente</div>
+          <div class="d" id="d-frente">Toca para tomar la foto</div>
+        </label>
+        <input type="file" id="ine-frente" accept="image/*" capture="environment">
+
+        <label class="casilla" id="caja-reverso" for="ine-reverso">
+          <div class="t">Foto del reverso</div>
+          <div class="d" id="d-reverso">Toca para tomar la foto</div>
+        </label>
+        <input type="file" id="ine-reverso" accept="image/*" capture="environment">
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2><span class="paso">2</span>Tus datos</h2>
+      <p class="sub">Revisa lo que ya tenemos y corrige lo que esté mal.</p>
+
+      <div class="campo"><label for="f-Nombre">Nombre(s)</label>
+        <input id="f-Nombre" autocomplete="given-name"></div>
+      <div class="dos">
+        <div class="campo"><label for="f-Apellido_Paterno">Apellido paterno</label>
+          <input id="f-Apellido_Paterno" autocomplete="family-name"></div>
+        <div class="campo"><label for="f-Apellido_Materno">Apellido materno</label>
+          <input id="f-Apellido_Materno"></div>
+      </div>
+      <div class="dos">
+        <div class="campo"><label for="f-Fecha_Nacimiento">Fecha de nacimiento</label>
+          <input id="f-Fecha_Nacimiento" type="date"></div>
+        <div class="campo"><label for="f-Sexo">Sexo</label>
+          <select id="f-Sexo">
+            <option value="">Selecciona…</option>
+            <option>Femenino</option>
+            <option>Masculino</option>
+          </select></div>
+      </div>
+      <div class="campo"><label for="f-CURP">CURP</label>
+        <input id="f-CURP" maxlength="18" autocapitalize="characters" spellcheck="false">
+        <div class="pista">Son 18 letras y números. Viene en tu INE.</div></div>
+      <div class="dos">
+        <div class="campo"><label for="f-Telefono">Teléfono</label>
+          <input id="f-Telefono" type="tel" inputmode="numeric" autocomplete="tel"></div>
+        <div class="campo"><label for="f-Correo">Correo</label>
+          <input id="f-Correo" type="email" autocomplete="email"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2><span class="paso">3</span>Tu domicilio</h2>
+      <p class="sub">El que aparece en tu identificación.</p>
+      <div class="campo"><label for="f-Calle_Numero">Calle y número</label>
+        <input id="f-Calle_Numero" autocomplete="street-address"></div>
+      <div class="dos">
+        <div class="campo"><label for="f-Colonia">Colonia</label>
+          <input id="f-Colonia"></div>
+        <div class="campo"><label for="f-CP">Código postal</label>
+          <input id="f-CP" inputmode="numeric" maxlength="5" autocomplete="postal-code"></div>
+      </div>
+      <div class="dos">
+        <div class="campo"><label for="f-Alcaldia_Municipio">Alcaldía o municipio</label>
+          <input id="f-Alcaldia_Municipio"></div>
+        <div class="campo"><label for="f-Estado">Estado</label>
+          <input id="f-Estado"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2><span class="paso">4</span>Contacto de urgencia</h2>
+      <p class="sub">A quién llamamos el día de tu cirugía si hiciera falta. Que no seas tú.</p>
+      <div class="campo"><label for="f-Contacto_Urgencia_Nombre">Nombre completo</label>
+        <input id="f-Contacto_Urgencia_Nombre"></div>
+      <div class="dos">
+        <div class="campo"><label for="f-Contacto_Urgencia_Parentesco">Parentesco</label>
+          <input id="f-Contacto_Urgencia_Parentesco" placeholder="Esposo, hermana…"></div>
+        <div class="campo"><label for="f-Contacto_Urgencia_Telefono">Teléfono</label>
+          <input id="f-Contacto_Urgencia_Telefono" type="tel" inputmode="numeric"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2><span class="paso">5</span>Privacidad</h2>
+      <p class="sub">Para atenderte necesitamos tratar datos de salud, y la ley nos obliga a
+        decírtelo antes, no después.</p>
+
+      <details>
+        <summary>Qué hacemos con tus datos</summary>
+        <p><strong>Quién es responsable.</strong> Zorvix S. de R.L. de C.V., con domicilio en
+          Gabriel Mancera 879, Col. Del Valle Centro, Benito Juárez, CDMX, 03100.</p>
+        <p><strong>Para qué los usamos.</strong> Para integrar tu expediente clínico, prepararte
+          y atenderte en el quirófano, cobrarte lo que corresponde y cumplir con lo que la
+          autoridad sanitaria exige.</p>
+        <p><strong>Qué datos sensibles tratamos.</strong> Datos de salud. Tu expediente es
+          propiedad del establecimiento y se conserva cinco años contados desde el último acto
+          médico, como manda la NOM-004-SSA3-2012.</p>
+        <p><strong>Tus derechos.</strong> Puedes pedirnos acceder, rectificar, cancelar u
+          oponerte al uso de tus datos —los derechos ARCO— escribiendo a
+          <strong>atencion@zorvix.mx</strong>.</p>
+        <p>Este resumen no sustituye el aviso de privacidad completo, que te entregamos por
+          separado y puedes pedirnos cuando quieras.</p>
+      </details>
+
+      <label class="marca" for="c-aviso">
+        <input type="checkbox" id="c-aviso">
+        <span>He leído y acepto el <strong>Aviso de Privacidad</strong> de Zorvix, incluido el
+          tratamiento de mis datos personales sensibles de salud.</span>
+      </label>
+
+      <label class="marca" for="c-whatsapp">
+        <input type="checkbox" id="c-whatsapp">
+        <span>Acepto que Zorvix me contacte por WhatsApp para lo relacionado con mi cirugía.
+          <em>(Opcional)</em></span>
+      </label>
+    </div>
+
+  </div>
+
+  <div id="barra-guardar">
+    <div class="envoltura">
+      <button class="btn primario" id="btn-guardar">Guardar mis datos</button>
+    </div>
+  </div>
+  <p class="pie">Esta liga es tuya y personal. No la compartas.</p>
+</div>
+
+<!-- Listo. -->
+<div id="pantalla-listo" class="oculto">
+  <header>
+    <img src="../assets/zorvix-iso.png" alt="Zorvix">
+    <h1>Listo, gracias</h1>
+  </header>
+  <div class="envoltura">
+    <div id="listo-cuerpo"></div>
+    <p class="pie">Si algo quedó mal, vuelve a abrir esta misma liga y corrígelo.</p>
+  </div>
+</div>
+
 <script>
-const CONFIG = {
-  GATEWAY:   'https://script.google.com/macros/s/AKfycbyf-Kl0VuSmdRu2oetyVPp_7ztjqX77mNZ41jEJYTrtnR4aTSOdSX0KiJmQVGUuCaxO/exec',
-  CLIENT_ID: '148311031818-4ku0lhia6qd0fgbmi379dvi7k4vp303g.apps.googleusercontent.com'
-};
+/* ═══════════════════════════════════════════════════════════════════════════
+   El token es lo único que identifica a la paciente. No viaja ningún
+   Paciente_ID ni por la URL ni en las peticiones: si el token no sirve, no hay
+   forma de pedir el expediente de alguien más cambiando un número.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const API = 'https://script.google.com/macros/s/AKfycbyplldJRxqP20tkrVqOsRUV6dHKBJDJQ2MIE1Fg_-Z1nB34bZYUsJ6TuwlXJxZTlHM/exec';
 
-/**
- * Content-Type text/plain no es descuido: Apps Script no responde OPTIONS,
- * y application/json dispara preflight CORS que mata la petición antes de salir.
- * El cuerpo sí va en JSON.
- */
-async function api(action, datos = {}) {
-  const token = sessionStorage.getItem('zx_token');
-  const r = await fetch(CONFIG.GATEWAY, {
-    method: 'POST',
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+
+const CAMPOS = ['Nombre','Apellido_Paterno','Apellido_Materno','Fecha_Nacimiento','Sexo',
+  'CURP','Telefono','Correo','Calle_Numero','Colonia','CP','Alcaldia_Municipio','Estado',
+  'Contacto_Urgencia_Nombre','Contacto_Urgencia_Parentesco','Contacto_Urgencia_Telefono'];
+
+const $ = (id) => document.getElementById(id);
+const ver = (id) => { ['cargando','pantalla-error','pantalla-form','pantalla-listo']
+  .forEach(x => $(x).classList.toggle('oculto', x !== id)); };
+
+/* Dos cosas que NO son opcionales, las dos aprendidas a golpes:
+   · credentials:'omit' — con varias cuentas de Google abiertas, el navegador
+     sigue un redirect a /macros/u/<N>/ que contesta 404.
+   · Content-Type text/plain — cualquier otro dispara una preflight CORS que
+     Apps Script no contesta. */
+async function llamar(cuerpo) {
+  const r = await fetch(API, {
+    method: 'POST', credentials: 'omit',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, token, ...datos })
+    body: JSON.stringify(Object.assign({ token: TOKEN }, cuerpo))
   });
-  const res = await r.json();
-  if (!res.ok) {
-    if (/sesión/i.test(res.error)) { sessionStorage.removeItem('zx_token'); mostrar('vista-acceso'); }
-    throw new Error(res.error);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.mensaje || 'Algo salió mal.');
+  return j;
+}
+
+function mensaje(clase, texto) {
+  $('mensaje').innerHTML = '<div class="aviso ' + clase + '">' + texto + '</div>';
+  if (clase !== 'malo') setTimeout(() => { $('mensaje').innerHTML = ''; }, 6000);
+}
+
+/* ── Arranque ─────────────────────────────────────────────────────────────── */
+(async function () {
+  if (!TOKEN) {
+    ver('pantalla-error');
+    $('error-texto').textContent = 'Esta liga está incompleta. Ábrela tal cual te llegó, sin cortarle nada.';
+    return;
   }
-  return res.data;
-}
-
-function mostrar(id) {
-  ['vista-acceso', 'vista-lanzador'].forEach(v =>
-    document.getElementById(v).classList.toggle('oculto', v !== id));
-}
-
-function mostrarError(msg) {
-  const el = document.getElementById('error-acceso');
-  el.textContent = msg;
-  el.classList.remove('oculto');
-  mostrar('vista-acceso');
-}
-
-window.onload = () => {
-  if (window.google?.accounts) {
-    google.accounts.id.initialize({
-      client_id: CONFIG.CLIENT_ID,
-      callback: r => { sessionStorage.setItem('zx_token', r.credential); iniciar(); },
-      // Al expirar el token, si ya hay sesión de Google la renueva sin un clic.
-      // Es lo que evita que el staff sienta que se está logueando todo el día.
-      auto_select: true
-    });
-    google.accounts.id.renderButton(document.getElementById('boton-google'),
-      { theme: 'filled_black', size: 'large', width: 320, text: 'continue_with', locale: 'es' });
-    google.accounts.id.prompt();
+  try {
+    const d = await llamar({ accion: 'fichaAbrir' });
+    if (d.saludo) $('saludo').textContent = 'Hola, ' + d.saludo;
+    CAMPOS.forEach(k => { if ($('f-' + k) && d.datos[k]) $('f-' + k).value = d.datos[k]; });
+    marcaINE('frente', d.ine.frente);
+    marcaINE('reverso', d.ine.reverso);
+    $('c-aviso').checked = !!d.aviso_aceptado;
+    $('c-whatsapp').checked = !!d.whatsapp_aceptado;
+    ver('pantalla-form');
+  } catch (err) {
+    ver('pantalla-error');
+    $('error-texto').textContent = err.message;
   }
-  if (sessionStorage.getItem('zx_token')) iniciar();
+})();
+
+function marcaINE(lado, listo) {
+  $('caja-' + lado).classList.toggle('listo', !!listo);
+  $('d-' + lado).textContent = listo ? 'Ya la tenemos · toca para reemplazarla'
+                                     : 'Toca para tomar la foto';
+}
+
+/* ── INE ──────────────────────────────────────────────────────────────────── */
+/* La foto de un teléfono pesa varios megas. Mandarla entera por base64 a
+   Apps Script es la receta para que truene a media captura, así que se reduce
+   ANTES de subirla: el lado largo a 1600 px alcanza de sobra para leer un CURP
+   y deja el archivo en cientos de kilobytes. */
+function reducir(archivo) {
+  return new Promise((resolve, reject) => {
+    const lector = new FileReader();
+    lector.onerror = () => reject(new Error('No pudimos leer la foto.'));
+    lector.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Ese archivo no parece una foto.'));
+      img.onload = () => {
+        const max = 1600;
+        const escala = Math.min(1, max / Math.max(img.width, img.height));
+        const lienzo = document.createElement('canvas');
+        lienzo.width  = Math.round(img.width  * escala);
+        lienzo.height = Math.round(img.height * escala);
+        lienzo.getContext('2d').drawImage(img, 0, 0, lienzo.width, lienzo.height);
+        const url = lienzo.toDataURL('image/jpeg', 0.85);
+        resolve(url.slice(url.indexOf(',') + 1));
+      };
+      img.src = lector.result;
+    };
+    lector.readAsDataURL(archivo);
+  });
+}
+
+['frente', 'reverso'].forEach(lado => {
+  $('ine-' + lado).addEventListener('change', async (ev) => {
+    const archivo = ev.target.files && ev.target.files[0];
+    if (!archivo) return;
+    $('d-' + lado).textContent = 'Subiendo…';
+    try {
+      const contenido = await reducir(archivo);
+      await llamar({ accion: 'fichaINE', lado: lado, tipo: 'image/jpeg', contenido: contenido });
+      marcaINE(lado, true);
+      mensaje('ok', 'Recibimos la foto del ' + lado + '.');
+    } catch (err) {
+      marcaINE(lado, false);
+      mensaje('malo', err.message);
+    }
+    ev.target.value = '';
+  });
+});
+
+/* ── Guardar ──────────────────────────────────────────────────────────────── */
+$('btn-guardar').addEventListener('click', async () => {
+  if (!$('c-aviso').checked) {
+    mensaje('warn', 'Para poder atenderte necesitamos que aceptes el Aviso de Privacidad.');
+    $('c-aviso').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  const curp = $('f-CURP').value.trim();
+  if (curp && curp.length !== 18) {
+    mensaje('warn', 'El CURP debe tener exactamente 18 caracteres. Revísalo en tu INE.');
+    $('f-CURP').focus();
+    return;
+  }
+
+  const cambios = {};
+  CAMPOS.forEach(k => { const el = $('f-' + k); if (el) cambios[k] = el.value.trim(); });
+  cambios.Aviso_Privacidad_Aceptado = 'Si';
+  cambios.Consentimiento_Contacto_WhatsApp = $('c-whatsapp').checked ? 'Si' : 'No';
+
+  const boton = $('btn-guardar');
+  boton.disabled = true; boton.textContent = 'Guardando…';
+  try {
+    const r = await llamar({ accion: 'fichaGuardar', cambios: cambios });
+    pintaListo(r);
+    ver('pantalla-listo');
+    window.scrollTo(0, 0);
+  } catch (err) {
+    mensaje('malo', err.message);
+  }
+  boton.disabled = false; boton.textContent = 'Guardar mis datos';
+});
+
+/* Se le dice con nombre y apellido qué falta. Un "quedó incompleto" sin decir
+   qué falta obliga a una llamada, que es justo lo que esta pantalla evita. */
+const BONITO = {
+  Nombre_Completo:'tu nombre', Fecha_Nacimiento:'tu fecha de nacimiento', Sexo:'tu sexo',
+  CURP:'tu CURP', Telefono:'tu teléfono', Calle_Numero:'tu calle y número',
+  Colonia:'tu colonia', CP:'tu código postal',
+  Contacto_Urgencia_Nombre:'el nombre de tu contacto de urgencia',
+  Contacto_Urgencia_Telefono:'el teléfono de tu contacto de urgencia'
 };
 
-async function iniciar() {
-  try {
-    const s = await api('portal.sesion');
-
-    // Un médico que llega aquí recibe su puerta, no un error.
-    if (s.redirigir) { location.href = s.redirigir; return; }
-
-    document.getElementById('quien').textContent = s.nombre || s.correo;
-    mostrar('vista-lanzador');
-    cargarApps();
-  } catch (e) {
-    mostrarError(e.message);
+function pintaListo(r) {
+  if (r.ficha_completa) {
+    $('listo-cuerpo').innerHTML =
+      '<div class="aviso ok">Ya quedaron todos tus datos. No tienes que hacer nada más; ' +
+      'Zorvix te va a escribir con las indicaciones para el día de tu cirugía.</div>';
+    return;
   }
+  const faltan = (r.faltan || []).map(k => BONITO[k] || k);
+  $('listo-cuerpo').innerHTML =
+    '<div class="aviso warn">Guardamos lo que escribiste, pero todavía falta ' +
+    (faltan.length === 1 ? faltan[0] : faltan.slice(0, -1).join(', ') + ' y ' + faltan[faltan.length - 1]) +
+    '.</div><button class="btn" id="btn-volver">Volver y completarlo</button>';
+  $('btn-volver').addEventListener('click', () => { ver('pantalla-form'); window.scrollTo(0, 0); });
 }
-
-async function cargarApps() {
-  const cont = document.getElementById('mosaicos');
-  try {
-    const apps = await api('portal.apps');
-    cont.innerHTML = apps.map(a => `
-      <button class="zx-mosaico"
-              ${a.nivel ? `onclick="location.href='${a.url}'"` : 'disabled aria-disabled="true"'}>
-        <span class="zx-anillo"><i class="ti ${a.icono}" style="font-size:20px" aria-hidden="true"></i></span>
-        <span class="zx-mosaico-nombre">${a.nombre}</span>
-        <span class="zx-mosaico-desc">${a.descripcion}</span>
-        ${etiqueta(a)}
-      </button>`).join('');
-
-    const abiertas = apps.filter(a => a.nivel).length;
-    document.getElementById('conteo').textContent =
-      `${apps.length} apps · ${abiertas} disponibles`;
-  } catch (e) {
-    cont.innerHTML = `<p style="color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
-  }
-}
-
-function etiqueta(a) {
-  if (!a.nivel) return '<span class="zx-pill" style="margin-top:9px;font-size:10px">sin permiso</span>';
-  if (a.pendiente) return `<span class="zx-pill ${a.pendiente.tono}" style="margin-top:9px;font-size:10px">${a.pendiente.texto}</span>`;
-  if (a.nivel === 'lectura') return '<span class="zx-pill" style="margin-top:9px;font-size:10px">solo lectura</span>';
-  return '<span style="display:block;height:9px"></span>';
-}
-
-document.getElementById('salir').onclick = () => {
-  sessionStorage.removeItem('zx_token');
-  if (window.google?.accounts) google.accounts.id.disableAutoSelect();
-  mostrar('vista-acceso');
-};
 </script>
 </body>
 </html>
