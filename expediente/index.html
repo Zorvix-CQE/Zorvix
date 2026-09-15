@@ -122,6 +122,23 @@ main{max-width:1120px;margin:0 auto;padding:22px 18px 80px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.chico{padding:5px 10px;font-size:13px}
 
+/* ── Selector de documento nuevo ─────────────────────────────
+   Veintiún botones del mismo peso obligan a leerlos todos para
+   encontrar uno. Agrupados por momento quirúrgico, el ojo salta
+   directo al bloque del momento en que va el caso. */
+.momento{margin-bottom:15px}
+.momento:last-child{margin-bottom:0}
+.momento h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--tinta3);font-weight:600}
+/* Cuántos hay ya de ese tipo en el expediente: el que no trae número es
+   el que falta, y eso se ve sin leer. */
+.btn.chico .cuenta{display:inline-block;margin-left:7px;font-size:10.5px;font-weight:600;
+  padding:1px 6px;border-radius:var(--r-full);background:var(--ok-bg);color:var(--ok)}
+/* Los consentimientos los firma el paciente y tienen consecuencias
+   legales: no pueden pesar lo mismo que una nota interna. */
+.btn.chico.firma-paciente{border-color:var(--morado-300);
+  box-shadow:inset 3px 0 0 var(--morado-600)}
+
 /* ── Avisos ─────────────────────────────────────────────────── */
 .aviso{border-radius:var(--r-sm);padding:11px 14px;font-size:14px;margin-bottom:12px;border:1px solid}
 .aviso.ok{background:var(--ok-bg);border-color:var(--ok-linea);color:var(--ok)}
@@ -674,13 +691,80 @@ function pintaExpediente(){
         esc(d.Estado)+'</span></div>').join('');
   D.querySelectorAll('[data-doc]').forEach(el => el.onclick = () => abreDocumento(el.dataset.doc));
 
+  pintaSelectorDocumentos();
+}
+
+/* Los momentos van en el orden en que transcurre el caso, no en el orden
+   del Índice Guía. El Índice sirve para auditar un expediente cerrado; esto
+   sirve para capturarlo mientras pasa.
+
+   "Hoja frontal" dice en el diccionario "al alta en el establecimiento", que
+   en el uso de aquí significa cuando se da de alta al paciente EN el centro,
+   o sea al registrarlo. Por eso va en Ingreso y no al final.
+
+   Los consentimientos se separan a propósito: los firma el paciente y su
+   ausencia tiene consecuencias distintas a las de una nota interna. */
+const MOMENTOS_DOC = [
+  { titulo:'Ingreso', docs:[
+      'Aviso de privacidad', 'Hoja frontal', 'Nota de ingreso', 'Historia clínica' ] },
+  { titulo:'Consentimientos · los firma el paciente', firma:true, docs:[
+      'CI procedimiento quirúrgico', 'CI para anestesia',
+      'CI marcaje de sitio quirúrgico', 'CI atención con riesgo de COVID-19' ] },
+  { titulo:'Antes de la cirugía', docs:[
+      'Nota preoperatoria', 'Nota preanestésica, vigilancia y registro anestésico',
+      'Hoja de servicios auxiliares' ] },
+  { titulo:'Quirófano', docs:[
+      'Lista de verificación de la cirugía', 'Hoja de enfermería',
+      'Nota postoperatoria' ] },
+  { titulo:'Estancia y alta', docs:[
+      'Notas de evolución', 'Indicaciones médicas',
+      'Nota de egreso', 'Plan de alta de internamiento' ] },
+  { titulo:'Excepciones', docs:[
+      'Nota de referencia/traslado', 'Hoja de egreso voluntario',
+      'Hoja de notificación del ministerio público' ] }
+];
+
+function pintaSelectorDocumentos(){
   const puedo = EXP.puedo_crear || [];
-  $('exp-crear').innerHTML = !puedo.length ?
-    '<p class="sub">Su papel en este paciente no escribe ningún documento.</p>' :
-    '<p class="sub">Documento nuevo:</p><div class="fila">' +
-      puedo.map(t => '<button class="btn chico" data-nuevo="'+esc(t)+'">'+esc(t)+'</button>').join('') +
-    '</div>';
-  $('exp-crear').querySelectorAll('[data-nuevo]').forEach(b => b.onclick = () => nuevoDocumento(b.dataset.nuevo));
+  if (!puedo.length) {
+    $('exp-crear').innerHTML =
+      '<p class="sub">Su papel en este paciente no escribe ningún documento.</p>';
+    return;
+  }
+
+  /* Cuántos hay ya de cada tipo. No sirve para bloquear —de notas de
+     evolución van varias— sino para que se vea de un vistazo qué falta. */
+  const hechos = {};
+  (EXP.documentos || []).forEach(d => { hechos[d.Tipo] = (hechos[d.Tipo] || 0) + 1; });
+
+  const pendientes = new Set(puedo);
+  const bloques = [];
+
+  MOMENTOS_DOC.forEach(m => {
+    const suyos = m.docs.filter(t => pendientes.has(t));
+    suyos.forEach(t => pendientes.delete(t));
+    if (suyos.length) bloques.push({ titulo:m.titulo, firma:!!m.firma, docs:suyos });
+  });
+
+  /* Si mañana el diccionario trae un documento que aquí no está mapeado, NO
+     puede desaparecer de la pantalla: cae en Otros y se sigue pudiendo
+     capturar. Un documento invisible es un documento que nadie llena. */
+  if (pendientes.size) bloques.push({ titulo:'Otros', firma:false, docs:[...pendientes] });
+
+  const chip = (t, firma) => {
+    const n = hechos[t] || 0;
+    return '<button class="btn chico'+(firma ? ' firma-paciente' : '')+'" data-nuevo="'+esc(t)+'">'+
+      esc(t) + (n ? '<span class="cuenta">'+n+'</span>' : '') + '</button>';
+  };
+
+  $('exp-crear').innerHTML =
+    '<p class="sub">Documento nuevo:</p>' +
+    bloques.map(b =>
+      '<div class="momento"><h4>'+esc(b.titulo)+'</h4><div class="fila">'+
+      b.docs.map(t => chip(t, b.firma)).join('')+'</div></div>').join('');
+
+  $('exp-crear').querySelectorAll('[data-nuevo]')
+    .forEach(b => b.onclick = () => nuevoDocumento(b.dataset.nuevo));
 }
 
 function fecha(v){ return v ? String(v).slice(0,10) : ''; }
