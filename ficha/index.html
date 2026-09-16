@@ -82,6 +82,15 @@ input:focus,select:focus{outline:none;border-color:var(--morado-500);box-shadow:
 input::placeholder{color:var(--tinta3)}
 .dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .pista{font-size:12px;color:var(--tinta3);margin-top:5px}
+/* Los opcionales van agrupados igual que en el apartado 16 del aviso, para que
+   quien compare las dos hojas encuentre lo mismo en el mismo orden. */
+.grupo{margin:18px 0 3px;font-size:13px;font-weight:600;color:var(--tinta2);
+  text-transform:uppercase;letter-spacing:.04em}
+.nota-grupo{margin:0 0 9px;font-size:12.5px;color:var(--tinta3);line-height:1.45}
+.marca.apagada{opacity:.5}
+.marca.apagada input{cursor:not-allowed}
+.marca em{color:var(--tinta3);font-style:normal}
+.obligatoria{border-color:var(--morado-600)}
 
 .btn{border:1px solid var(--linea);background:var(--papel);color:var(--tinta);
   border-radius:var(--r-sm);padding:13px 16px;cursor:pointer;font-size:15px;width:100%;
@@ -260,10 +269,25 @@ details ul{font-size:13px;color:var(--tinta2);margin:8px 0 0;padding-left:18px}
           también puedes pedirnos una copia impresa cuando quieras.</p>
       </details>
 
-      <label class="marca" for="c-aviso">
+      <!-- ══════════════════════════════════════════════════════════════════
+           Una casilla no puede acreditar seis voluntades.
+
+           Hasta la version anterior aqui habia UNA casilla que decia "acepto
+           el aviso, incluido el tratamiento de mis datos sensibles". Eso junta
+           en un solo clic un acuse de recibo y un consentimiento expreso, y
+           deja fuera --sin preguntarlos-- el audio, las imagenes y las
+           finalidades secundarias, que el propio aviso publicado dice que se
+           autorizan por separado y que en blanco significan NO.
+
+           El orden, los encabezados y el texto siguen al apartado 16 del aviso
+           a proposito: la paciente que lo leyo en app.zorvix.mx/aviso/ tiene
+           que encontrar aqui exactamente lo mismo.
+           ══════════════════════════════════════════════════════════════════ -->
+
+      <label class="marca obligatoria" for="c-aviso">
         <input type="checkbox" id="c-aviso">
-        <span>He leído y acepto el <strong>Aviso de Privacidad</strong> de Zorvix, incluido el
-          tratamiento de mis datos personales sensibles de salud.</span>
+        <span>Declaro que se me puso a disposición el <strong>Aviso de Privacidad</strong> de
+          Zorvix, que lo leí, que comprendí su contenido y que se resolvieron mis dudas.</span>
       </label>
       <!-- El enlace va FUERA del label a proposito: dentro, tocarlo tambien
            palomearia la casilla, y quedaria aceptado el aviso por el solo
@@ -272,11 +296,64 @@ details ul{font-size:13px;color:var(--tinta2);margin:8px 0 0;padding-left:18px}
         <a href="../aviso/" target="_blank" rel="noopener">Leer el Aviso de Privacidad completo</a>
       </p>
 
+      <label class="marca obligatoria" for="c-sensibles">
+        <input type="checkbox" id="c-sensibles">
+        <span>Otorgo mi consentimiento <strong>expreso</strong> para el tratamiento de mis datos
+          personales sensibles de salud, con las finalidades primarias descritas en el aviso.
+          <em>— Necesario para poder atenderte.</em></span>
+      </label>
+
+      <h3 class="grupo">Grabación de audio</h3>
+      <p class="nota-grupo">Marca únicamente si lo autorizas. Dejarla en blanco significa que no
+        autorizas la grabación, y tu nota se capturará escribiendo.</p>
+      <label class="marca" for="c-audio">
+        <input type="checkbox" id="c-audio">
+        <span>Autorizo que se grabe el audio de mi valoración, mi interrogatorio y el dictado de
+          mis notas clínicas, incluida su transcripción por el proveedor descrito en el aviso y
+          su eliminación en un plazo máximo de treinta días naturales.</span>
+      </label>
+
+      <h3 class="grupo">Uso de imágenes clínicas más allá del expediente</h3>
+      <p class="nota-grupo">Marca únicamente lo que autorices. Dejarlas en blanco significa que no
+        autorizas ningún uso distinto al clínico.</p>
+      <label class="marca" for="c-img-acad">
+        <input type="checkbox" id="c-img-acad">
+        <span>Autorizo el uso de mis imágenes con fines <strong>académicos y científicos</strong>,
+          ante colegas y en foros médicos.</span>
+      </label>
+      <label class="marca" for="c-img-promo">
+        <input type="checkbox" id="c-img-promo">
+        <span>Autorizo el uso de mis imágenes con fines de <strong>difusión y promoción</strong>,
+          incluidos sitios web y redes sociales.</span>
+      </label>
+      <!-- El rostro no se autoriza en el vacio: cuelga de haber autorizado
+           algun uso. Se apaga sola cuando no hay ninguno, en vez de quedarse
+           palomeada diciendo que si a nada. -->
+      <label class="marca" id="lbl-rostro" for="c-rostro">
+        <input type="checkbox" id="c-rostro">
+        <span>De los usos que autoricé arriba, autorizo además que
+          <strong>mi rostro sea visible</strong>.</span>
+      </label>
+      <p class="pista" id="pista-rostro" style="margin:-6px 0 12px 3px">
+        Se activa si autorizas alguno de los dos usos anteriores.
+      </p>
+
+      <h3 class="grupo">Finalidades secundarias</h3>
+      <p class="nota-grupo">Ninguna es necesaria para que te atendamos. Negarlas no afecta tu
+        atención ni tu cirugía.</p>
+      <label class="marca" for="c-secundarias">
+        <input type="checkbox" id="c-secundarias">
+        <span>Acepto recibir recordatorios, encuestas de satisfacción e información sobre
+          servicios de Zorvix.</span>
+      </label>
       <label class="marca" for="c-whatsapp">
         <input type="checkbox" id="c-whatsapp">
-        <span>Acepto que Zorvix me contacte por WhatsApp para lo relacionado con mi cirugía.
-          <em>(Opcional)</em></span>
+        <span>Acepto que Zorvix me contacte por WhatsApp para lo relacionado con mi cirugía.</span>
       </label>
+
+      <p class="pista" style="margin-top:14px">Puedes cambiar de opinión sobre las casillas
+        opcionales volviendo a abrir esta misma liga. Para retirar el consentimiento de tus datos
+        de salud, escríbenos a <strong>atencion@zorvix.mx</strong>.</p>
     </div>
 
   </div>
@@ -314,6 +391,19 @@ const TOKEN = new URLSearchParams(location.search).get('t') || '';
 const CAMPOS = ['Nombre','Apellido_Paterno','Apellido_Materno','Fecha_Nacimiento','Sexo',
   'CURP','Telefono','Correo','Calle_Numero','Colonia','CP','Alcaldia_Municipio','Estado',
   'Contacto_Urgencia_Nombre','Contacto_Urgencia_Parentesco','Contacto_Urgencia_Telefono'];
+
+/* Cada casilla opcional con la columna que le toca en la hoja. El nombre de la
+   columna se escribe UNA vez, aqui: si se teclea distinto en el listener y en
+   el guardado, el consentimiento se guarda en una columna y se lee de otra, y
+   nadie se entera hasta que alguien pregunta por que su foto salio publicada. */
+const CONSENT = [
+  ['c-sensibles',   'Consentimiento_Datos_Sensibles'],
+  ['c-audio',       'Consentimiento_Audio'],
+  ['c-img-acad',    'Consentimiento_Imagenes_Academico'],
+  ['c-img-promo',   'Consentimiento_Imagenes_Promocional'],
+  ['c-rostro',      'Consentimiento_Rostro_Visible'],
+  ['c-secundarias', 'Consentimiento_Finalidades_Secundarias']
+];
 
 const $ = (id) => document.getElementById(id);
 const ver = (id) => { ['cargando','pantalla-error','pantalla-form','pantalla-listo']
@@ -355,12 +445,35 @@ function mensaje(clase, texto) {
     marcaINE('reverso', d.ine.reverso);
     $('c-aviso').checked = !!d.aviso_aceptado;
     $('c-whatsapp').checked = !!d.whatsapp_aceptado;
+    /* Un backend viejo no manda `consentimientos`. En ese caso las casillas se
+       quedan en blanco, que es justo lo que el aviso dice que significa una
+       casilla en blanco: que no autoriza. Nunca se marca por omision. */
+    const c = d.consentimientos || {};
+    CONSENT.forEach(([id, col]) => { $(id).checked = !!c[col]; });
+    pintaRostro();
     ver('pantalla-form');
   } catch (err) {
     ver('pantalla-error');
     $('error-texto').textContent = err.message;
   }
 })();
+
+/* El rostro visible no existe por si solo: es un "ademas" de haber autorizado
+   algun uso. Si no hay ninguno, la casilla se apaga Y se desmarca, porque
+   dejarla palomeada sin uso autorizado seria guardar un si que no aplica a
+   nada --y el dia que ella autorice una imagen, ese si viejo entraria en vigor
+   sin que lo haya vuelto a pensar. */
+function pintaRostro() {
+  const hayImagen = $('c-img-acad').checked || $('c-img-promo').checked;
+  const caja = $('c-rostro');
+  caja.disabled = !hayImagen;
+  if (!hayImagen) caja.checked = false;
+  $('lbl-rostro').classList.toggle('apagada', !hayImagen);
+  $('pista-rostro').style.display = hayImagen ? 'none' : '';
+}
+['c-img-acad', 'c-img-promo'].forEach(id => {
+  $(id).addEventListener('change', pintaRostro);
+});
 
 function marcaINE(lado, listo) {
   $('caja-' + lado).classList.toggle('listo', !!listo);
@@ -416,9 +529,18 @@ function reducir(archivo) {
 
 /* ── Guardar ──────────────────────────────────────────────────────────────── */
 $('btn-guardar').addEventListener('click', async () => {
+  /* Las dos que no son opcionales se revisan por separado, y se dice cual
+     falta. "Acepta el aviso" cuando lo que falta es el consentimiento de datos
+     sensibles manda a la paciente a buscar la casilla equivocada. */
   if (!$('c-aviso').checked) {
-    mensaje('warn', 'Para poder atenderte necesitamos que aceptes el Aviso de Privacidad.');
+    mensaje('warn', 'Necesitamos que nos confirmes que leíste el Aviso de Privacidad.');
     $('c-aviso').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  if (!$('c-sensibles').checked) {
+    mensaje('warn', 'Para poder atenderte necesitamos tu consentimiento expreso para tratar ' +
+                    'tus datos de salud. Es la única casilla que no podemos dejar en blanco.');
+    $('c-sensibles').scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
   const curp = $('f-CURP').value.trim();
@@ -432,6 +554,10 @@ $('btn-guardar').addEventListener('click', async () => {
   CAMPOS.forEach(k => { const el = $('f-' + k); if (el) cambios[k] = el.value.trim(); });
   cambios.Aviso_Privacidad_Aceptado = 'Si';
   cambios.Consentimiento_Contacto_WhatsApp = $('c-whatsapp').checked ? 'Si' : 'No';
+  /* Van SIEMPRE los seis, marcados y sin marcar. Mandar solo los marcados
+     haria imposible retirar uno: el backend no puede distinguir "lo quito" de
+     "no me lo preguntaron". */
+  CONSENT.forEach(([id, col]) => { cambios[col] = $(id).checked ? 'Si' : 'No'; });
 
   const boton = $('btn-guardar');
   boton.disabled = true; boton.textContent = 'Guardando…';

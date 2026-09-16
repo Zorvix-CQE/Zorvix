@@ -895,7 +895,12 @@ function pintaDocumento(){
       ' · expediente '+esc(EXP.expediente_no||'')+'</div>';
 
   const cerrado = DOC.Estado === 'Firmado y escaneado';
-  ['btn-guardar','btn-listo','btn-firmado','btn-dictar'].forEach(b => $(b).disabled = cerrado);
+  ['btn-guardar','btn-listo','btn-firmado'].forEach(b => $(b).disabled = cerrado);
+  /* El dictado tiene una segunda condicion ademas de que el documento este
+     abierto: que este paciente haya autorizado que se le grabe. El aviso de
+     privacidad lo pide en una casilla propia y dice, con esas palabras, que
+     dejarla en blanco significa que no autoriza. */
+  $('btn-dictar').disabled = cerrado || !audioAutorizado();
   aviso('doc-aviso', cerrado ? 'ok' : '', cerrado ?
     'Este documento ya está firmado y escaneado. No se edita: para corregir se hace nota nueva (NOM-004-SSA3-2012, 5.11).' : '');
 
@@ -1254,7 +1259,29 @@ async function guarda(estado){
    proveedor que el aviso de privacidad declara, y el texto se reparte a los
    campos con la secuencia del documento. Lo que no cae en ningún campo va
    íntegro a «Sin ubicar»: no se tira nada y no se inventa nada. */
+/* ── La puerta del audio ───────────────────────────────────────────────────
+
+   Esta pantalla abria el microfono sin preguntarle nada a nadie. El aviso de
+   privacidad publicado (apartado 6 y apartado 16) trata la grabacion como una
+   autorizacion aparte y opcional: grabar sin ella es tratar un dato sensible
+   sin consentimiento, y ademas mandarselo al proveedor de transcripcion.
+
+   Esto es la mitad de la reja, la que se ve. La otra mitad vive en el
+   servidor, que rechaza la subida del audio aunque alguien llegue aqui por
+   otro camino. Una reja que solo existe en el navegador no es una reja. */
+function audioAutorizado(){
+  return String((EXP && EXP.paciente && EXP.paciente.Consentimiento_Audio) || '')
+           .trim().toLowerCase() === 'si';
+}
+
 $('btn-dictar').onclick = function(){
+  if (!audioAutorizado()){
+    aviso('doc-aviso','malo',
+      'Este paciente no ha autorizado que se grabe su audio, así que el dictado está ' +
+      'apagado para su expediente. Puede capturar la nota escribiendo. Si el paciente ' +
+      'quiere autorizarlo, la casilla está en su ficha: vuelva a mandarle la liga.');
+    return;
+  }
   const s = SECU[DOC.Tipo];
   $('dic-titulo').textContent = 'Dictar · ' + DOC.Tipo;
   $('dic-sub').textContent = s ? 'Siga los pasos en orden.' :
@@ -1269,6 +1296,10 @@ $('dic-cerrar').onclick = () => { paraGrabacion(); $('dictado').classList.add('o
 let t0 = null, reloj = null;
 $('dic-grabar').onclick = async function(){
   try{
+    if (!audioAutorizado()){
+      aviso('dic-aviso','malo','Este paciente no autorizó la grabación de audio.');
+      return;
+    }
     if (!DOC.Doc_ID){
       aviso('dic-aviso','warn','Primero guarde el borrador: el audio se cuelga de un documento que ya exista.');
       return;
