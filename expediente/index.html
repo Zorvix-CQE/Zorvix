@@ -403,11 +403,7 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   <div class="caja" style="max-width:520px">
     <h2 style="margin:0 0 8px" id="conf-titulo"></h2>
     <div id="conf-texto" class="sub" style="white-space:pre-wrap;margin-bottom:16px"></div>
-    <div class="fila">
-      <span class="crece"></span>
-      <button class="btn" id="conf-no">Cancelar</button>
-      <button class="btn primario" id="conf-si">Continuar</button>
-    </div>
+    <div class="fila" id="conf-botones"></div>
   </div>
 </div>
 
@@ -618,25 +614,39 @@ async function api(accion, datos){
   } finally { cargando(false); }
 }
 
-/* Devuelve una promesa: true si el médico confirma, false si cancela.
-   Sustituye a confirm(), que bloquea la pestaña entera. */
-function confirma(titulo, texto, textoSi){
+/* Pregunta con las opciones que se le den y devuelve la clave elegida, o
+   null si se cancela con Escape. Sustituye a confirm(), que bloquea la
+   pestaña entera. */
+function elige(titulo, texto, opciones){
   return new Promise(function(res){
     $('conf-titulo').textContent = titulo;
     $('conf-texto').textContent = texto;
-    $('conf-si').textContent = textoSi || 'Continuar';
-    $('confirmar').classList.remove('oculto');
+    const caja = $('conf-botones');
+    caja.innerHTML = '<span class="crece"></span>';
     const cierra = function(v){
       $('confirmar').classList.add('oculto');
-      $('conf-si').onclick = null; $('conf-no').onclick = null;
+      caja.innerHTML = '';
       document.removeEventListener('keydown', tecla);
       res(v);
     };
-    const tecla = function(e){ if (e.key === 'Escape') cierra(false); };
-    $('conf-si').onclick = () => cierra(true);
-    $('conf-no').onclick = () => cierra(false);
+    const tecla = function(e){ if (e.key === 'Escape') cierra(null); };
+    opciones.forEach(function(o){
+      const b = document.createElement('button');
+      b.className = 'btn' + (o.primario ? ' primario' : '');
+      b.textContent = o.texto;
+      b.onclick = () => cierra(o.clave);
+      caja.appendChild(b);
+    });
     document.addEventListener('keydown', tecla);
+    $('confirmar').classList.remove('oculto');
   });
+}
+
+function confirma(titulo, texto, textoSi){
+  return elige(titulo, texto, [
+    { clave:'no', texto:'Cancelar' },
+    { clave:'si', texto:textoSi || 'Continuar', primario:true }
+  ]).then(v => v === 'si');
 }
 
 let AVISO_GLOBAL_T = null;
@@ -1840,7 +1850,24 @@ $('dic-retranscribir').onclick = async function(){
   finally{ b.disabled = false; }
 };
 
-$('dic-repartir').onclick = function(){
+/* ── Quitar la etiqueta hablada ──────────────────────────────────────────
+
+   Los patrones del esquema vienen sin acentos («exploracion», «pronostico»,
+   «diagnosticos»). La bandera /i ignora mayúsculas, no acentos, así que
+   sobre el texto crudo NUNCA quitaban nada: la nota quedaba con
+   «Pronóstico reservado…», «Exploración física: TA 110-70…».
+
+   Se busca sobre el texto sin acentos y se corta esa misma cantidad de
+   caracteres del original. Quitar una tilde no cambia el largo de la
+   cadena, así que las posiciones coinciden y el texto conserva sus
+   acentos. Todos los patrones están anclados en ^. */
+function quitaEtiqueta(frase, re){
+  if (!re) return frase.trim();
+  const m = re.exec(normaliza(frase));
+  return (m ? frase.slice(m[0].length) : frase).trim();
+}
+
+$('dic-repartir').onclick = async function(){
   const texto = $('dic-texto').value.trim();
   if (!texto) return;
   const s = SECU[DOC.Tipo];
@@ -1850,7 +1877,7 @@ $('dic-repartir').onclick = function(){
      avanzando en orden. Si ninguna ancla la reconoce, se queda con el paso en
      curso; si todavía no hay paso en curso, va a «Sin ubicar». */
   const frases = texto.split(/(?<=[.!?])\s+|\n+/).map(x => x.trim()).filter(Boolean);
-  const cubo = {}, sueltas = [];
+  const cubo = {}, sueltas = [], conVitales = [];
   let actual = -1;
   frases.forEach(function(f){
     const n = normaliza(f);
@@ -1861,21 +1888,58 @@ $('dic-repartir').onclick = function(){
     if (elegido >= 0) actual = elegido;
     if (actual < 0){ sueltas.push(f); return; }
     const p = s[actual];
-    let limpia = f;
-    if (p.etiquetaRe) limpia = limpia.replace(p.etiquetaRe, '').trim();
-    (cubo[p.campo] = cubo[p.campo] || []).push(limpia);
-    if (p.vitales) sacaVitales(f, p);
+    (cubo[p.campo] = cubo[p.campo] || []).push(quitaEtiqueta(f, p.etiquetaRe));
+    if (p.vitales) conVitales.push({ frase:f, paso:p });
   });
+
+  /* ── Reemplazar o agregar ───────────────────────────────────────────────
+
+     Antes siempre se agregaba al final. Dictar dos veces —revisando, o
+     corrigiendo— dejaba las dos versiones apiladas en el mismo campo, y la
+     nota impresa salía diciendo la misma exploración dos veces con cifras
+     distintas. Pero borrar por omisión rompería la regla de la app: no se
+     tira nada sin que el médico lo sepa. Así que se pregunta, y sólo cuando
+     de verdad hay algo que se pueda perder. */
+  const ocupados = Object.keys(cubo).filter(function(cid){
+    const el = $('f_'+cid); return el && el.value.trim();
+  });
+  let modo = 'agrega';
+  if (ocupados.length){
+    const nombres = ocupados.map(cid => {
+      const c = PORID[cid]; return '· ' + ((c && c.etiqueta) || cid);
+    }).join('\n');
+    const r = await elige('Estos campos ya tienen texto',
+      nombres + '\n\nSi va a redictar lo mismo, reemplace. Si está agregando ' +
+      'algo nuevo a la nota, agregue al final.',
+      [{ clave:'cancela', texto:'Cancelar' },
+       { clave:'agrega',  texto:'Agregar al final' },
+       { clave:'reemplaza', texto:'Reemplazar', primario:true }]);
+    if (!r || r === 'cancela') return;
+    modo = r;
+  }
 
   Object.keys(cubo).forEach(function(cid){
     const el = $('f_'+cid);
     if (!el){ sueltas.push(cubo[cid].join(' ')); return; }
     const previo = el.value.trim();
-    el.value = (previo ? previo + '\n' : '') + cubo[cid].join(' ');
+    el.value = (modo === 'reemplaza' || !previo) ? cubo[cid].join(' ')
+                                                 : previo + '\n' + cubo[cid].join(' ');
   });
+
+  /* Los signos vitales se sacan después, ya sabiendo el modo: al reemplazar
+     se sobrescriben; al agregar se respeta lo que ya estaba, pero si lo
+     dictado ahora no coincide, se dice. Un campo que diga 16 mientras la
+     nota dice 20 es una contradicción dentro del mismo documento. */
+  const choques = [];
+  conVitales.forEach(v => sacaVitales(v.frase, v.paso, modo, choques));
+
   if (sueltas.length) agregaSinUbicar(sueltas.join('\n'));
   cierraDictado('Repartido en '+Object.keys(cubo).length+' campo(s)'+
+    (modo === 'reemplaza' ? ' (reemplazando lo anterior)' : '')+
     (sueltas.length ? ' · '+sueltas.length+' frase(s) a «Sin ubicar»' : '')+'.');
+  if (choques.length)
+    avisoGlobal('Revise estos signos vitales: lo que acaba de dictar no coincide con lo ' +
+      'que ya estaba en la casilla, y se conservó lo anterior. ' + choques.join('; ') + '.', 'warn');
 };
 
 function cierraDictado(msg){
@@ -1918,7 +1982,7 @@ function paraVitales(frase){
 
 /* Los signos vitales se sacan del texto y se meten en su campo numérico, pero
    la frase completa se queda igual en la exploración: no se tira nada. */
-function sacaVitales(frase, paso){
+function sacaVitales(frase, paso, modo, choques){
   const base = paso.campo.split('_')[0];
   const texto = paraVitales(frase);
   VITALES.forEach(function(v){
@@ -1928,7 +1992,18 @@ function sacaVitales(frase, paso){
     const candidatos = [base+'_sv_'+v.sufijo, base+'_'+v.sufijo, 'ing_sv_'+v.sufijo, 'hc_sv_'+v.sufijo];
     for (let i = 0; i < candidatos.length; i++){
       const el = $('f_'+candidatos[i]);
-      if (el && !el.value){ el.value = valor; return; }
+      if (!el) continue;
+      const previo = String(el.value || '').trim();
+      if (!previo || modo === 'reemplaza'){ el.value = valor; return; }
+      /* Ya había un valor y se pidió agregar: no se pisa, pero tampoco se
+         calla. La casilla y el texto de la nota no pueden discrepar sin que
+         alguien se entere. */
+      if (previo !== valor){
+        const c = PORID[candidatos[i]];
+        choques.push(((c && c.etiqueta) || v.sufijo.toUpperCase()) +
+                     ' dice ' + previo + ', dictó ' + valor);
+      }
+      return;
     }
   });
 }
