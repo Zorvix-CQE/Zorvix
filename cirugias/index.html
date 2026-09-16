@@ -1060,7 +1060,7 @@ async function cargaPendientes(){
     /* Los botones se cablean después de pintar, no en el HTML: así no hay
        onclick con datos interpolados, que es por donde se cuela una comilla. */
     Array.prototype.forEach.call(document.querySelectorAll('#p-ficha [data-liga]'),
-      function(b){ b.onclick = function(){ mandarLiga(b); }; });
+      function(b){ b.onclick = function(ev){ mandarLiga(b, ev); }; });
     pinta('p-preaparto', r.preaparto_vencido, function(x){
       return '<div class="caso" data-id="'+esc(x.Caso_ID)+'"><div class="nom">'+esc(x.Folio_Caso)+
         '</div><div class="meta">venció '+esc(x.vencio)+'</div></div>';
@@ -1078,7 +1078,12 @@ async function cargaPendientes(){
    El Paciente_ID viene en el renglón cuando el backend es v2.4 o más. Si el
    backend todavía es el viejo, se pide el caso para sacarlo: así el botón
    funciona hoy y nada más se vuelve más rápido cuando se actualice. */
-async function mandarLiga(boton){
+/* El botón vive DENTRO del renglón, y el renglón trae su propio onclick que
+   abre el caso (lo pone pinta(), para todos los pendientes). Sin
+   stopPropagation, apretarlo generaba la liga y acto seguido te mandaba a la
+   pantalla del caso: el mensaje se pintaba donde ya nadie estaba viendo. */
+async function mandarLiga(boton, ev){
+  if (ev) ev.stopPropagation();
   const original = boton.textContent;
   boton.disabled = true; boton.textContent = 'Generando…';
   try{
@@ -1094,23 +1099,56 @@ async function mandarLiga(boton){
     const r = await api('generarLigaFicha', { paciente_id: pacienteId });
 
     const nombre = String(r.paciente || boton.dataset.nom || '').trim().split(/\s+/)[0];
+    const vence  = String(r.vence || '').slice(0, 10);
     const texto =
       'Hola ' + nombre + ', le escribimos de Zorvix. Para preparar su cirugía nos faltan ' +
       'algunos datos suyos. Con esta liga los completa desde su celular en un par de ' +
       'minutos, tomando una foto de su INE:\n\n' + r.url + '\n\n' +
-      'La liga es personal, no la comparta. Vence el ' + String(r.vence || '').slice(0, 10) + '.';
+      'La liga es personal, no la comparta. Vence el ' + vence + '.';
 
     try { await navigator.clipboard.writeText(r.url); } catch(e){ /* sin portapapeles, ni modo */ }
 
-    const tel = String(r.telefono || telefono || '').replace(/\D/g, '').slice(-10);
-    if (tel) window.open('https://wa.me/52' + tel + '?text=' + encodeURIComponent(texto), '_blank');
+    /* WhatsApp NO se abre solo. Un window.open después de un await ya no cuenta
+       como consecuencia del clic y Chrome lo bloquea como popup — por eso antes
+       no pasaba nada. Se deja un enlace que la persona aprieta: no hay bloqueo
+       y, de paso, queda claro que quien manda el mensaje es alguien, no el
+       sistema.
 
-    aviso('p-ficha', 'ok',
-      'Liga generada' + (tel ? ' y WhatsApp abierto con el mensaje listo.' : '.') +
-      ' La liga ya está en el portapapeles. Vence el ' + String(r.vence||'').slice(0,10) +
-      '. Si generas otra, ésta deja de servir.');
+       El resultado reemplaza al botón EN SU LUGAR y no se usa aviso(), que hace
+       innerHTML sobre el contenedor y borraría la lista de pendientes entera. */
+    const tel = String(r.telefono || telefono || '').replace(/\D/g, '').slice(-10);
+    const caja = document.createElement('div');
+    caja.style.marginTop = '10px';
+
+    if (tel) {
+      const a = document.createElement('a');
+      a.className = 'btn sec';
+      a.style.display = 'inline-block';
+      a.style.textDecoration = 'none';
+      a.href = 'https://wa.me/52' + tel + '?text=' + encodeURIComponent(texto);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = 'Abrir WhatsApp con el mensaje listo';
+      a.onclick = function(e){ e.stopPropagation(); };
+      caja.appendChild(a);
+    }
+
+    const nota = document.createElement('div');
+    nota.className = 'meta';
+    nota.style.marginTop = '6px';
+    nota.textContent = 'Liga generada y copiada al portapapeles. Vence el ' + vence +
+      (tel ? '. Si generas otra, ésta deja de servir.'
+           : '. Este paciente no tiene teléfono: pégala tú donde corresponda.');
+    caja.appendChild(nota);
+
+    boton.replaceWith(caja);
+    return;
   }catch(e){
-    aviso('p-ficha', 'malo', e.message);
+    const err = document.createElement('div');
+    err.className = 'aviso malo';
+    err.style.marginTop = '10px';
+    err.textContent = e.message;
+    boton.insertAdjacentElement('afterend', err);
   }
   boton.disabled = false; boton.textContent = original;
 }
