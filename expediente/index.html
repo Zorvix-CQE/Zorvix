@@ -424,6 +424,7 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
     <div class="fila" style="margin-top:14px">
       <button class="btn primario" id="dic-grabar">Grabar</button>
       <button class="btn" id="dic-parar" disabled>Detener</button>
+      <button class="btn oculto" id="dic-retranscribir">Reintentar transcripción</button>
       <span class="crece"></span>
       <span id="dic-reloj" style="font-family:var(--zx-mono,monospace);color:var(--tinta3)"></span>
     </div>
@@ -483,67 +484,106 @@ const cargando = (on) => $('cargando').classList.toggle('on', !!on);
    copie window.ZORVIX_ULTIMO_FALLO. Un error mudo es un error que no se arregla. */
 window.ZORVIX_ULTIMO_FALLO = null;
 
+/* ── Reintento, y por qué NO en todas las acciones ───────────────────────
+
+   El 16 sep 2026 `audioTranscribir` volvió con HTTP 404 y una página de error
+   de Google — no del gateway. Ese 404 viene del salto intermedio: /exec
+   contesta 302 hacia script.googleusercontent.com con una llave de un solo
+   uso, y ese segundo salto a veces se cae. Es intermitente: la llamada de
+   antes, con el mismo token y la misma sesión, había pasado.
+
+   Un reintento lo resuelve. Pero reintentar a ciegas es peligroso: si la
+   petición SÍ llegó y lo que se perdió fue la respuesta, repetir un guardado
+   crea un documento duplicado en el expediente. Así que sólo se reintenta lo
+   que se puede repetir sin dejar rastro nuevo: lecturas, y transcribir un
+   audio que ya está guardado (se vuelve a transcribir el mismo Audio_ID,
+   no se crea otro). Guardar, subir y borrar NO se reintentan nunca. */
+const REPETIBLES = ['ping','sesion','esquema','buscarPaciente','expediente',
+                    'documento','agendaDelDia','bitacora','audioTranscribir'];
+
+const esperaMs = ms => new Promise(res => setTimeout(res, ms));
+
+function dondeContesto(u){
+  try{ const x = new URL(u); return x.host + x.pathname.slice(0, 32); }
+  catch(e){ return String(u || '').slice(0, 60); }
+}
+
 async function api(accion, datos){
   if (!API) throw new Error('Falta configurar la dirección del servidor en esta página (constante API).');
   cargando(true);
   const cuerpo = JSON.stringify(Object.assign({accion:accion, id_token:TOKEN}, datos||{}));
-  const t0 = Date.now();
+  const intentos = REPETIBLES.indexOf(accion) >= 0 ? 2 : 1;
   try{
-    let r;
-    try{
-      r = await fetch(API, {
-        method:'POST', credentials:'omit',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: cuerpo
-      });
-    }catch(err){
-      window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'red', enviado:cuerpo.length,
-        ms:Date.now()-t0, error:String(err) };
-      console.error('[Zorvix] falló la conexión', window.ZORVIX_ULTIMO_FALLO);
-      throw new Error('No se pudo conectar con el servidor (' + err.message + '). ' +
-        'Enviábamos ' + Math.round(cuerpo.length/1024) + ' KB en «' + accion + '».');
+    for (let intento = 1; intento <= intentos; intento++){
+      const t0 = Date.now();
+      let r;
+      try{
+        r = await fetch(API, {
+          method:'POST', credentials:'omit',
+          headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body: cuerpo
+        });
+      }catch(err){
+        window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'red', intento:intento,
+          enviado:cuerpo.length, ms:Date.now()-t0, error:String(err) };
+        console.error('[Zorvix] falló la conexión', window.ZORVIX_ULTIMO_FALLO);
+        if (intento < intentos){ await esperaMs(900); continue; }
+        throw new Error('No se pudo conectar con el servidor (' + err.message + '). ' +
+          'Enviábamos ' + Math.round(cuerpo.length/1024) + ' KB en «' + accion + '».');
+      }
+
+      const txt = await r.text();
+      let j = null;
+      try{ j = JSON.parse(txt); }catch(e){ j = null; }
+
+      if (j === null){
+        const detalle = {
+          accion: accion, etapa:'respuesta', intento:intento, de:intentos,
+          http:r.status, tipo:r.headers.get('content-type') || '',
+          enviado: cuerpo.length, recibido: txt.length, ms: Date.now()-t0,
+          url: r.url, inicio: txt.slice(0, 500)
+        };
+        window.ZORVIX_ULTIMO_FALLO = detalle;
+        console.error('[Zorvix] respuesta no-JSON', detalle);
+        if (intento < intentos){ await esperaMs(900); continue; }
+        const pista = txt.length === 0
+          ? 'La respuesta llegó vacía.'
+          : 'Contestó ' + dondeContesto(r.url) + ' con: «' +
+            txt.slice(0, 140).replace(/\s+/g,' ').trim() + '»';
+        throw new Error('El servidor no respondió JSON en «' + accion + '». HTTP ' + r.status +
+          (intentos > 1 ? ' (falló ' + intentos + ' de ' + intentos + ' intentos). ' : '. ') + pista);
+      }
+
+      if (!j.ok){
+        window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'servidor', http:r.status,
+          enviado:cuerpo.length, ms:Date.now()-t0, respuesta:j };
+        /* Una credencial vencida a media sesión no puede quedarse callada
+           dejando la pantalla puesta: se regresa al botón de entrada. La acción
+           'sesion' se excluye porque ésa la maneja entro(), que sabe si hay otra
+           entrada más nueva en curso. */
+        if (j.error === 'no_autorizado' && accion !== 'sesion')
+          caducoLaSesion(j.mensaje);
+        throw new Error(j.mensaje || j.error || 'Error desconocido');
+      }
+
+      /* Si doPost no logra leer el cuerpo, Apps Script contesta el saludo de «ping»,
+         que es ok:true pero no es la respuesta pedida. Eso hay que cazarlo aquí o
+         se convierte en un fallo confuso dos llamadas más adelante. */
+      const esSaludo = accion !== 'ping' && j.servicio && j.modulo && j.version && j.hora &&
+                       Object.keys(j).length === 5;
+      if (esSaludo){
+        window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'eco_de_ping', intento:intento,
+          enviado:cuerpo.length, ms:Date.now()-t0, respuesta:j };
+        console.error('[Zorvix] el servidor contestó el saludo, no la acción', window.ZORVIX_ULTIMO_FALLO);
+        if (intento < intentos){ await esperaMs(900); continue; }
+        throw new Error('El servidor no recibió la acción «' + accion + '»: contestó el saludo de arranque. ' +
+          'Suele pasar cuando el envío (' + Math.round(cuerpo.length/1024) + ' KB) no le llega completo.');
+      }
+
+      if (intento > 1) console.log('[Zorvix] «' + accion + '» salió al segundo intento');
+      return j;
     }
-    const txt = await r.text();
-    let j;
-    try{ j = JSON.parse(txt); }
-    catch(e){
-      const detalle = {
-        accion: accion, etapa:'respuesta', http:r.status, tipo:r.headers.get('content-type') || '',
-        enviado: cuerpo.length, recibido: txt.length, ms: Date.now()-t0,
-        url: r.url, inicio: txt.slice(0, 500)
-      };
-      window.ZORVIX_ULTIMO_FALLO = detalle;
-      console.error('[Zorvix] respuesta no-JSON', detalle);
-      const pista = txt.length === 0
-        ? 'La respuesta llegó vacía.'
-        : 'Empieza así: «' + txt.slice(0, 180).replace(/\s+/g,' ').trim() + '»';
-      throw new Error('El servidor no respondió JSON en «' + accion + '». ' +
-        'HTTP ' + r.status + ', ' + txt.length + ' caracteres. ' + pista);
-    }
-    if (!j.ok){
-      window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'servidor', http:r.status,
-        enviado:cuerpo.length, ms:Date.now()-t0, respuesta:j };
-      /* Una credencial vencida a media sesión no puede quedarse callada
-         dejando la pantalla puesta: se regresa al botón de entrada. La acción
-         'sesion' se excluye porque ésa la maneja entro(), que sabe si hay otra
-         entrada más nueva en curso. */
-      if (j.error === 'no_autorizado' && accion !== 'sesion')
-        caducoLaSesion(j.mensaje);
-      throw new Error(j.mensaje || j.error || 'Error desconocido');
-    }
-    /* Si doPost no logra leer el cuerpo, Apps Script contesta el saludo de «ping»,
-       que es ok:true pero no es la respuesta pedida. Eso hay que cazarlo aquí o
-       se convierte en un fallo confuso dos llamadas más adelante. */
-    const esSaludo = accion !== 'ping' && j.servicio && j.modulo && j.version && j.hora &&
-                     Object.keys(j).length === 5;
-    if (esSaludo){
-      window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'eco_de_ping', enviado:cuerpo.length,
-        ms:Date.now()-t0, respuesta:j };
-      console.error('[Zorvix] el servidor contestó el saludo, no la acción', window.ZORVIX_ULTIMO_FALLO);
-      throw new Error('El servidor no recibió la acción «' + accion + '»: contestó el saludo de arranque. ' +
-        'Suele pasar cuando el envío (' + Math.round(cuerpo.length/1024) + ' KB) no le llega completo.');
-    }
-    return j;
+    throw new Error('La llamada «' + accion + '» terminó sin respuesta.');
   } finally { cargando(false); }
 }
 
@@ -1647,6 +1687,8 @@ $('dic-grabar').onclick = async function(){
       }
     };
 
+    AUDIO_ID = null;
+    $('dic-retranscribir').classList.add('oculto');
     reiniciaNivel();
     arrancaMedidor(stream, true);
     grabadora.start();
@@ -1700,8 +1742,31 @@ async function subeYTranscribe(blob, segundos){
     $('dic-texto').value = ($('dic-texto').value ? $('dic-texto').value + '\n' : '') + t.texto.trim();
     aviso('dic-aviso','ok','Listo. Revise el texto y repártalo. El audio se borra al firmar y a los '+
       (s.borra_en_dias||30)+' días como máximo.');
-  }catch(e){ aviso('dic-aviso','malo', e.message); }
+  }catch(e){
+    /* Si el audio ya subió y lo que falló fue transcribirlo, no hay por qué
+       volver a dictar: el archivo está guardado y se puede reintentar sobre
+       el mismo Audio_ID. Volver a grabar dejaría un audio de más del mismo
+       paciente, y el expediente no necesita basura. */
+    if (AUDIO_ID) $('dic-retranscribir').classList.remove('oculto');
+    aviso('dic-aviso','malo', e.message +
+      (AUDIO_ID ? ' El audio ya está guardado (' + AUDIO_ID + '): use «Reintentar transcripción», no hace falta volver a dictar.' : ''));
+  }
 }
+
+$('dic-retranscribir').onclick = async function(){
+  if (!AUDIO_ID) return;
+  const b = $('dic-retranscribir'); b.disabled = true;
+  try{
+    aviso('dic-aviso','warn','Transcribiendo de nuevo el audio ' + AUDIO_ID + '…');
+    const t = await api('audioTranscribir', { audio_id: AUDIO_ID });
+    if (typeof t.texto !== 'string')
+      throw new Error('El servidor no devolvió texto para el audio ' + AUDIO_ID + '.');
+    $('dic-texto').value = ($('dic-texto').value ? $('dic-texto').value + '\n' : '') + t.texto.trim();
+    b.classList.add('oculto');
+    aviso('dic-aviso','ok','Listo. Revise el texto y repártalo.');
+  }catch(e){ aviso('dic-aviso','malo', e.message); }
+  finally{ b.disabled = false; }
+};
 
 $('dic-repartir').onclick = function(){
   const texto = $('dic-texto').value.trim();
