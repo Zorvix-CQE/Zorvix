@@ -1305,15 +1305,39 @@ $('dic-grabar').onclick = async function(){
       return;
     }
     const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-    GRAB = new MediaRecorder(stream);
+
+    /* ── Por qué una referencia local y no la global ─────────────────────────
+
+       paraGrabacion() hace GRAB.stop() y en la línea siguiente GRAB = null.
+       stop() NO ejecuta onstop en ese instante: lo encola. Para cuando el
+       evento llega, la global ya vale null, y leer GRAB.mimeType reventaba
+       con "Cannot read properties of null". Como el fallo ocurría dentro de
+       un manejador async sin catch, moría callado: ni se subía el audio, ni
+       aparecía un error. El dictado se veía roto sin decir por qué.
+
+       `grabadora` es de esta grabación y sobrevive a que la global se limpie. */
+    const grabadora = new MediaRecorder(stream);
+    GRAB = grabadora;
     const trozos = [];
-    GRAB.ondataavailable = e => trozos.push(e.data);
-    GRAB.onstop = async function(){
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(trozos, { type: GRAB.mimeType || 'audio/webm' });
-      await subeYTranscribe(blob, Math.round((Date.now()-t0)/1000));
+    grabadora.ondataavailable = e => trozos.push(e.data);
+    grabadora.onstop = async function(){
+      /* El catch no es decorativo: sin él, cualquier tropiezo al cerrar la
+         grabación vuelve a desaparecer sin dejar rastro, que es exactamente
+         como se escondió este bug. Si algo falla, que se vea. */
+      try{
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(trozos, { type: grabadora.mimeType || 'audio/webm' });
+        if (!blob.size){
+          aviso('dic-aviso','malo','La grabación salió vacía: no se capturó audio. ' +
+            'Revise que el micrófono correcto esté seleccionado e intente de nuevo.');
+          return;
+        }
+        await subeYTranscribe(blob, Math.round((Date.now()-t0)/1000));
+      }catch(err){
+        aviso('dic-aviso','malo','No se pudo cerrar la grabación: ' + err.message);
+      }
     };
-    GRAB.start();
+    grabadora.start();
     t0 = Date.now();
     $('dic-grabar').disabled = true; $('dic-parar').disabled = false;
     reloj = setInterval(() => {
