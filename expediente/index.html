@@ -391,6 +391,11 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
 
 </main>
 
+<!-- Un aviso que se ve desde cualquier vista, en lugar del cuadro modal del
+     navegador, que congela la pestaña entera y no deja ni leer lo de atrás. -->
+<div id="aviso-global" class="oculto"
+     style="position:fixed;left:50%;transform:translateX(-50%);top:14px;z-index:60;max-width:580px;width:calc(100% - 32px)"></div>
+
 <!-- ══════════ DICTADO ══════════ -->
 <div id="dictado" class="oculto">
   <div class="caja">
@@ -518,6 +523,12 @@ async function api(accion, datos){
     if (!j.ok){
       window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'servidor', http:r.status,
         enviado:cuerpo.length, ms:Date.now()-t0, respuesta:j };
+      /* Una credencial vencida a media sesión no puede quedarse callada
+         dejando la pantalla puesta: se regresa al botón de entrada. La acción
+         'sesion' se excluye porque ésa la maneja entro(), que sabe si hay otra
+         entrada más nueva en curso. */
+      if (j.error === 'no_autorizado' && accion !== 'sesion')
+        caducoLaSesion(j.mensaje);
       throw new Error(j.mensaje || j.error || 'Error desconocido');
     }
     /* Si doPost no logra leer el cuerpo, Apps Script contesta el saludo de «ping»,
@@ -534,6 +545,15 @@ async function api(accion, datos){
     }
     return j;
   } finally { cargando(false); }
+}
+
+let AVISO_GLOBAL_T = null;
+function avisoGlobal(texto, clase){
+  const d = $('aviso-global'); if (!d) return;
+  d.innerHTML = '<div class="aviso '+(clase||'malo')+'">'+esc(texto)+'</div>';
+  d.classList.remove('oculto');
+  clearTimeout(AVISO_GLOBAL_T);
+  AVISO_GLOBAL_T = setTimeout(function(){ d.classList.add('oculto'); }, 9000);
 }
 
 function aviso(destino, clase, texto){
@@ -605,10 +625,51 @@ window.onload = function(){
   }, 150);
 };
 
+/* ── Por qué hay un número de generación ─────────────────────────────────
+
+   window.onload dispara entro() DOS veces y en paralelo:
+     · una con la credencial heredada de sessionStorage, y
+     · otra cuando Google contesta el auto_select de One Tap.
+
+   Las dos empiezan poniendo TOKEN y las dos hacen await. Si la vieja falla
+   —y falla seguido, porque una credencial de Google dura una hora— su catch
+   corría `TOKEN = null; olvidaSesion()` y borraba la credencial BUENA que la
+   otra acababa de dejar. La pantalla ya estaba pintada por la que sí sirvió,
+   así que la app se quedaba viéndose conectada, con su nombre y su agenda,
+   y sin credencial por dentro. De ahí el «Falta la credencial de Google.»
+   al abrir un paciente, y de ahí la búsqueda que salía con 0 KB.
+
+   La regla ahora es una sola: cada entrada saca número, y sólo la más
+   reciente puede tocar TOKEN o la pantalla. Una entrada vieja que llega
+   tarde se calla y se va. */
+let SESION_GEN = 0;
+
+function muestraEntrada(){
+  $('pantalla-entrada').classList.remove('oculto');
+  $('barra').classList.add('oculto');
+  $('tabs').classList.add('oculto');
+  $('app').classList.add('oculto');
+}
+
+/* Una credencial vencida no se disfraza: se dice y se vuelve al botón. Dejar
+   la pantalla puesta sin sesión fue justo el error que costó esta mañana. */
+function caducoLaSesion(mensaje){
+  TOKEN = null;
+  olvidaSesion();
+  SESION_GEN++;
+  muestraEntrada();
+  aviso('entrada-error','malo', mensaje ||
+    'Su sesión de Google venció. Vuelva a entrar; la credencial dura una hora.');
+}
+
 async function entro(resp, silencioso){
-  TOKEN = resp.credential;
+  const mi = ++SESION_GEN;
+  const tok = resp && resp.credential;
+  if (!tok) return;
+  TOKEN = tok;
   try{
     const s = await api('sesion');
+    if (mi !== SESION_GEN) return;   /* llegó tarde: manda la entrada más nueva */
     YO = s; EST = s.establecimiento || {};
     guardaSesion(TOKEN);
     $('pantalla-entrada').classList.add('oculto');
@@ -633,8 +694,12 @@ async function entro(resp, silencioso){
     }catch(e){}
     if (pedido) await abreExpediente(pedido);
   }catch(err){
+    /* Si ya hay una entrada más nueva, esta fracasó pero no manda: no le
+       borra la credencial a nadie ni le tumba la pantalla. */
+    if (mi !== SESION_GEN) return;
     TOKEN = null;
     olvidaSesion();
+    muestraEntrada();
     /* Silencioso quiere decir que veníamos con una credencial heredada que ya
        no sirve. Eso no es un error que la persona deba leer: se cae al botón. */
     if (!silencioso) aviso('entrada-error','malo', err.message);
@@ -748,7 +813,7 @@ async function abreExpediente(pacienteId){
     $('tab-exp').classList.remove('oculto');
     pintaExpediente();
     vista('expediente');
-  }catch(e){ alert(e.message); }
+  }catch(e){ avisoGlobal('No se pudo abrir el expediente: ' + e.message); }
 }
 
 function pintaExpediente(){
@@ -896,7 +961,7 @@ function nuevoDocumento(tipo){
   let casoId = '';
   if (deCaso){
     const cs = EXP.casos;
-    if (!cs.length){ alert('Ese documento pertenece a un internamiento y este paciente no tiene ninguno.'); return; }
+    if (!cs.length){ avisoGlobal('Ese documento pertenece a un internamiento y este paciente no tiene ninguno.','warn'); return; }
     if (cs.length === 1) casoId = cs[0].Caso_ID;
     else {
       const op = cs.map((c,i) => (i+1)+') '+String(c.Fecha_Cirugia||'').slice(0,10)+'  '+(c.Procedimiento_Principal||'')).join('\n');
@@ -916,7 +981,7 @@ async function abreDocumento(docId){
     DOC = r.documento;
     DOC.campos = DOC.campos || {};
     pintaDocumento();
-  }catch(e){ alert(e.message); }
+  }catch(e){ avisoGlobal('No se pudo abrir el documento: ' + e.message); }
 }
 
 function casoActual(){
