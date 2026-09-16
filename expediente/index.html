@@ -401,6 +401,21 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
     </div>
     <div id="dic-aviso"></div>
     <div id="dic-pasos"></div>
+
+    <!-- El micrófono se elige y se ve ANTES de dictar. Un micrófono mudo
+         produce un archivo válido lleno de silencio, y el transcriptor
+         rellena el silencio con frases inventadas. Eso ya pasó una vez. -->
+    <div class="fila" style="margin-top:14px;align-items:center;gap:10px">
+      <select id="dic-micro" class="crece" style="max-width:360px"></select>
+      <button class="btn" id="dic-probar">Probar micrófono</button>
+    </div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+      <div style="flex:1;height:10px;border-radius:6px;background:var(--linea,#e6e6ef);overflow:hidden">
+        <div id="dic-barra" style="height:100%;width:0%;background:var(--zx-acento,#5b3df5);transition:width .08s linear"></div>
+      </div>
+      <span id="dic-nivel" style="font-family:var(--zx-mono,monospace);font-size:11.5px;color:var(--tinta3);min-width:96px;text-align:right"></span>
+    </div>
+
     <div class="fila" style="margin-top:14px">
       <button class="btn primario" id="dic-grabar">Grabar</button>
       <button class="btn" id="dic-parar" disabled>Detener</button>
@@ -1334,11 +1349,170 @@ $('btn-dictar').onclick = function(){
   $('dic-pasos').innerHTML = !s ? '' : s.map(p =>
     '<div class="paso"><div class="t">'+esc(p.titulo)+'</div><div class="a">'+esc(p.ayuda||'')+'</div></div>').join('');
   aviso('dic-aviso','','');
+  $('dic-texto').value = $('dic-texto').value || '';
   $('dictado').classList.remove('oculto');
+  listaMicros();
 };
-$('dic-cerrar').onclick = () => { paraGrabacion(); $('dictado').classList.add('oculto'); };
+$('dic-cerrar').onclick = () => {
+  paraGrabacion();
+  paraMedidor(true);
+  const b = $('dic-probar');
+  if (b){ b.dataset.corriendo = ''; b.textContent = 'Probar micrófono'; }
+  $('dictado').classList.add('oculto');
+};
+
+/* ══════════ MEDICIÓN DEL MICRÓFONO ══════════
+
+   El 16 de septiembre de 2026 el dictado devolvió «The skin on the face feels
+   soft.» — una frase en inglés que nadie dijo, en una nota de evolución. El
+   micrófono no estaba capturando; el archivo pesaba lo suficiente para pasar
+   el control de "grabación vacía", pero adentro había silencio. Los modelos
+   de la familia Whisper rellenan el silencio con frases plausibles.
+
+   De ahí estas tres reglas:
+   · El nivel se mide durante toda la grabación, no después.
+   · Si no hubo voz, el audio NO se sube. No se le pregunta al transcriptor
+     qué cree que oyó, porque contesta aunque no haya oído nada.
+   · El médico puede ver y elegir su micrófono antes de hablar.            */
+
+const PICO_MINIMO = 0.012;   /* por debajo de esto no hubo voz, hubo ruido de piso */
+const VOZ_UMBRAL  = 0.006;   /* un cuadro cuenta como voz si pasa esto */
+const VOZ_MINIMA  = 0.02;    /* y al menos el 2% de los cuadros tienen que contar */
 
 let t0 = null, reloj = null;
+let CTX_AUDIO = null, MEDIDOR = null, MEDIDOR_STREAM = null;
+let NIVEL = { pico:0, cuadros:0, cuadrosVoz:0 };
+
+function reiniciaNivel(){ NIVEL = { pico:0, cuadros:0, cuadrosVoz:0 }; }
+
+function pintaNivel(rms, contando){
+  const pct = Math.min(100, Math.round(rms * 400));
+  const b = $('dic-barra'); if (b) b.style.width = pct + '%';
+  const t = $('dic-nivel');
+  if (t) t.textContent = contando
+    ? 'nivel ' + pct + '% · pico ' + Math.min(100, Math.round(NIVEL.pico*400)) + '%'
+    : 'nivel ' + pct + '%';
+}
+
+/* Arranca el medidor sobre un stream ya abierto. `contando` decide si además
+   acumula estadística para el veredicto de "hubo voz o no". */
+function arrancaMedidor(stream, contando){
+  paraMedidor(false);
+  MEDIDOR_STREAM = stream;
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    CTX_AUDIO = new AC();
+    const fuente = CTX_AUDIO.createMediaStreamSource(stream);
+    const an = CTX_AUDIO.createAnalyser();
+    an.fftSize = 2048;
+    fuente.connect(an);
+    const buf = new Float32Array(an.fftSize);
+    if (contando) reiniciaNivel();
+    MEDIDOR = setInterval(function(){
+      an.getFloatTimeDomainData(buf);
+      let suma = 0;
+      for (let i = 0; i < buf.length; i++) suma += buf[i] * buf[i];
+      const rms = Math.sqrt(suma / buf.length);
+      if (contando){
+        NIVEL.cuadros++;
+        if (rms > NIVEL.pico) NIVEL.pico = rms;
+        if (rms > VOZ_UMBRAL) NIVEL.cuadrosVoz++;
+      }
+      pintaNivel(rms, contando);
+    }, 60);
+  }catch(err){
+    /* Sin medidor se puede dictar, pero se pierde la única defensa contra el
+       silencio. Que se vea, no que se calle. */
+    console.error('[Zorvix] no se pudo medir el micrófono', err);
+    const t = $('dic-nivel'); if (t) t.textContent = 'sin medición';
+  }
+}
+
+function paraMedidor(cerrarStream){
+  if (MEDIDOR){ clearInterval(MEDIDOR); MEDIDOR = null; }
+  if (CTX_AUDIO){ try{ CTX_AUDIO.close(); }catch(e){} CTX_AUDIO = null; }
+  if (cerrarStream && MEDIDOR_STREAM){
+    try{ MEDIDOR_STREAM.getTracks().forEach(t => t.stop()); }catch(e){}
+  }
+  if (cerrarStream) MEDIDOR_STREAM = null;
+  const b = $('dic-barra'); if (b) b.style.width = '0%';
+}
+
+/* El veredicto. Devuelve null si hubo voz, o el motivo si no la hubo. */
+function porQueNoHuboVoz(){
+  if (!NIVEL.cuadros) return 'No se pudo medir el nivel del micrófono durante la grabación.';
+  const frac = NIVEL.cuadrosVoz / NIVEL.cuadros;
+  if (NIVEL.pico < PICO_MINIMO)
+    return 'El micrófono no capturó voz: el nivel más alto de toda la grabación fue ' +
+           Math.round(NIVEL.pico*400) + '% (hace falta más de ' + Math.round(PICO_MINIMO*400) + '%).';
+  if (frac < VOZ_MINIMA)
+    return 'Casi toda la grabación es silencio: sólo el ' + (frac*100).toFixed(1) +
+           '% tiene señal de voz.';
+  return null;
+}
+
+/* ══════════ ELEGIR MICRÓFONO ══════════ */
+
+const MICRO_GUARDADO = 'zx-microfono';
+
+function microElegido(){
+  const v = $('dic-micro') && $('dic-micro').value;
+  return v && v !== 'auto' ? v : null;
+}
+
+function restriccionAudio(){
+  const id = microElegido();
+  return id ? { audio: { deviceId: { exact: id } } } : { audio: true };
+}
+
+async function listaMicros(){
+  const sel = $('dic-micro');
+  if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  let guardado = null;
+  try{ guardado = localStorage.getItem(MICRO_GUARDADO); }catch(e){}
+  const actual = sel.value || guardado;
+  try{
+    const ds = await navigator.mediaDevices.enumerateDevices();
+    const micros = ds.filter(d => d.kind === 'audioinput');
+    sel.innerHTML = '<option value="auto">Micrófono predeterminado del sistema</option>' +
+      micros.map((d, i) =>
+        '<option value="'+esc(d.deviceId)+'">'+
+        esc(d.label || ('Micrófono ' + (i+1) + ' (permita el acceso para ver el nombre)'))+
+        '</option>').join('');
+    if (actual && micros.some(d => d.deviceId === actual)) sel.value = actual;
+  }catch(err){
+    console.error('[Zorvix] no se pudieron listar los micrófonos', err);
+  }
+}
+
+if ($('dic-micro')) $('dic-micro').onchange = function(){
+  try{ localStorage.setItem(MICRO_GUARDADO, $('dic-micro').value); }catch(e){}
+};
+
+if (navigator.mediaDevices && 'ondevicechange' in navigator.mediaDevices)
+  navigator.mediaDevices.ondevicechange = listaMicros;
+
+$('dic-probar').onclick = async function(){
+  const btn = $('dic-probar');
+  if (btn.dataset.corriendo === '1'){ paraMedidor(true); btn.dataset.corriendo = ''; btn.textContent = 'Probar micrófono'; return; }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia(restriccionAudio());
+    await listaMicros();                 /* con permiso ya se ven los nombres */
+    arrancaMedidor(stream, false);
+    btn.dataset.corriendo = '1'; btn.textContent = 'Detener prueba';
+    aviso('dic-aviso','','Hable normal. La barra se tiene que mover. Si no se mueve, ese micrófono no está capturando.');
+    setTimeout(function(){
+      if (btn.dataset.corriendo === '1'){
+        paraMedidor(true); btn.dataset.corriendo = ''; btn.textContent = 'Probar micrófono';
+      }
+    }, 15000);
+  }catch(e){
+    aviso('dic-aviso','malo','No se pudo abrir el micrófono: '+e.message);
+  }
+};
+
+/* ══════════ GRABAR ══════════ */
+
 $('dic-grabar').onclick = async function(){
   try{
     if (!audioAutorizado()){
@@ -1349,7 +1523,12 @@ $('dic-grabar').onclick = async function(){
       aviso('dic-aviso','warn','Primero guarde el borrador: el audio se cuelga de un documento que ya exista.');
       return;
     }
-    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    paraMedidor(true);
+    const btnP = $('dic-probar');
+    if (btnP){ btnP.dataset.corriendo = ''; btnP.textContent = 'Probar micrófono'; }
+
+    const stream = await navigator.mediaDevices.getUserMedia(restriccionAudio());
+    await listaMicros();
 
     /* ── Por qué una referencia local y no la global ─────────────────────────
 
@@ -1370,35 +1549,63 @@ $('dic-grabar').onclick = async function(){
          grabación vuelve a desaparecer sin dejar rastro, que es exactamente
          como se escondió este bug. Si algo falla, que se vea. */
       try{
+        const medido = { pico:NIVEL.pico, cuadros:NIVEL.cuadros, cuadrosVoz:NIVEL.cuadrosVoz };
+        paraMedidor(false);
         stream.getTracks().forEach(t => t.stop());
+        MEDIDOR_STREAM = null;
         const blob = new Blob(trozos, { type: grabadora.mimeType || 'audio/webm' });
+        const segundos = Math.round((Date.now()-t0)/1000);
+        console.log('[Zorvix] grabación cerrada', {
+          segundos: segundos, bytes: blob.size, mime: blob.type,
+          pico: medido.pico, cuadros: medido.cuadros, cuadrosVoz: medido.cuadrosVoz });
+
         if (!blob.size){
           aviso('dic-aviso','malo','La grabación salió vacía: no se capturó audio. ' +
-            'Revise que el micrófono correcto esté seleccionado e intente de nuevo.');
+            'Elija el micrófono correcto arriba y use «Probar micrófono» antes de dictar.');
           return;
         }
-        await subeYTranscribe(blob, Math.round((Date.now()-t0)/1000));
+
+        /* La reja. Un archivo de silencio pesa y parece válido; el transcriptor
+           le inventa contenido. Aquí se detiene, antes de gastar la llamada y
+           mucho antes de que algo inventado llegue a un campo del expediente. */
+        const motivo = porQueNoHuboVoz();
+        if (motivo){
+          aviso('dic-aviso','malo', motivo + ' No se mandó a transcribir: un audio en ' +
+            'silencio hace que el transcriptor invente texto, y eso no puede entrar a ' +
+            'una nota clínica. Pruebe el micrófono con el botón de arriba y repita el dictado.');
+          return;
+        }
+
+        await subeYTranscribe(blob, segundos);
       }catch(err){
         aviso('dic-aviso','malo','No se pudo cerrar la grabación: ' + err.message);
       }
     };
+
+    reiniciaNivel();
+    arrancaMedidor(stream, true);
     grabadora.start();
     t0 = Date.now();
     $('dic-grabar').disabled = true; $('dic-parar').disabled = false;
+    if (btnP) btnP.disabled = true;
+    if ($('dic-micro')) $('dic-micro').disabled = true;
     reloj = setInterval(() => {
       const s = Math.round((Date.now()-t0)/1000);
       $('dic-reloj').innerHTML = '<span class="punto"></span> ' +
         String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
     }, 500);
-    aviso('dic-aviso','','');
+    aviso('dic-aviso','','Grabando. Vigile la barra: si no se mueve mientras habla, detenga y cambie de micrófono.');
   }catch(e){ aviso('dic-aviso','malo','No se pudo abrir el micrófono: '+e.message); }
 };
+
 $('dic-parar').onclick = paraGrabacion;
 function paraGrabacion(){
   if (GRAB && GRAB.state === 'recording') GRAB.stop();
   GRAB = null;
   clearInterval(reloj); reloj = null;
   $('dic-grabar').disabled = false; $('dic-parar').disabled = true;
+  if ($('dic-probar')) $('dic-probar').disabled = false;
+  if ($('dic-micro')) $('dic-micro').disabled = false;
   $('dic-reloj').textContent = '';
 }
 
