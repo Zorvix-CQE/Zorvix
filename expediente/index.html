@@ -541,6 +541,34 @@ const CLIENTE = '148311031818-4ku0lhia6qd0fgbmi379dvi7k4vp303g.apps.googleuserco
    justo lo que NOM-004-SSA3-2012 5.11 llama enmendaduras. El rastro no se
    pierde: cada guardado sube de versión, deja su archivo en Drive y queda en
    la bitácora con quién y cuándo. */
+/* ── Correos adentro, nombres afuera ─────────────────────────────────────
+
+   Las hojas Casos y Documentos identifican a los médicos por correo, y está
+   bien: es la llave, no cambia y no se repite. Pero una nota clínica que dice
+   «Médico tratante: miguelsotouniverse@gmail.com» no es una nota clínica. El
+   padrón viene con la sesión y se usa sólo para MOSTRAR; lo que se guarda
+   sigue siendo el correo. */
+const ES_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function nombreDeCorreo(v){
+  const c = String(v == null ? '' : v).trim();
+  if (!ES_CORREO.test(c)) return c;
+  const k = c.toLowerCase();
+  const pad = (YO && YO.padron_medicos) || [];
+  for (let i = 0; i < pad.length; i++)
+    if (pad[i].correo === k && pad[i].nombre) return pad[i].nombre;
+  /* El caso trae el nombre aunque el médico ya no esté en el padrón. */
+  const cs = (EXP && EXP.casos) || [];
+  for (let i = 0; i < cs.length; i++){
+    if (String(cs[i].Cirujano_Email || '').toLowerCase().trim() === k && cs[i].Cirujano_Nombre)
+      return cs[i].Cirujano_Nombre;
+    if (String(cs[i].Anestesiologo_Email || '').toLowerCase().trim() === k && cs[i].Anestesiologo_Nombre)
+      return cs[i].Anestesiologo_Nombre;
+  }
+  if (YO && String(YO.correo || '').toLowerCase().trim() === k && YO.nombre) return YO.nombre;
+  return c;   /* nunca se inventa un nombre: si no se sabe, va el correo */
+}
+
 const ESTADO_ARCHIVADA = 'Impresa y archivada';
 const ESTADO_HEREDADO  = 'Firmado y escaneado';   /* notas viejas */
 const esArchivada = e => e === ESTADO_ARCHIVADA || e === ESTADO_HEREDADO;
@@ -1153,7 +1181,10 @@ function filaImp(etiqueta, valor){
 function armaImpresion(){
   const vals = leeFormulario();
   const campos = camposDe(DOC.Tipo);
-  const val = c => textoDe(c, vals[c.id] !== undefined ? vals[c.id] : DOC.campos[c.id]);
+  const val = function(c){
+    const t = textoDe(c, vals[c.id] !== undefined ? vals[c.id] : DOC.campos[c.id]);
+    return typeof t === 'string' ? nombreDeCorreo(t) : t;
+  };
   const porId = {};
   campos.forEach(c => porId[c.id] = c);
   const v = id => (porId[id] ? val(porId[id]) : '');
@@ -1364,8 +1395,12 @@ function pintaCampo(c){
          agrega como opción. Si no, la lista sale en blanco y el dato se pierde
          en silencio al guardar, que es la peor forma de perderlo. */
       if (val && ops.map(String).indexOf(String(val)) < 0) ops.unshift(String(val));
+      /* El value sigue siendo el correo —es lo que se guarda—, pero lo que se
+         lee es el nombre. Si el correo no está en el padrón, se queda el
+         correo: más vale un dato feo que un nombre inventado. */
       cuerpo = '<select id="'+id+'"'+(bloq?' disabled':'')+'><option value=""></option>'+
-        ops.map(o => '<option'+(String(o)===String(val)?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select>';
+        ops.map(o => '<option value="'+esc(o)+'"'+(String(o)===String(val)?' selected':'')+'>'+
+          esc(nombreDeCorreo(o))+'</option>').join('')+'</select>';
       break; }
     case 'sino':
       cuerpo = '<div class="sino" id="'+id+'" data-v="'+esc(val)+'">'+
