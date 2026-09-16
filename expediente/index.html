@@ -459,19 +459,64 @@ const $  = (id) => document.getElementById(id);
 const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const cargando = (on) => $('cargando').classList.toggle('on', !!on);
 
+/* El último fallo crudo queda aquí para poder diagnosticarlo desde la consola:
+   copie window.ZORVIX_ULTIMO_FALLO. Un error mudo es un error que no se arregla. */
+window.ZORVIX_ULTIMO_FALLO = null;
+
 async function api(accion, datos){
   if (!API) throw new Error('Falta configurar la dirección del servidor en esta página (constante API).');
   cargando(true);
+  const cuerpo = JSON.stringify(Object.assign({accion:accion, id_token:TOKEN}, datos||{}));
+  const t0 = Date.now();
   try{
-    const r = await fetch(API, {
-      method:'POST', credentials:'omit',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify(Object.assign({accion:accion, id_token:TOKEN}, datos||{}))
-    });
+    let r;
+    try{
+      r = await fetch(API, {
+        method:'POST', credentials:'omit',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: cuerpo
+      });
+    }catch(err){
+      window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'red', enviado:cuerpo.length,
+        ms:Date.now()-t0, error:String(err) };
+      console.error('[Zorvix] falló la conexión', window.ZORVIX_ULTIMO_FALLO);
+      throw new Error('No se pudo conectar con el servidor (' + err.message + '). ' +
+        'Enviábamos ' + Math.round(cuerpo.length/1024) + ' KB en «' + accion + '».');
+    }
     const txt = await r.text();
-    let j; try{ j = JSON.parse(txt); }
-    catch(e){ throw new Error('El servidor respondió algo que no es JSON. ¿Está publicada la versión correcta?'); }
-    if (!j.ok) throw new Error(j.mensaje || j.error || 'Error desconocido');
+    let j;
+    try{ j = JSON.parse(txt); }
+    catch(e){
+      const detalle = {
+        accion: accion, etapa:'respuesta', http:r.status, tipo:r.headers.get('content-type') || '',
+        enviado: cuerpo.length, recibido: txt.length, ms: Date.now()-t0,
+        url: r.url, inicio: txt.slice(0, 500)
+      };
+      window.ZORVIX_ULTIMO_FALLO = detalle;
+      console.error('[Zorvix] respuesta no-JSON', detalle);
+      const pista = txt.length === 0
+        ? 'La respuesta llegó vacía.'
+        : 'Empieza así: «' + txt.slice(0, 180).replace(/\s+/g,' ').trim() + '»';
+      throw new Error('El servidor no respondió JSON en «' + accion + '». ' +
+        'HTTP ' + r.status + ', ' + txt.length + ' caracteres. ' + pista);
+    }
+    if (!j.ok){
+      window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'servidor', http:r.status,
+        enviado:cuerpo.length, ms:Date.now()-t0, respuesta:j };
+      throw new Error(j.mensaje || j.error || 'Error desconocido');
+    }
+    /* Si doPost no logra leer el cuerpo, Apps Script contesta el saludo de «ping»,
+       que es ok:true pero no es la respuesta pedida. Eso hay que cazarlo aquí o
+       se convierte en un fallo confuso dos llamadas más adelante. */
+    const esSaludo = accion !== 'ping' && j.servicio && j.modulo && j.version && j.hora &&
+                     Object.keys(j).length === 5;
+    if (esSaludo){
+      window.ZORVIX_ULTIMO_FALLO = { accion:accion, etapa:'eco_de_ping', enviado:cuerpo.length,
+        ms:Date.now()-t0, respuesta:j };
+      console.error('[Zorvix] el servidor contestó el saludo, no la acción', window.ZORVIX_ULTIMO_FALLO);
+      throw new Error('El servidor no recibió la acción «' + accion + '»: contestó el saludo de arranque. ' +
+        'Suele pasar cuando el envío (' + Math.round(cuerpo.length/1024) + ' KB) no le llega completo.');
+    }
     return j;
   } finally { cargando(false); }
 }
@@ -1359,20 +1404,27 @@ function paraGrabacion(){
 
 async function subeYTranscribe(blob, segundos){
   try{
-    aviso('dic-aviso','warn','Subiendo el audio…');
+    const kb = Math.round(blob.size/1024);
+    aviso('dic-aviso','warn','Subiendo el audio… ('+segundos+' s, '+kb+' KB)');
     const b64 = await new Promise(function(res, rej){
       const r = new FileReader();
       r.onload = () => res(String(r.result).split(',')[1]);
       r.onerror = rej;
       r.readAsDataURL(blob);
     });
+    console.log('[Zorvix] audio listo', {segundos:segundos, bytes:blob.size,
+      b64:b64.length, mime:blob.type, doc:DOC && DOC.Doc_ID});
     const s = await api('audioSubir', {
       doc_id: DOC.Doc_ID, contenido_b64: b64,
       mime: blob.type || 'audio/webm', extension: 'webm', segundos: segundos
     });
+    if (!s.audio_id)
+      throw new Error('El servidor aceptó la subida pero no devolvió el identificador del audio.');
     AUDIO_ID = s.audio_id;
-    aviso('dic-aviso','warn','Transcribiendo…');
+    aviso('dic-aviso','warn','Transcribiendo… (audio '+AUDIO_ID+')');
     const t = await api('audioTranscribir', { audio_id: AUDIO_ID });
+    if (typeof t.texto !== 'string')
+      throw new Error('El servidor no devolvió texto para el audio ' + AUDIO_ID + '.');
     $('dic-texto').value = ($('dic-texto').value ? $('dic-texto').value + '\n' : '') + t.texto.trim();
     aviso('dic-aviso','ok','Listo. Revise el texto y repártalo. El audio se borra al firmar y a los '+
       (s.borra_en_dias||30)+' días como máximo.');
