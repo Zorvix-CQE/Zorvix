@@ -232,9 +232,15 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   display:flex;gap:10px;align-items:center;flex-wrap:wrap;z-index:40;margin:0 -18px -80px}
 
 /* ── Dictado ────────────────────────────────────────────────── */
-#dictado{position:fixed;inset:0;background:rgba(20,18,28,.55);display:grid;place-items:end center;z-index:200;padding:16px}
-#dictado .caja{background:var(--papel);border:1px solid var(--linea);border-radius:var(--r-lg);box-shadow:var(--sombra-3);
-  width:min(560px,100%);padding:20px;max-height:86vh;overflow:auto}
+/* #confirmar comparte estas reglas a proposito. Cuando lo agregue sin CSS,
+   el cuadro se dibujo al final del documento, fuera de la vista: los botones
+   de guardar «no servian» porque abrian una pregunta invisible y se quedaban
+   esperando una respuesta que nadie podia dar. */
+#dictado,#confirmar{position:fixed;inset:0;background:rgba(20,18,28,.55);display:grid;z-index:200;padding:16px}
+#dictado{place-items:end center}
+#confirmar{place-items:center}
+#dictado .caja,#confirmar .caja{background:var(--papel);border:1px solid var(--linea);border-radius:var(--r-lg);
+  box-shadow:var(--sombra-3);width:min(560px,100%);padding:20px;max-height:86vh;overflow:auto}
 .punto{width:10px;height:10px;border-radius:var(--r-full);background:var(--malo-linea);display:inline-block;
   animation:late 1s infinite}
 @keyframes late{50%{opacity:.25}}
@@ -245,7 +251,7 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
 
 /* ── Impresión ──────────────────────────────────────────────── */
 @media print{
-  #barra,#tabs,#acciones,#cargando,#dictado,.no-imprime{display:none !important}
+  #barra,#tabs,#acciones,#cargando,#dictado,#confirmar,#aviso-global,.no-imprime{display:none !important}
   body{background:#fff;color:#000;font-size:11pt}
   main{max-width:none;padding:0}
   .grupo{border:0;page-break-inside:avoid}
