@@ -385,11 +385,25 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
       <span class="crece"></span>
       <button class="btn" id="btn-guardar">Guardar borrador</button>
       <button class="btn" id="btn-listo">Marcar listo para firma</button>
-      <button class="btn primario" id="btn-firmado">Firmado y escaneado</button>
+      <button class="btn primario" id="btn-firmado">Archivar — impresa y firmada</button>
     </div>
   </section>
 
 </main>
+
+<!-- Confirmación propia. El confirm() del navegador congela la pestaña y
+     se ve como una alerta de sistema en una pantalla clínica. -->
+<div id="confirmar" class="oculto">
+  <div class="caja" style="max-width:520px">
+    <h2 style="margin:0 0 8px" id="conf-titulo"></h2>
+    <div id="conf-texto" class="sub" style="white-space:pre-wrap;margin-bottom:16px"></div>
+    <div class="fila">
+      <span class="crece"></span>
+      <button class="btn" id="conf-no">Cancelar</button>
+      <button class="btn primario" id="conf-si">Continuar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Un aviso que se ve desde cualquier vista, en lugar del cuadro modal del
      navegador, que congela la pestaña entera y no deja ni leer lo de atrás. -->
@@ -472,6 +486,17 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
 const API = 'https://script.google.com/macros/s/AKfycbxlmONobORxeELaEdH2OHnlmnOIME8RodEqV8tzYBnlz9zu0x8mAk7SajEaW6ObERam/exec';
 
 const CLIENTE = '148311031818-4ku0lhia6qd0fgbmi379dvi7k4vp303g.apps.googleusercontent.com';
+
+/* «Archivada» es un acuse, no un candado: dice que la nota ya se imprimió,
+   se firmó con pluma y está en el expediente físico. La nota sigue siendo
+   editable siempre — decisión del Dr. Soto, 16 sep 2026: prefiere reimprimir
+   una hoja limpia antes que acumular notas correctivas encimadas, que es
+   justo lo que NOM-004-SSA3-2012 5.11 llama enmendaduras. El rastro no se
+   pierde: cada guardado sube de versión, deja su archivo en Drive y queda en
+   la bitácora con quién y cuándo. */
+const ESTADO_ARCHIVADA = 'Impresa y archivada';
+const ESTADO_HEREDADO  = 'Firmado y escaneado';   /* notas viejas */
+const esArchivada = e => e === ESTADO_ARCHIVADA || e === ESTADO_HEREDADO;
 
 let TOKEN=null, YO=null, ESQ=null, EXP=null, DOC=null, GRAB=null, AUDIO_ID=null;
 let PORID={}, CATS={}, ORDEN_GRUPOS=[], SECU={}, VITALES=[], EST={};
@@ -585,6 +610,27 @@ async function api(accion, datos){
     }
     throw new Error('La llamada «' + accion + '» terminó sin respuesta.');
   } finally { cargando(false); }
+}
+
+/* Devuelve una promesa: true si el médico confirma, false si cancela.
+   Sustituye a confirm(), que bloquea la pestaña entera. */
+function confirma(titulo, texto, textoSi){
+  return new Promise(function(res){
+    $('conf-titulo').textContent = titulo;
+    $('conf-texto').textContent = texto;
+    $('conf-si').textContent = textoSi || 'Continuar';
+    $('confirmar').classList.remove('oculto');
+    const cierra = function(v){
+      $('confirmar').classList.add('oculto');
+      $('conf-si').onclick = null; $('conf-no').onclick = null;
+      document.removeEventListener('keydown', tecla);
+      res(v);
+    };
+    const tecla = function(e){ if (e.key === 'Escape') cierra(false); };
+    $('conf-si').onclick = () => cierra(true);
+    $('conf-no').onclick = () => cierra(false);
+    document.addEventListener('keydown', tecla);
+  });
 }
 
 let AVISO_GLOBAL_T = null;
@@ -900,7 +946,7 @@ function pintaExpediente(){
       '<div class="crece"><div class="nom">'+esc(d.Tipo)+'</div>'+
       '<div class="det">'+esc(d.Fecha||'')+' '+esc(d.Hora||'')+
         ' · '+esc(d.Capturo_Nombre||d.Capturo_Email||'')+' · v'+esc(d.Version||1)+'</div></div>'+
-      '<span class="etq '+(d.Estado==='Firmado y escaneado'?'ok':(d.Estado==='Listo para firma'?'warn':''))+'">'+
+      '<span class="etq '+(esArchivada(d.Estado)?'ok':(d.Estado==='Listo para firma'?'warn':''))+'">'+
         esc(d.Estado)+'</span></div>').join('');
   D.querySelectorAll('[data-doc]').forEach(el => el.onclick = () => abreDocumento(el.dataset.doc));
 
@@ -1059,15 +1105,17 @@ function pintaDocumento(){
     '<div class="d">'+esc(DOC.Tipo)+' · '+esc(EXP.paciente.Nombre_Completo||'')+
       ' · expediente '+esc(EXP.expediente_no||'')+'</div>';
 
-  const cerrado = DOC.Estado === 'Firmado y escaneado';
-  ['btn-guardar','btn-listo','btn-firmado'].forEach(b => $(b).disabled = cerrado);
+  const archivada = esArchivada(DOC.Estado);
+  ['btn-guardar','btn-listo','btn-firmado'].forEach(b => $(b).disabled = false);
   /* El dictado tiene una segunda condicion ademas de que el documento este
      abierto: que este paciente haya autorizado que se le grabe. El aviso de
      privacidad lo pide en una casilla propia y dice, con esas palabras, que
      dejarla en blanco significa que no autoriza. */
-  $('btn-dictar').disabled = cerrado || !audioAutorizado();
-  aviso('doc-aviso', cerrado ? 'ok' : '', cerrado ?
-    'Este documento ya está firmado y escaneado. No se edita: para corregir se hace nota nueva (NOM-004-SSA3-2012, 5.11).' : '');
+  $('btn-dictar').disabled = !audioAutorizado();
+  aviso('doc-aviso', archivada ? 'ok' : '', archivada ?
+    'Esta nota ya está impresa, firmada y archivada en el expediente físico (versión ' +
+    (DOC.Version || '?') + '). Se puede seguir editando: si la cambia, reimprímala, ' +
+    'fírmela y sustituya la hoja anterior.' : '');
 
   const campos = camposDe(DOC.Tipo);
   const porGrupo = {};
@@ -1390,18 +1438,36 @@ function faltantes(){
 /* ── Guardar ───────────────────────────────────────────────────── */
 $('btn-guardar').onclick = () => guarda('Borrador');
 $('btn-listo').onclick   = () => guarda('Listo para firma');
-$('btn-firmado').onclick = function(){
-  if (!confirm('Al marcarlo como firmado y escaneado el documento se cierra: ya no se edita y ' +
-               'su audio se elimina. Para corregir habría que hacer una nota nueva.\n\n¿Continuar?')) return;
-  guarda('Firmado y escaneado');
+$('btn-firmado').onclick = async function(){
+  const ok = await confirma('Archivar la nota',
+    'Queda registrado que esta nota ya se imprimió, se firmó con pluma y está en el ' +
+    'expediente físico. Su audio se elimina en este momento.\n\n' +
+    'La nota sigue siendo editable: si después la cambia, hay que reimprimirla y ' +
+    'sustituir la hoja archivada.', 'Archivar');
+  if (!ok) return;
+  guarda(ESTADO_ARCHIVADA);
 };
 
 async function guarda(estado){
   if (estado !== 'Borrador'){
     const f = faltantes();
-    if (f.length && !confirm('Quedan sin contestar '+f.length+' campos obligatorios:\n\n· '+
-        f.slice(0,12).join('\n· ')+(f.length>12?'\n· …':'')+
-        '\n\nSe guardan vacíos, no se inventan. ¿Continuar?')) return;
+    if (f.length){
+      const ok = await confirma('Faltan campos obligatorios',
+        'Quedan sin contestar ' + f.length + ':\n\n· ' +
+        f.slice(0,12).join('\n· ') + (f.length>12 ? '\n· …' : '') +
+        '\n\nSe guardan vacíos. No se inventan.', 'Guardar así');
+      if (!ok) return;
+    }
+  }
+  /* Editar una nota ya archivada no está prohibido —es lo que el Dr. Soto
+     pidió— pero deja de coincidir con la hoja que está en el expediente
+     físico. Se avisa en el momento, no después. */
+  if (DOC.Doc_ID && esArchivada(DOC.Estado) && estado !== ESTADO_ARCHIVADA){
+    const ok = await confirma('Esta nota ya está archivada',
+      'La hoja impresa que está en el expediente físico va a dejar de coincidir ' +
+      'con lo que guarde ahora.\n\nSi continúa: imprima la nota otra vez, fírmela y ' +
+      'sustituya la hoja anterior. Queda asentado en la bitácora.', 'Entendido, guardar');
+    if (!ok) return;
   }
   try{
     const r = await api('documentoGuardar', {
@@ -1415,7 +1481,7 @@ async function guarda(estado){
     $('doc-estado').textContent = r.estado;
     EXP = await api('expediente', { paciente_id: EXP.paciente.Paciente_ID });
     pintaExpediente();
-    if (estado === 'Firmado y escaneado') pintaDocumento();
+    if (esArchivada(estado)) pintaDocumento();
   }catch(e){ aviso('doc-aviso','malo', e.message); }
 }
 
