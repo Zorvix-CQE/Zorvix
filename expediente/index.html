@@ -1885,12 +1885,38 @@ function agregaSinUbicar(t){
 function normaliza(s){
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 }
+/* ── Por qué el texto se prepara antes de buscar los signos vitales ──────
+
+   16 sep 2026. Se dictó: «TA de 110,70, frecuencia cardíaca de 80 por minuto,
+   frecuencia respiratoria de 16 por minuto, temperatura de 36 grados,
+   saturación al 98 por ciento». Entraron FR y temperatura. TA, FC y
+   saturación se quedaron vacías. Tres causas, todas comprobadas:
+
+   · Los patrones del esquema están sin acentos («frecuencia cardiaca»,
+     «tension arterial»). La bandera /i del regex ignora mayúsculas, NO
+     acentos. «cardíaca» no casaba con «cardiaca».
+   · En JavaScript \w no incluye la ó, así que «satur\w*» se atoraba en
+     «satur-aci» y nunca llegaba al número de «saturación».
+   · El transcriptor escribe la tensión arterial con coma: «110,70», no
+     «110/70». Ningún separador del patrón contemplaba la coma.
+
+   Así que aquí se quitan los acentos —igual que para las anclas— y se
+   traduce la coma de la tensión a diagonal. Esa traducción SÓLO ocurre
+   cuando hay una señal de tensión arterial delante, para no destrozar un
+   decimal legítimo: «temperatura de 36,5» y «talla 1,70» quedan intactos. */
+function paraVitales(frase){
+  return normaliza(frase).replace(
+    /(\b(?:t\.?\s?a\.?|tension arterial|presion arterial)\s*:?\s*(?:de\s*)?\d{2,3})\s*,\s*(\d{2,3})/g,
+    '$1/$2');
+}
+
 /* Los signos vitales se sacan del texto y se meten en su campo numérico, pero
    la frase completa se queda igual en la exploración: no se tira nada. */
 function sacaVitales(frase, paso){
   const base = paso.campo.split('_')[0];
+  const texto = paraVitales(frase);
   VITALES.forEach(function(v){
-    const m = v.re.exec(frase);
+    const m = v.re.exec(texto);
     if (!m) return;
     const valor = v.arma.replace(/\{(\d)\}/g, (_,i) => m[Number(i)] || '');
     const candidatos = [base+'_sv_'+v.sufijo, base+'_'+v.sufijo, 'ing_sv_'+v.sufijo, 'hc_sv_'+v.sufijo];
