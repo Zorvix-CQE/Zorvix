@@ -1119,6 +1119,13 @@ function heredado(campo){
   if (campo.id === 'doc_id')    return DOC.Doc_ID || '(al guardar)';
   if (campo.id === 'doc_capturo') return YO.correo;
   if (campo.id === 'med_nombre')  return YO.nombre;
+  /* Estos tres estaban marcados «Automático» en el diccionario pero nadie los
+     llenaba, así que salían vacíos Y se le reclamaban al médico como campos
+     obligatorios. La app ya sabe los tres desde antes de abrir el documento:
+     el rol viene de la sesión, el tipo y el estado del propio documento. */
+  if (campo.id === 'usuario_rol') return YO.rol || '';
+  if (campo.id === 'doc_tipo')    return DOC.Tipo || '';
+  if (campo.id === 'doc_estado')  return DOC.Estado || 'Borrador';
   return null;
 }
 
@@ -1456,8 +1463,15 @@ function faltantes(){
     if (!c.obligatorio) return false;
     /* Lo automático no se le reclama a nadie: o lo calcula la app o lo pone
        el sistema al imprimir. Reclamarlo sería pedirle al médico que llene
-       algo que no le toca. */
+       algo que no le toca.
+
+       Ojo con la distinción, que costó una confusión: `control` es el tipo de
+       control en pantalla y `captura` es quién llena el campo. Aquí sólo se
+       miraba el control, así que tres campos marcados «captura: Automático»
+       pero dibujados como lista —rol, tipo de documento y estado de firma—
+       se colaban a la lista de pendientes. */
     if (c.control === 'automatico') return false;
+    if (c.captura === 'Automático') return false;
     if (heredado(c)) return false;
     const v = leeFormulario()[c.id];
     if (Array.isArray(v)) return v.length === 0;
