@@ -1281,6 +1281,11 @@ function heredado(campo){
      llenaba, así que salían vacíos Y se le reclamaban al médico como campos
      obligatorios. La app ya sabe los tres desde antes de abrir el documento:
      el rol viene de la sesión, el tipo y el estado del propio documento. */
+  /* La cédula viene de la hoja Medicos por la sesión. Si está vacía, se
+     devuelve '' y la hoja impresa deja la línea en blanco para escribirla a
+     mano. Un número de cédula no se inventa nunca. */
+  if (campo.id === 'med_cedula')     return YO.cedula || '';
+  if (campo.id === 'med_cedula_esp') return YO.cedula_esp || '';
   if (campo.id === 'usuario_rol') return YO.rol || '';
   if (campo.id === 'doc_tipo')    return DOC.Tipo || '';
   if (campo.id === 'doc_estado')  return DOC.Estado || 'Borrador';
