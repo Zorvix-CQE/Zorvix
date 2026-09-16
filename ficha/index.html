@@ -255,8 +255,9 @@ details ul{font-size:13px;color:var(--tinta2);margin:8px 0 0;padding-left:18px}
         <p><strong>Tus derechos.</strong> Puedes pedirnos acceder, rectificar, cancelar u
           oponerte al uso de tus datos —los derechos ARCO— escribiendo a
           <strong>atencion@zorvix.mx</strong>.</p>
-        <p>Este resumen no sustituye el aviso de privacidad completo, que te entregamos por
-          separado y puedes pedirnos cuando quieras.</p>
+        <p>Este resumen no sustituye el aviso de privacidad completo.
+          <a href="../aviso/" target="_blank" rel="noopener">Léelo aquí</a> antes de aceptar —
+          también puedes pedirnos una copia impresa cuando quieras.</p>
       </details>
 
       <label class="marca" for="c-aviso">
@@ -264,6 +265,12 @@ details ul{font-size:13px;color:var(--tinta2);margin:8px 0 0;padding-left:18px}
         <span>He leído y acepto el <strong>Aviso de Privacidad</strong> de Zorvix, incluido el
           tratamiento de mis datos personales sensibles de salud.</span>
       </label>
+      <!-- El enlace va FUERA del label a proposito: dentro, tocarlo tambien
+           palomearia la casilla, y quedaria aceptado el aviso por el solo
+           hecho de ir a leerlo. -->
+      <p class="pista" style="margin:-6px 0 12px 3px">
+        <a href="../aviso/" target="_blank" rel="noopener">Leer el Aviso de Privacidad completo</a>
+      </p>
 
       <label class="marca" for="c-whatsapp">
         <input type="checkbox" id="c-whatsapp">
