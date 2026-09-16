@@ -586,6 +586,7 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
         <div id="c-detalle"></div>
         <div class="fila">
           <button class="btn sec" id="c-ficha" type="button">Abrir ficha del paciente</button>
+          <button class="btn sec" id="c-expediente" type="button">Abrir expediente</button>
           <button class="btn sec" id="c-confirmar" type="button">Confirmar el caso</button>
           <button class="btn sec" id="c-volver" type="button">Volver</button>
           <span id="c-msg"></span>
@@ -670,8 +671,30 @@ function logotipos(){
   if (m) m.src = oscuro ? '../assets/zorvix-marca-blanco.png' : '../assets/zorvix-marca.png';
 }
 
+/* ── La sesión se comparte entre las tres apps ────────────────
+   Portal, Cirugías y Expediente viven en el mismo origen
+   (app.zorvix.mx), así que pueden pasarse la credencial de Google por
+   sessionStorage. Quien entra por el Portal ya no se vuelve a
+   identificar al brincar de un ala a la otra, y quien entra directo
+   aquí le deja la sesión puesta a la otra.
+
+   sessionStorage y no localStorage a propósito: muere al cerrar la
+   pestaña, no se queda en el disco. La credencial dura una hora y el
+   backend la verifica en cada llamada, así que una vencida no abre
+   nada — por eso, si falla, se borra y se enseña el botón en vez de
+   dejar la pantalla colgada esperando. */
+const LLAVE_SESION = 'zx_token';
+function guardaSesion(c){ try{ sessionStorage.setItem(LLAVE_SESION, c); }catch(e){} }
+function olvidaSesion(){ try{ sessionStorage.removeItem(LLAVE_SESION); }catch(e){} }
+function sesionHeredada(){ try{ return sessionStorage.getItem(LLAVE_SESION); }catch(e){ return null; } }
+
 /* ── Entrada ──────────────────────────────────────────────── */
 window.onload = function(){
+  /* Si venimos del Portal o de la otra ala, la credencial ya está puesta:
+     se intenta en silencio y, si sirve, nadie llega a ver esta pantalla.
+     Si no sirve, se cae al botón de siempre sin decir nada. */
+  const heredada = sesionHeredada();
+  if (heredada) entro({ credential: heredada }, true);
   const esperar = setInterval(function(){
     if (!(window.google && google.accounts && google.accounts.id)) return;
     clearInterval(esperar);
@@ -692,11 +715,12 @@ window.onload = function(){
   }, 150);
 };
 
-async function entro(resp){
+async function entro(resp, silencioso){
   TOKEN = resp.credential;
   try{
     const s = await api('sesion');
     YO = s;
+    guardaSesion(TOKEN);
     $('pantalla-entrada').classList.add('oculto');
     $('barra').classList.remove('oculto');
     $('app').classList.remove('oculto');
@@ -712,14 +736,28 @@ async function entro(resp){
     pintaTabs();
     await Promise.all([cargaPaquetes(), cargaCasos(), cargaMedicos()]);
   }catch(e){
-    aviso('entrada-error','malo', e.message);
     TOKEN = null;
+    olvidaSesion();
+    /* Silencioso quiere decir que veníamos con una credencial heredada que ya
+       no sirve. Eso no es un error que la persona deba leer: se cae al botón. */
+    if (!silencioso) aviso('entrada-error','malo', e.message);
   }
 }
 
 $('salir').onclick = function(){
+  olvidaSesion();
   try{ google.accounts.id.disableAutoSelect(); }catch(e){}
   location.reload();
+};
+
+/* Del caso al expediente de ese mismo paciente, sin volver a buscarlo. El
+   Paciente_ID viaja por sessionStorage y no por la URL: mismo origen, así que
+   llega igual, pero no queda escrito en la barra de direcciones ni en el
+   historial del navegador ni en un referer. */
+$('c-expediente').onclick = function(){
+  if (!CASO_SEL || !CASO_SEL.Paciente_ID) return;
+  try{ sessionStorage.setItem('zx_abrir_paciente', CASO_SEL.Paciente_ID); }catch(e){}
+  location.href = '../expediente/';
 };
 
 /* ── Padrón de médicos ─────────────────────────────────────
