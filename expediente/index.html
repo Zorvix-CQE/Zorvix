@@ -254,18 +254,53 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
 .paso .t{font-size:13px;font-weight:600}
 .paso .a{font-size:12px;color:var(--tinta3)}
 
-/* ── Impresión ──────────────────────────────────────────────── */
+/* ── Impresión ───────────────────────────────────────────────
+
+   Antes se imprimía la pantalla con otro estilo, y salía una foto del
+   formulario: recuadros, flechitas de lista, etiquetas HEREDADO, asteriscos
+   rojos, «Paso 5», campos vacíos, y tres encabezados de grupo sin nada
+   debajo. Tres hojas para media hoja de contenido, y sin un lugar donde
+   firmar.
+
+   Ahora se imprime #impresion, que se arma al momento con lo que de verdad
+   lleva una nota: membrete, identificación, lo capturado, y el pie de firma
+   que pide NOM-004-SSA3-2012 5.10 (nombre completo, cédula y firma).
+   Un campo vacío no se imprime: una nota no debe tener huecos rotulados. */
+#impresion{display:none}
 @media print{
-  #barra,#tabs,#acciones,#cargando,#dictado,#confirmar,#aviso-global,.no-imprime{display:none !important}
-  body{background:#fff;color:#000;font-size:11pt}
-  main{max-width:none;padding:0}
-  .grupo{border:0;page-break-inside:avoid}
-  .grupo>summary{background:none;border-bottom:1px solid #999;padding:6px 0;font-size:12pt}
-  .grupo>summary::before{display:none}
-  .grupo .cuerpo{padding:8px 0;grid-template-columns:1fr 1fr}
-  .tarjeta{border:0;box-shadow:none;padding:0}
-  input,select,textarea{border:0;border-bottom:1px solid #bbb;border-radius:0;padding:2px 0;background:none}
-  .membrete{display:block !important}
+  body>*{display:none !important}
+  body{background:#fff;color:#000;margin:0}
+  #impresion{display:block !important;font:10.5pt/1.45 Georgia,'Times New Roman',serif;
+    color:#000;padding:26px 0 0}
+  @page{margin:14mm 14mm 16mm}
+
+  /* Se repite en cada hoja: en un expediente de papel las hojas se sueltan. */
+  .imp-corre{position:fixed;top:0;left:0;right:0;font-size:8pt;font-family:system-ui,sans-serif;
+    color:#333;border-bottom:.5pt solid #999;padding-bottom:3px}
+
+  .imp-membrete{border-bottom:1.5pt solid #000;padding-bottom:5px;margin-bottom:10px}
+  .imp-membrete .n{font-size:13pt;font-weight:700;letter-spacing:.01em}
+  .imp-membrete .d{font-size:8.5pt;font-family:system-ui,sans-serif;color:#222}
+  .imp-titulo{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:12pt;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}
+  .imp-titulo span{font-size:9pt;font-weight:400;text-transform:none;letter-spacing:0}
+  .imp-id{display:grid;grid-template-columns:1fr 1fr;gap:1px 20px;font-size:9.5pt;
+    border-bottom:.5pt solid #000;padding-bottom:8px;margin-bottom:12px}
+  .imp-id div{break-inside:avoid}
+  .imp-id b{font-weight:700}
+  .imp-grupo{font-size:11pt;font-weight:700;margin:14px 0 6px;border-bottom:.5pt solid #000;
+    padding-bottom:2px;break-after:avoid}
+  .imp-campo{margin:0 0 9px;break-inside:avoid}
+  .imp-campo .e{font-weight:700;font-size:9.5pt;font-family:system-ui,sans-serif}
+  .imp-campo .v{white-space:pre-wrap;margin-top:1px}
+  .imp-vitales{font-size:10.5pt;margin:0 0 9px}
+  .imp-tabla{width:100%;border-collapse:collapse;font-size:9pt;margin-top:3px}
+  .imp-tabla th,.imp-tabla td{border:.5pt solid #666;padding:2px 4px;text-align:left}
+  .imp-firma{margin-top:30px;break-inside:avoid}
+  .imp-firma .linea{border-bottom:.75pt solid #000;height:34px;margin-bottom:3px}
+  .imp-firma .pie{font-size:9pt;font-family:system-ui,sans-serif}
+  .imp-nota{font-size:8pt;font-family:system-ui,sans-serif;color:#444;margin-top:14px;
+    border-top:.5pt solid #bbb;padding-top:4px}
 }
 .membrete{display:none;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:12px}
 .membrete .n{font-weight:700;font-size:13pt}
@@ -401,6 +436,11 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   </section>
 
 </main>
+
+<!-- Lo que sale en papel. No es la pantalla con otro estilo: es un documento
+     aparte que se arma al momento de imprimir, con lo que de verdad va en una
+     nota clínica y nada más. -->
+<div id="impresion"></div>
 
 <!-- Confirmación propia. El confirm() del navegador congela la pestaña y
      se ve como una alerta de sistema en una pantalla clínica. -->
@@ -1071,7 +1111,125 @@ function edad(nac){
 
 /* ══════════ DOCUMENTO ══════════ */
 $('btn-volver-exp').onclick = () => vista('expediente');
-$('btn-imprimir').onclick = () => window.print();
+$('btn-imprimir').onclick = function(){ armaImpresion(); window.print(); };
+
+/* ══════════ LA HOJA QUE SE IMPRIME ══════════
+
+   Tres grupos no se imprimen como campos porque ya viven en otro lado de la
+   hoja: Establecimiento es el membrete, Identificación es el bloque de datos
+   de arriba, y Equipo médico es el pie de firma. Repetirlos como lista era lo
+   que hacía que una nota de media cuartilla ocupara tres hojas. */
+const GRUPOS_APARTE = ['Establecimiento', 'Identificación',
+                       'Equipo médico y control documental'];
+
+function textoDe(c, v){
+  if (v === undefined || v === null) return '';
+  if (Array.isArray(v)){
+    if (!v.length) return '';
+    if (typeof v[0] === 'object') return v;          /* tabla: se pinta aparte */
+    return v.join(', ');
+  }
+  if (typeof v === 'object'){
+    const claves = Object.keys(v).filter(k => v[k] !== '' && v[k] != null);
+    if (!claves.length) return '';
+    if (c.control === 'serie') return claves.map(k => k + ': ' + v[k]).join(' · ');
+    return '';                                        /* gráfica e imagen: no en papel */
+  }
+  return String(v).trim();
+}
+
+function filaImp(etiqueta, valor){
+  if (Array.isArray(valor)){                          /* tabla */
+    const cols = Object.keys(valor[0]);
+    return '<div class="imp-campo"><span class="e">'+esc(etiqueta)+'</span>'+
+      '<table class="imp-tabla"><thead><tr>'+cols.map(x=>'<th>'+esc(x)+'</th>').join('')+
+      '</tr></thead><tbody>'+valor.map(f=>'<tr>'+cols.map(x=>'<td>'+esc(f[x]||'')+'</td>').join('')+'</tr>').join('')+
+      '</tbody></table></div>';
+  }
+  return '<div class="imp-campo"><span class="e">'+esc(etiqueta)+'</span>'+
+         '<div class="v">'+esc(valor)+'</div></div>';
+}
+
+function armaImpresion(){
+  const vals = leeFormulario();
+  const campos = camposDe(DOC.Tipo);
+  const val = c => textoDe(c, vals[c.id] !== undefined ? vals[c.id] : DOC.campos[c.id]);
+  const porId = {};
+  campos.forEach(c => porId[c.id] = c);
+  const v = id => (porId[id] ? val(porId[id]) : '');
+
+  const p = EXP.paciente;
+  const ident = p.Nombre_Completo + ' · expediente ' + (EXP.expediente_no || '—') +
+                ' · ' + DOC.Tipo + ' · ' + (v('doc_fecha') || DOC.Fecha || hoyISO());
+
+  /* ── Identificación: sólo lo que tiene valor, en dos columnas ── */
+  const idCampos = campos.filter(c => c.grupo === 'Identificación' && val(c));
+  const bloqueId = idCampos.map(c =>
+    '<div><b>'+esc(c.etiqueta)+':</b> '+esc(val(c))+'</div>').join('');
+
+  /* ── Cuerpo clínico ── */
+  const grupos = [];
+  campos.forEach(function(c){
+    if (GRUPOS_APARTE.indexOf(c.grupo) >= 0) return;
+    if (grupos.indexOf(c.grupo) < 0) grupos.push(c.grupo);
+  });
+
+  const cuerpo = grupos.map(function(g){
+    const suyos = campos.filter(c => c.grupo === g);
+    /* Los cinco signos vitales en un renglón: en papel una tabla de cinco
+       recuadros para cinco números es un desperdicio de hoja. */
+    const sv = suyos.filter(c => /_sv_/.test(c.id) && val(c));
+    const resto = suyos.filter(c => !/_sv_/.test(c.id) && val(c));
+    if (!sv.length && !resto.length) return '';       /* grupo vacío: no se imprime */
+    /* Si el grupo se llama igual que el documento, el encabezado repetiría el
+       título que ya está arriba. Una nota de evolución no necesita decir
+       «Notas de evolución» dos veces en la misma hoja. */
+    const titulo = (g === DOC.Tipo) ? '' : '<div class="imp-grupo">'+esc(g)+'</div>';
+    const linea = sv.length
+      ? '<p class="imp-vitales"><b>Signos vitales:</b> ' +
+        sv.map(c => esc(c.etiqueta) + ' ' + esc(val(c))).join(' · ') + '</p>'
+      : '';
+    return titulo + linea + resto.map(c => filaImp(c.etiqueta, val(c))).join('');
+  }).join('');
+
+  /* Lo que el dictado no logró ubicar NO se pierde en el papel: si se quedó
+     en la nota, se imprime, señalado como lo que es. */
+  const suelto = String(DOC.campos.__sin_ubicar || $('f__sin_ubicar') && $('f__sin_ubicar').value || '').trim();
+  const bloqueSuelto = suelto
+    ? '<div class="imp-grupo">Texto dictado sin ubicar</div>' +
+      '<div class="imp-campo"><div class="v">'+esc(suelto)+'</div></div>'
+    : '';
+
+  const cedula = v('med_cedula');
+  const cedEsp = v('med_cedula_esp');
+
+  $('impresion').innerHTML =
+    '<div class="imp-corre">'+esc(ident)+'</div>' +
+    '<div class="imp-membrete">'+
+      '<div class="n">'+esc(EST.nombre || 'Zorvix')+'</div>'+
+      '<div class="d">'+esc(EST.domicilio || '')+
+        (EST.licencia_sanitaria ? ' · Licencia sanitaria '+esc(EST.licencia_sanitaria) : '')+
+        (EST.telefono ? ' · Tel. '+esc(EST.telefono) : '')+'</div>'+
+    '</div>' +
+    '<div class="imp-titulo">'+esc(DOC.Tipo)+
+      '<span>'+(v('doc_hoja') ? 'Hoja '+esc(v('doc_hoja'))+' · ' : '')+
+      esc(v('doc_fecha') || DOC.Fecha || hoyISO())+
+      (v('doc_hora') ? ' · '+esc(v('doc_hora')) : '')+'</span></div>' +
+    '<div class="imp-id">'+bloqueId+'</div>' +
+    cuerpo + bloqueSuelto +
+    '<div class="imp-firma">'+
+      '<div class="linea"></div>'+
+      '<div class="pie"><b>'+esc(v('med_nombre') || YO.nombre || '')+'</b>'+
+        (cedula ? ' · Cédula profesional '+esc(cedula) : ' · Cédula profesional ______________')+
+        (cedEsp ? ' · Cédula de especialidad '+esc(cedEsp) : '')+
+        '<br>Firma autógrafa</div>'+
+    '</div>' +
+    '<div class="imp-nota">Documento '+esc(DOC.Doc_ID || '(sin guardar)')+
+      ' · versión '+esc(String(DOC.Version || 1))+
+      ' · capturó '+esc(YO.correo || '')+
+      '. El expediente es propiedad del establecimiento y se conserva cinco años '+
+      'contados desde el último acto médico (NOM-004-SSA3-2012, 5.4).</div>';
+}
 
 function nuevoDocumento(tipo){
   const deCaso = (EXP.docs_de_paciente||[]).indexOf(tipo) < 0;
