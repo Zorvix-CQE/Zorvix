@@ -236,9 +236,14 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
    el cuadro se dibujo al final del documento, fuera de la vista: los botones
    de guardar «no servian» porque abrian una pregunta invisible y se quedaban
    esperando una respuesta que nadie podia dar. */
-#dictado,#confirmar{position:fixed;inset:0;background:rgba(20,18,28,.55);display:grid;z-index:200;padding:16px}
-#dictado{place-items:end center}
-#confirmar{place-items:center}
+#dictado,#confirmar{position:fixed;inset:0;background:rgba(20,18,28,.55);display:grid;padding:16px}
+#dictado{place-items:end center;z-index:200}
+/* Mas alto que el dictado A PROPOSITO. #confirmar siempre pregunta ALGO de lo
+   que ya esta en pantalla, asi que nunca puede quedar debajo. Con los dos en
+   200 ganaba el dictado —esta despues en el HTML— y la pregunta se abria
+   invisible detras: «Repartir a los campos» parecia no servir. */
+#confirmar{place-items:center;z-index:300}
+#aviso-global{z-index:400}
 #dictado .caja,#confirmar .caja{background:var(--papel);border:1px solid var(--linea);border-radius:var(--r-lg);
   box-shadow:var(--sombra-3);width:min(560px,100%);padding:20px;max-height:86vh;overflow:auto}
 .punto{width:10px;height:10px;border-radius:var(--r-full);background:var(--malo-linea);display:inline-block;
@@ -638,7 +643,17 @@ function elige(titulo, texto, opciones){
       caja.appendChild(b);
     });
     document.addEventListener('keydown', tecla);
-    $('confirmar').classList.remove('oculto');
+    const caja2 = $('confirmar');
+    caja2.classList.remove('oculto');
+    /* Una pregunta que no se puede ver ni tocar deja la app colgada esperando
+       una respuesta imposible. Ya pasó dos veces hoy. Si algo la tapa, se
+       sube por encima y queda constancia en la consola. */
+    const enMedio = document.elementFromPoint(innerWidth/2, innerHeight/2);
+    if (!enMedio || !enMedio.closest('#confirmar')){
+      caja2.style.zIndex = '2147483000';
+      console.error('[Zorvix] el diálogo de confirmación estaba tapado por',
+                    enMedio && (enMedio.id || enMedio.className));
+    }
   });
 }
 
