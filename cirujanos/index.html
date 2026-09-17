@@ -392,6 +392,7 @@ async function verMio() {
   try {
     const d = await api('cirujanos.mios');
     MI_EXPEDIENTE = d;
+    registraDocs(d.documentos);
     pintarSaludo(d);
     document.getElementById('m-docs').innerHTML = d.documentos.map(tarjetaDoc).join('');
   } catch (e) {
@@ -430,6 +431,16 @@ function pintarSaludo(d) {
       ? `Solo falta su ${faltan[0].nombre.toLowerCase()} y su expediente queda completo. `
         + `Puede subirlo desde su celular en un minuto.`
       : `Puede subirlos desde su celular en unos minutos. Nosotros le avisamos cuando algo esté por vencer.`;
+  } else if (r.sinNumero && r.sinNumero.length) {
+    /* Documento vigente, folio sin asentar. No bloquea nada, pero el número
+       es lo que se imprime en cada nota clínica, así que no puede quedarse
+       callado en una pantalla que dice «todo en orden». */
+    titulo = 'Casi todo en orden, ' + doc;
+    mensaje = r.sinNumero.length === 1
+      ? `Su documentación está vigente. Falta un detalle: nos hace falta asentar el número de su `
+        + `${r.sinNumero[0].toLowerCase()}. Recepción lo captura del documento que usted ya subió.`
+      : `Su documentación está vigente. Falta asentar el número de ${r.sinNumero.length} documentos: `
+        + `${r.sinNumero.join(', ').toLowerCase()}. Recepción los captura de los archivos que usted ya subió.`;
   } else {
     titulo = 'Todo en orden, ' + doc;
     mensaje = porVencer
@@ -464,11 +475,28 @@ const TINTES = {
   falta:        'zx-t-nada'
 };
 
+/**
+ * Los documentos que se están pintando, por id. Así los onclick no tienen
+ * que cargar la etiqueta del folio dentro de una cadena HTML —donde una
+ * comilla o un acento rompen el atributo— y siempre se lee lo que el
+ * servidor mandó.
+ */
+let DOCS_VISTA = {};
+function registraDocs(docs) {
+  DOCS_VISTA = {};
+  (docs || []).forEach(d => DOCS_VISTA[d.id] = d);
+  (docs || []).forEach(d => { if (d.credId) DOCS_VISTA['cred:' + d.credId] = d; });
+}
+
 function sub(d) {
-  return d.estado === 'por_vencer' ? `Vence en ${d.dias} días`
-       : d.estado === 'vencido'    ? `Venció hace ${Math.abs(d.dias)} días`
-       : d.fechaVence              ? `Vence ${String(d.fechaVence).slice(0,10)}`
-       : d.obligatorio             ? 'Obligatorio' : 'Opcional';
+  const venc = d.estado === 'por_vencer' ? `Vence en ${d.dias} días`
+             : d.estado === 'vencido'    ? `Venció hace ${Math.abs(d.dias)} días`
+             : d.fechaVence              ? `Vence ${String(d.fechaVence).slice(0,10)}`
+             : d.obligatorio             ? 'Obligatorio' : 'Opcional';
+  /* El folio se lee en la tarjeta: es el dato que se imprime después en cada
+     nota clínica, así que tiene que poder revisarse de un vistazo. */
+  if (!d.pideNumero) return venc;
+  return venc + (d.numero ? ' · Nº ' + d.numero : ' · sin folio asentado');
 }
 
 /** Tarjeta de documento. La misma para médico y staff; cambia lo que puede hacer. */
@@ -491,7 +519,10 @@ function tarjetaDoc(d) {
                   onclick="event.stopPropagation();validar('${d.credId}', true)">Aprobar</button>
           <button class="zx-btn-2 val-no" style="height:29px;padding:0 12px;font-size:12px"
                   onclick="event.stopPropagation();validar('${d.credId}', false)">Rechazar</button>` : ''}
-        ${d.credId ? `<button class="zx-btn-2" style="${revisar ? '' : 'margin-left:auto;'}height:29px;padding:0 13px;font-size:12px"
+        ${d.credId && esStaff && d.pideNumero ? `
+          <button class="zx-btn-2" style="${revisar ? '' : 'margin-left:auto;'}height:29px;padding:0 12px;font-size:12px"
+             onclick="event.stopPropagation();ponerFolio('${d.id}')">${d.numero ? 'Folio' : 'Poner folio'}</button>` : ''}
+        ${d.credId ? `<button class="zx-btn-2" style="${revisar || (esStaff && d.pideNumero) ? '' : 'margin-left:auto;'}height:29px;padding:0 13px;font-size:12px"
              onclick="abrirDoc('${d.credId}')">Ver</button>` : ''}
         <button class="${d.credId ? 'zx-btn-2' : 'zx-btn'}" style="${d.credId ? '' : 'margin-left:auto;'}height:29px;padding:0 14px;font-size:12px"
              onclick="pedirArchivo('${d.id}', ${d.vence})">${d.credId ? 'Cambiar' : 'Subir'}</button>
@@ -504,13 +535,45 @@ function tarjetaDoc(d) {
  * saber qué corregir, si no vuelve a subir lo mismo.
  */
 async function validar(credId, aprobar) {
-  let nota = '';
+  let nota = '', numero;
   if (!aprobar) {
     nota = prompt('¿Por qué se rechaza? El médico va a ver este mensaje.\nPor ejemplo: la foto está ilegible.');
     if (nota === null) return;
+  } else {
+    /* Aprobar es decir «lo cotejé». Si el documento trae folio, se asienta
+       en el mismo movimiento: cotejar sin anotar el número es lo que dejó a
+       Zorvix con cédulas verificadas y sin saber cuáles. */
+    const d = DOCS_VISTA['cred:' + credId];
+    if (d && d.pideNumero) {
+      numero = prompt(d.etiquetaNumero + '\n\nCópielo tal cual del documento que acaba de revisar.',
+                      d.numero || '');
+      if (numero === null) return;
+      if (!String(numero).trim()) { alert('Sin el folio no se puede aprobar.'); return; }
+    }
   }
   try {
-    await api('cirujanos.verificar', { credId, aprobar, nota });
+    const r = await api('cirujanos.verificar', { credId, aprobar, nota, numero });
+    if (r && r.aviso) alert('Se guardó, con una advertencia: ' + r.aviso);
+    verDetalle(MEDICO_ACTIVO);
+  } catch (e) { alert(e.message); }
+}
+
+/**
+ * Asentar o corregir el folio de un documento que ya está arriba, sin volver
+ * a subirlo. Es para los que se verificaron antes de que el folio se pidiera:
+ * el número está impreso en el archivo que Zorvix ya tiene, no hay por qué
+ * pedirle al médico que escanee otra vez.
+ */
+async function ponerFolio(docId) {
+  const d = DOCS_VISTA[docId];
+  if (!d || !d.credId) return;
+  const numero = prompt(d.etiquetaNumero + '\n\n' + d.nombre +
+    '\nCópielo tal cual del documento. Ábralo con «Ver» si necesita consultarlo.',
+    d.numero || '');
+  if (numero === null || !String(numero).trim()) return;
+  try {
+    const r = await api('cirujanos.numero', { credId: d.credId, numero });
+    if (r && r.aviso) alert('Se guardó, con una advertencia: ' + r.aviso);
     verDetalle(MEDICO_ACTIVO);
   } catch (e) { alert(e.message); }
 }
@@ -671,6 +734,7 @@ async function verDetalle(id) {
     document.getElementById('d-nombre').textContent = d.medico.nombre;
     document.getElementById('d-esp').textContent = d.medico.especialidad || d.medico.tipo;
     document.getElementById('d-anillo').innerHTML = anillo(d.resumen.listos, d.resumen.total, 'grande');
+    registraDocs(d.documentos);
     document.getElementById('d-docs').innerHTML = d.documentos.map(tarjetaDoc).join('');
   } catch (e) {
     document.getElementById('d-docs').innerHTML = `<p style="grid-column:1/-1;color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
@@ -737,6 +801,21 @@ document.getElementById('picker').onchange = async function () {
     if (!vence) return;
   }
 
+  /* El folio se pide AQUÍ, con el documento en la mano. Si no se pide en
+     este momento no se pide nunca: así fue como Zorvix terminó con cédulas
+     verificadas cuyo número no estaba en ningún campo. */
+  let numero = '';
+  const def = DOCS_VISTA[DOC_PENDIENTE.tipo];
+  if (def && def.pideNumero) {
+    numero = prompt(def.etiquetaNumero + '\n\nCópielo tal cual del documento que va a subir.',
+                    def.numero || '');
+    if (numero === null) return;
+    if (!String(numero).trim()) {
+      alert('Ese documento no se puede registrar sin su folio.');
+      return;
+    }
+  }
+
   const base64 = await new Promise((ok, mal) => {
     const r = new FileReader();
     r.onload = () => ok(r.result.split(',')[1]);
@@ -745,12 +824,13 @@ document.getElementById('picker').onchange = async function () {
   });
 
   try {
-    await api('cirujanos.subir', {
+    const r = await api('cirujanos.subir', {
       medicoId: MEDICO_ACTIVO || undefined,
       tipo: DOC_PENDIENTE.tipo,
-      vence, archivo: base64,
+      vence, numero, archivo: base64,
       nombreArchivo: f.name, mime: f.type
     });
+    if (r && r.aviso) alert('Se subió, con una advertencia: ' + r.aviso);
     SESION.esStaff ? verDetalle(MEDICO_ACTIVO) : verMio();
   } catch (e) {
     alert(e.message);
