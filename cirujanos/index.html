@@ -178,6 +178,11 @@
       <div id="d-anillo" style="position:relative;flex-shrink:0"></div>
     </div>
 
+    <!-- Invitación. Sólo aparece cuando de verdad falta algo: un botón que
+         no tiene nada que pedir es un botón que alguien va a apretar. -->
+    <div class="zx-widget oculto" id="d-invitar"
+         style="padding:20px 23px;margin-bottom:var(--zx-gap);position:relative"></div>
+
     <div class="rejilla" id="d-docs"></div>
   </section>
 </div>
@@ -214,6 +219,14 @@ const CONFIG = {
 };
 
 let SESION = null, MEDICO_ACTIVO = null, DOC_PENDIENTE = null, MI_EXPEDIENTE = null, URL_ACTUAL = null;
+
+/* Todo lo que se arma con plantillas y viene de la base pasa por aquí. No es
+   paranoia de seguridad: la nota de rechazo la teclea recepción a mano, y un
+   «<» en ese texto rompe la tarjeta y deja la pantalla a medias sin decir por
+   qué. */
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 async function api(action, datos = {}) {
   const token = sessionStorage.getItem('zx_token');
@@ -713,11 +726,13 @@ async function verLista() {
            onclick="verDetalle('${m.medicoId}')">
         ${anillo(m.listos, m.total)}
         <div style="min-width:0;position:relative">
-          <div class="med-nom">${m.nombre}</div>
-          <div class="med-esp">${m.especialidad || m.tipo}</div>
+          <div class="med-nom">${esc(m.nombre)}</div>
+          <div class="med-esp">${esc(m.especialidad || m.tipo)}</div>
           <span class="zx-pill ${m.bloqueado ? 'error' : m.porVerificar ? 'alerta' : 'ok'}"
                 style="font-size:10px;margin-top:9px">${
             m.bloqueado ? 'Incompleto' : m.porVerificar ? m.porVerificar + ' por revisar' : 'Vigente'}</span>
+          ${m.bloqueado ? `<div class="med-esp" style="margin-top:7px">${
+            m.invitadoEn ? 'Invitado ' + esc(fechaCorta(m.invitadoEn)) : 'Sin invitar'}</div>` : ''}
         </div>
       </div>`).join('');
   } catch (e) {
@@ -735,9 +750,89 @@ async function verDetalle(id) {
     document.getElementById('d-esp').textContent = d.medico.especialidad || d.medico.tipo;
     document.getElementById('d-anillo').innerHTML = anillo(d.resumen.listos, d.resumen.total, 'grande');
     registraDocs(d.documentos);
+    pintaInvitacion(d);
     document.getElementById('d-docs').innerHTML = d.documentos.map(tarjetaDoc).join('');
   } catch (e) {
+    document.getElementById('d-invitar').classList.add('oculto');
     document.getElementById('d-docs').innerHTML = `<p style="grid-column:1/-1;color:var(--zx-error-txt);font-size:12.5px">${e.message}</p>`;
+  }
+}
+
+/* ---------- Invitación ----------
+
+   Antes esto era mandar la liga por WhatsApp desde el teléfono de quien se
+   acordara. El problema no era la comodidad: era que después nadie podía
+   contestar «¿ya le avisamos y cuándo?», que es justo lo que se pregunta
+   cuando un médico llega a operar sin papeles. */
+
+function fechaCorta(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return String(v).slice(0, 10);
+  const hoy = new Date();
+  const dias = Math.floor((hoy - d) / 86400000);
+  const txt = d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' });
+  if (dias <= 0) return 'hoy';
+  if (dias === 1) return 'ayer';
+  if (dias < 30) return 'hace ' + dias + ' días (' + txt + ')';
+  return 'el ' + txt;
+}
+
+function pintaInvitacion(d) {
+  const caja = document.getElementById('d-invitar');
+  const faltan = d.faltantes || [];
+  INVITA_DESTINO = d.medico.correo || '';
+  if (!faltan.length) { caja.classList.add('oculto'); caja.innerHTML = ''; return; }
+
+  const inv = d.invitacion;
+  const historia = inv
+    ? `Se le invitó ${fechaCorta(inv.enviadaEn)}, desde ${esc(inv.enviadaPor)}` +
+      (inv.cuantas > 1 ? ` · ${inv.cuantas} invitaciones en total` : '') + '.'
+    : 'Todavía no se le ha invitado a subirlos.';
+
+  caja.classList.remove('oculto');
+  caja.innerHTML = `
+    <div class="zx-widget-etq">Invitación</div>
+    <p style="font-size:13px;color:var(--zx-txt);margin:9px 0 0">
+      Le faltan ${faltan.length} documento${faltan.length > 1 ? 's' : ''}:
+      ${faltan.map(f => esc(f.nombre) + ' <span style="color:var(--zx-txt-3)">(' + esc(f.motivo) + ')</span>').join(' · ')}
+    </p>
+    <p style="font-size:12px;color:var(--zx-txt-2);margin:9px 0 0">${historia}</p>
+    <div class="fila-inv" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:15px">
+      <button class="zx-btn" id="d-btn-invitar" style="height:33px;padding:0 15px;font-size:12.5px"
+              onclick="invitar(false)">${inv ? 'Reenviar invitación' : 'Invitar a subir documentos'}</button>
+      <span style="font-size:11.5px;color:var(--zx-txt-3)">
+        Sale de atencion@zorvix.mx hacia ${esc(d.medico.correo || '— sin correo en el padrón —')}
+      </span>
+    </div>
+    <div id="d-inv-msg" style="font-size:12.5px;margin-top:11px"></div>`;
+}
+
+let INVITA_DESTINO = '';
+
+async function invitar(reenviar) {
+  if (!MEDICO_ACTIVO) return;
+  const btn = document.getElementById('d-btn-invitar');
+  const msg = document.getElementById('d-inv-msg');
+  if (btn) btn.disabled = true;
+  msg.innerHTML = '<span style="color:var(--zx-txt-3)">Mandando…</span>';
+  try {
+    const r = await api('cirujanos.invitar', { medicoId: MEDICO_ACTIVO, reenviar: !!reenviar });
+    msg.innerHTML = `<span style="color:var(--zx-ok-txt)">Invitación enviada a ${esc(r.correo)} desde ${esc(r.de)}.</span>`;
+    /* Se recarga el detalle para que la historia quede al día sin que nadie
+       tenga que recordar cuántas van. */
+    setTimeout(() => verDetalle(MEDICO_ACTIVO), 1400);
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    /* El rechazo por haberla mandado hace un rato no es un error: es el
+       sistema evitando que le insistan dos veces a la misma doctora por un
+       doble clic. Se ofrece la salida en vez de dejarlo atorado. */
+    const reciente = /Ya se le invitó/.test(e.message || '');
+    msg.innerHTML = `<span style="color:var(--zx-${reciente ? 'alerta' : 'error'}-txt)">${esc(e.message)}</span>` +
+      (reciente && !reenviar
+        ? ` <button class="zx-btn-2" style="height:28px;padding:0 12px;font-size:12px;margin-left:8px"
+                   onclick="invitar(true)">Reenviar de todas formas</button>`
+        : '');
   }
 }
 
