@@ -1269,29 +1269,75 @@ async function cargaPendientes(){
    abre el caso (lo pone pinta(), para todos los pendientes). Sin
    stopPropagation, apretarlo generaba la liga y acto seguido te mandaba a la
    pantalla del caso: el mensaje se pintaba donde ya nadie estaba viendo. */
+const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio',
+                  'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+/* "2026-09-25" -> "25 de septiembre de 2026". Se arma a mediodía a propósito:
+   con T00:00 un huso negativo recorre la fecha al día anterior. */
+function fechaLarga(iso){
+  const s = String(iso || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s + 'T12:00:00');
+  if (isNaN(d.getTime())) return s;
+  return d.getDate() + ' de ' + MESES_ES[d.getMonth()] + ' de ' + d.getFullYear();
+}
+
+/* El mensaje que lee el paciente. Dos cosas que parecen detalle y no lo son:
+
+   1. Cirujano_Nombre YA trae el tratamiento desde el padrón ("Dra. María del
+      Carmen Damián Tovar"). Anteponerle un "Dr." aquí escribiría "Dr. Dra." en
+      el WhatsApp de un paciente.
+   2. De ese mismo tratamiento sale el género del oficio: a la Dra. Damián no se
+      le presenta como "su cirujano".
+
+   Si falta el cirujano o el procedimiento, la frase se acomoda sola en vez de
+   mandar un corchete vacío. */
+function mensajeAlPaciente(nombre, caso, url, vence){
+  const medico = String((caso && caso.Cirujano_Nombre) || '').trim();
+  const proc   = String((caso && caso.Procedimiento_Principal) || '').trim();
+  const oficio = /^dra\.?\s/i.test(medico) ? 'cirujana' : 'cirujano';
+  const suCx   = proc ? '*' + proc + '*' : 'cirugía';
+
+  const presenta = medico
+    ? 'Somos *ZORVIX, Centro Quirúrgico Especializado*, el centro que su ' + oficio +
+      ', *' + medico + '*, ha elegido para realizar su ' + suCx + '.'
+    : 'Somos *ZORVIX, Centro Quirúrgico Especializado*, el centro donde se realizará su ' +
+      suCx + '.';
+
+  const caduca = vence ? '\n\nEstará disponible hasta el *' + fechaLarga(vence) + '*.' : '';
+
+  return 'Hola, ' + nombre + '.\n\n' +
+    presenta + '\n\n' +
+    'Para continuar con la preparación de su cirugía, necesitamos completar algunos ' +
+    'datos de su expediente.\n\n' +
+    'Hemos preparado para usted un proceso sencillo que puede realizar desde su celular ' +
+    'en solo unos minutos. Únicamente necesitará tener a la mano su INE para tomarle ' +
+    'una fotografía:\n\n' +
+    url + '\n\n' +
+    '*Su liga es personal y confidencial. Por favor, no la comparta.*' + caduca + '\n\n' +
+    'Agradecemos su confianza. En *ZORVIX* cuidamos cada detalle desde antes de su llegada.';
+}
+
 async function mandarLiga(boton, ev){
   if (ev) ev.stopPropagation();
   const original = boton.textContent;
   boton.disabled = true; boton.textContent = 'Generando…';
   try{
-    let pacienteId = boton.dataset.pac;
-    let telefono   = boton.dataset.tel;
-    if (!pacienteId) {
-      const c = await api('obtenerCaso', { caso_id: boton.dataset.liga });
-      pacienteId = c.caso && c.caso.Paciente_ID;
-      telefono   = (c.paciente && c.paciente.Telefono) || telefono;
-    }
+    /* El caso se pide SIEMPRE, ya no solo cuando falta el Paciente_ID: el
+       mensaje nombra al cirujano y al procedimiento, y ninguno de los dos viaja
+       en el renglón de pendientes. Es una vuelta más por clic en un botón que
+       se aprieta un puñado de veces al día. */
+    const c    = await api('obtenerCaso', { caso_id: boton.dataset.liga });
+    const caso = (c && c.caso) || {};
+    const pacienteId = boton.dataset.pac || caso.Paciente_ID;
+    const telefono   = (c && c.paciente && c.paciente.Telefono) || boton.dataset.tel;
     if (!pacienteId) throw new Error('Ese caso no trae paciente.');
 
     const r = await api('generarLigaFicha', { paciente_id: pacienteId });
 
     const nombre = String(r.paciente || boton.dataset.nom || '').trim().split(/\s+/)[0];
     const vence  = String(r.vence || '').slice(0, 10);
-    const texto =
-      'Hola ' + nombre + ', le escribimos de Zorvix. Para preparar su cirugía nos faltan ' +
-      'algunos datos suyos. Con esta liga los completa desde su celular en un par de ' +
-      'minutos, tomando una foto de su INE:\n\n' + r.url + '\n\n' +
-      'La liga es personal, no la comparta. Vence el ' + vence + '.';
+    const texto  = mensajeAlPaciente(nombre, caso, r.url, vence);
 
     try { await navigator.clipboard.writeText(r.url); } catch(e){ /* sin portapapeles, ni modo */ }
 
@@ -1323,7 +1369,7 @@ async function mandarLiga(boton, ev){
     const nota = document.createElement('div');
     nota.className = 'meta';
     nota.style.marginTop = '6px';
-    nota.textContent = 'Liga generada y copiada al portapapeles. Vence el ' + vence +
+    nota.textContent = 'Liga generada y copiada al portapapeles. Vence el ' + fechaLarga(vence) +
       (tel ? '. Si generas otra, ésta deja de servir.'
            : '. Este paciente no tiene teléfono: pégala tú donde corresponda.');
     caja.appendChild(nota);
