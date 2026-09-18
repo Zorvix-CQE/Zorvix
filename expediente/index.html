@@ -397,6 +397,14 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
       <div id="exp-alertas"></div>
     </div>
 
+    <div class="tarjeta" id="t-identificacion" hidden>
+      <h2>Identificación</h2>
+      <p class="sub">Con qué se acreditó quién es este paciente. Se abre aquí, no se descarga:
+        el archivo no sale del expediente y cada consulta queda registrada.</p>
+      <div id="exp-ident"></div>
+      <div id="exp-ident-visor"></div>
+    </div>
+
     <div class="tarjeta">
       <h2>Internamientos</h2>
       <p class="sub">Cada cirugía es un episodio con sus propios documentos.</p>
@@ -1001,6 +1009,67 @@ async function abreExpediente(pacienteId){
   }catch(e){ avisoGlobal('No se pudo abrir el expediente: ' + e.message); }
 }
 
+/* ── Identificación ─────────────────────────────────────────────────────────
+
+   El backend manda QUÉ documentos hay, nunca el enlace de Drive: un enlace le
+   pediría acceso al médico externo, y compartírselo uno por uno sería regar
+   permisos sobre documentos de identidad sin dónde revocarlos. Los bytes se
+   piden de uno en uno, al apretar.
+
+   No hay descarga ni "abrir en pestaña nueva" a propósito. Se ve y se cierra. */
+let IDENT_ABIERTO = '';
+
+function pintaIdentificacion(){
+  const docs = (EXP.paciente && EXP.paciente.identificacion) || [];
+  const caja = $('exp-ident');
+  const visor = $('exp-ident-visor');
+  IDENT_ABIERTO = '';
+  visor.innerHTML = '';
+
+  /* Sin identificación la tarjeta no aparece: un hueco vacío en la pantalla
+     del expediente se lee como "se descompuso", no como "todavía no llega". */
+  $('t-identificacion').hidden = !docs.length;
+  if (!docs.length) return;
+
+  caja.innerHTML = '<div class="marcas">' + docs.map(d =>
+    '<button type="button" class="btn" data-ident="' + esc(d.llave) + '">' +
+    esc(d.etiqueta) + '</button>').join(' ') + '</div>';
+
+  caja.querySelectorAll('[data-ident]').forEach(b => {
+    b.onclick = () => abreIdentificacion(b.dataset.ident, b.textContent);
+  });
+}
+
+async function abreIdentificacion(cual, etiqueta){
+  const visor = $('exp-ident-visor');
+
+  /* Segundo toque sobre el mismo: se cierra. */
+  if (IDENT_ABIERTO === cual){ IDENT_ABIERTO = ''; visor.innerHTML = ''; return; }
+
+  visor.innerHTML = '<div class="vacio">Abriendo ' + esc(etiqueta) + '…</div>';
+  try{
+    const r = await api('pacienteArchivo', {
+      paciente_id: EXP.paciente.Paciente_ID, cual: cual
+    });
+    IDENT_ABIERTO = cual;
+    const fuente = 'data:' + r.mime + ';base64,' + r.datos;
+    const esPdf = String(r.mime).indexOf('pdf') >= 0;
+
+    visor.innerHTML =
+      '<div style="margin-top:14px">' +
+      (esPdf
+        ? '<object data="' + fuente + '" type="application/pdf" ' +
+          'style="width:100%;height:70vh;border:1px solid var(--linea);border-radius:10px"></object>'
+        : '<img alt="' + esc(r.etiqueta) + '" src="' + fuente + '" ' +
+          'style="max-width:100%;border:1px solid var(--linea);border-radius:10px;display:block">') +
+      '<p class="sub" style="margin:8px 0 0">' + esc(r.etiqueta) +
+      ' · esta consulta quedó registrada en la bitácora.</p></div>';
+  }catch(e){
+    IDENT_ABIERTO = '';
+    visor.innerHTML = '<div class="aviso malo" style="margin-top:12px">' + esc(e.message) + '</div>';
+  }
+}
+
 function pintaExpediente(){
   const p = EXP.paciente;
   $('exp-nombre').textContent = p.Nombre_Completo || '(sin nombre)';
@@ -1025,6 +1094,8 @@ function pintaExpediente(){
   if (p.Grupo_Sanguineo) al.push('Grupo sanguíneo ' + p.Grupo_Sanguineo);
   if (!esSi(p.Aviso_Privacidad_Aceptado)) al.push('Falta el aviso de privacidad firmado');
   $('exp-alertas').innerHTML = al.length ? '<div class="franja-alerta">'+esc(al.join('  ·  '))+'</div>' : '';
+
+  pintaIdentificacion();
 
   const C = $('exp-casos');
   C.innerHTML = !EXP.casos.length ? '<div class="vacio">Sin internamientos registrados.</div>' :
