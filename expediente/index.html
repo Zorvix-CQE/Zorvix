@@ -1194,7 +1194,10 @@ function armaImpresion(){
                 ' · ' + DOC.Tipo + ' · ' + (v('doc_fecha') || DOC.Fecha || hoyISO());
 
   /* ── Identificación: sólo lo que tiene valor, en dos columnas ── */
-  const idCampos = campos.filter(c => c.grupo === 'Identificación' && val(c));
+  /* doc_hoja no se imprime dentro del bloque de identificación: el folio de
+     hoja va en el pie de cada hoja, no una sola vez en la primera. */
+  const idCampos = campos.filter(c => c.grupo === 'Identificación' &&
+                                      c.id !== 'doc_hoja' && val(c));
   const bloqueId = idCampos.map(c =>
     '<div><b>'+esc(c.etiqueta)+':</b> '+esc(val(c))+'</div>').join('');
 
@@ -1294,6 +1297,82 @@ function casoActual(){
   return (EXP.casos||[]).filter(c => String(c.Caso_ID) === String(DOC.Caso_ID))[0] || {};
 }
 
+/* ---------- Cálculos de los campos marcados «Automático» ----------
+
+   El diccionario marca doce campos como automáticos. De ésos, la aplicación
+   llenaba sólo los que tenían una rama explícita en heredado(); los demás
+   salían en blanco en todas las hojas, y faltantes() ni siquiera los
+   reclamaba --- justamente por ser automáticos. Se imprimían vacíos en
+   silencio, que es la peor forma de faltar. Aquí se calculan los que sí son
+   calculables. */
+
+/* Edad a una fecha dada. Se calcula contra la FECHA DEL DOCUMENTO y no contra
+   hoy: una nota de hace ocho meses tiene que seguir diciendo la edad que el
+   paciente tenía ese día, no la de hoy. Bajo el año se informa en meses y bajo
+   el mes en días, como se escribe en clínica: «3 meses» dice algo que
+   «0 años» no dice. */
+function edadAl(nacimiento, fecha){
+  if (!nacimiento) return '';
+  const n = new Date(String(nacimiento).slice(0,10) + 'T12:00:00');
+  const f = new Date(String(fecha).slice(0,10) + 'T12:00:00');
+  if (isNaN(n.getTime()) || isNaN(f.getTime()) || f < n) return '';
+  let anios = f.getFullYear() - n.getFullYear();
+  let meses = f.getMonth() - n.getMonth();
+  let dias  = f.getDate()  - n.getDate();
+  if (dias  < 0){ meses--; dias += new Date(f.getFullYear(), f.getMonth(), 0).getDate(); }
+  if (meses < 0){ anios--; meses += 12; }
+  if (anios >= 1) return anios + (anios === 1 ? ' año'  : ' años');
+  if (meses >= 1) return meses + (meses === 1 ? ' mes'  : ' meses');
+  return dias + (dias === 1 ? ' día' : ' días');
+}
+
+/* IMC = peso / talla². La talla se anota en centímetros en unos formatos y en
+   metros en otros; se aceptan las dos en vez de exigirle a quien captura que
+   recuerde cuál pide este renglón. Un resultado imposible no se escribe: más
+   vale el hueco que un número que nadie va a cuestionar. */
+function imcDe(peso, talla){
+  const p = parseFloat(peso), bruta = parseFloat(talla);
+  if (!p || !bruta) return '';
+  const t = bruta > 3 ? bruta / 100 : bruta;   /* 170 son centímetros; 1.70, metros */
+  const imc = p / (t * t);
+  if (!isFinite(imc) || imc < 5 || imc > 200) return '';
+  return imc.toFixed(1);
+}
+
+const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio',
+                  'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function fechaLarga(iso){
+  const d = new Date(String(iso).slice(0,10) + 'T12:00:00');
+  if (isNaN(d.getTime())) return '';
+  return d.getDate() + ' de ' + MESES_ES[d.getMonth()] + ' de ' + d.getFullYear();
+}
+
+/* «Ciudad y fecha» del encabezado de los consentimientos: la ciudad es
+   constante del establecimiento, la fecha es la del documento. */
+function ciudadYFecha(iso){
+  const ciudad = (EST && EST.ciudad) || '';
+  const f = fechaLarga(iso);
+  if (!ciudad) return f;
+  return f ? (ciudad + ', a ' + f) : ciudad;
+}
+
+/* Índice guía de la hoja frontal. Se marcan solas las entradas que ya existen
+   en el expediente, en vez de que alguien palomee veinticinco casillas a mano
+   y de paso palomee una que no está.
+
+   El catálogo trae «Carta de consentimiento informado» como una sola entrada y
+   el expediente guarda cuatro consentimientos distintos, así que cualquiera de
+   los cuatro marca también la entrada genérica. */
+function indiceDelExpediente(){
+  const hay = {};
+  (EXP.documentos || []).forEach(d => { hay[String(d.Tipo)] = true; });
+  const algunCI = Object.keys(hay).some(t => /^CI /.test(t));
+  return (CATS['indice_guia'] || []).filter(function(o){
+    if (hay[o]) return true;
+    return o === 'Carta de consentimiento informado' && algunCI;
+  });
+}
+
 /* Valor heredado: de Pacientes, de Casos o del bloque de constantes del
    establecimiento. Se marca y se bloquea; no se recaptura nunca. */
 function heredado(campo){
@@ -1320,6 +1399,18 @@ function heredado(campo){
   if (campo.id === 'usuario_rol') return YO.rol || '';
   if (campo.id === 'doc_tipo')    return DOC.Tipo || '';
   if (campo.id === 'doc_estado')  return DOC.Estado || 'Borrador';
+  /* Los cinco que estaban marcados «Automático» y nadie llenaba. */
+  if (campo.id === 'pac_edad')
+    return edadAl(EXP.paciente && EXP.paciente.Fecha_Nacimiento, DOC.Fecha || hoyISO());
+  if (campo.id === 'hc_sv_imc')
+    return imcDe(DOC.campos.hc_sv_peso, DOC.campos.hc_sv_talla);
+  if (campo.id === 'ci_ciudad_fecha') return ciudadYFecha(DOC.Fecha || hoyISO());
+  if (campo.id === 'hf_indice')       return indiceDelExpediente();
+  /* El folio de hoja pertenece a la hoja impresa y no al formulario: cuántas
+     hojas son sólo se sabe al paginar, y el navegador no le presta ese dato a
+     la página. Lo pone el diálogo de impresión de Chrome en el pie. Aquí se
+     dice, en vez de dejar el renglón en blanco sin explicación. */
+  if (campo.id === 'doc_hoja') return 'Se numera al imprimir';
   return null;
 }
 
@@ -1373,8 +1464,14 @@ function pintaDocumento(){
 function pintaCampo(c){
   const v = DOC.campos[c.id];
   const her = heredado(c);
-  const val = (v !== undefined && v !== null && v !== '') ? v : (her !== null ? her : '');
-  const bloq = (her !== null && her !== '') || c.control === 'automatico';
+  const hayHer = her !== null && her !== '' && !(Array.isArray(her) && !her.length);
+  const bloq = hayHer || c.control === 'automatico';
+  /* Un campo bloqueado no lo escribió nadie: lo que tenga guardado sólo puede
+     ser una copia vieja de lo que hoy dicen el caso, el paciente o el cálculo.
+     Por eso gana el valor vivo. Antes ganaba el guardado, y con eso una cirugía
+     reprogramada seguía imprimiendo la fecha anterior sin que nadie se enterara. */
+  const val = hayHer ? her
+            : ((v !== undefined && v !== null && v !== '') ? v : (her !== null ? her : ''));
   const ancho = ['parrafo','tabla','serie','grafica','imagen','casillas'].indexOf(c.control) >= 0;
   const id = 'f_' + c.id;
 
@@ -1579,6 +1676,16 @@ function conecta(){
     redibuja();
   });
   document.querySelectorAll('.gfx input').forEach(i => i.oninput = redibuja);
+  /* El IMC se recalcula mientras se teclean peso y talla. Si esperara al
+     guardado, quien captura no vería el número en el momento en que le sirve
+     --- que es cuando todavía puede corregir la talla que puso mal. */
+  const fPeso = $('f_hc_sv_peso'), fTalla = $('f_hc_sv_talla'), fImc = $('f_hc_sv_imc');
+  if (fPeso && fTalla && fImc){
+    const recalculaImc = () => { fImc.value = imcDe(fPeso.value, fTalla.value); };
+    fPeso.addEventListener('input', recalculaImc);
+    fTalla.addEventListener('input', recalculaImc);
+    recalculaImc();
+  }
   document.querySelectorAll('.cuerpo-svg').forEach(svg => {
     if (svg.dataset.bloq === '1') return;
     svg.onclick = function(ev){
