@@ -802,7 +802,10 @@ function pintaInvitacion(d) {
       <button class="zx-btn" id="d-btn-invitar" style="height:33px;padding:0 15px;font-size:12.5px"
               onclick="invitar(false)">${inv ? 'Reenviar invitación' : 'Invitar a subir documentos'}</button>
       <span style="font-size:11.5px;color:var(--zx-txt-3)">
-        Sale de atencion@zorvix.mx hacia ${esc(d.medico.correo || '— sin correo en el padrón —')}
+        ${d.remitente
+          ? 'Sale de ' + esc(d.remitente.nombre) + ' &lt;' + esc(d.remitente.cuenta) +
+            '&gt;, respuestas a ' + esc(d.remitente.responder) + ', hacia '
+          : 'Hacia '}${esc(d.medico.correo || '— sin correo en el padrón —')}
       </span>
     </div>
     <div id="d-inv-msg" style="font-size:12.5px;margin-top:11px"></div>`;
