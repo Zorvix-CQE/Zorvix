@@ -584,6 +584,73 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
         <h2 id="c-titulo">Caso</h2>
         <p class="sub" id="c-sub"></p>
         <div id="c-detalle"></div>
+
+        <!-- Valoración prequirúrgica.
+
+             Estas columnas existían en la hoja Casos desde el principio y el
+             expediente ya sabía heredarlas: la nota preoperatoria, la lista de
+             verificación y la preanestésica las leen de aquí. Lo que faltaba era
+             la pantalla que las escribiera, así que salían en blanco en cada
+             nota y el médico las recapturaba a mano en cada documento. Se
+             asientan una vez, aquí, y de aquí las jala todo el expediente. -->
+        <div id="c-preq" class="oculto">
+          <h3 class="grupo">Sitio quirúrgico · lo asienta el cirujano</h3>
+          <div class="rejilla">
+            <div><label>Lateralidad</label>
+              <select id="q-Lateralidad"><option value=""></option>
+                <option>Derecha</option><option>Izquierda</option><option>Bilateral</option>
+                <option>Línea media</option><option>No aplica</option></select></div>
+            <div><label>¿Requiere marcaje de sitio?</label>
+              <select id="q-Marcaje_Sitio_Requerido"><option value=""></option>
+                <option>Si</option><option>No</option></select></div>
+          </div>
+
+          <h3 class="grupo">Valoración preanestésica · la asienta anestesiología</h3>
+          <div class="rejilla">
+            <div><label>Peso (kg)</label><input type="number" step="0.1" min="0" id="q-Peso_Kg" inputmode="decimal"></div>
+            <div><label>Talla (cm)</label><input type="number" step="0.1" min="0" id="q-Talla_Cm" inputmode="decimal"></div>
+            <div><label>IMC</label><input id="q-IMC" readonly placeholder="se calcula"></div>
+            <div><label>ASA</label>
+              <select id="q-ASA"><option value=""></option>
+                <option>I</option><option>II</option><option>III</option>
+                <option>IV</option><option>V</option><option>VI</option></select></div>
+            <div><label>Tabaquismo</label>
+              <select id="q-Tabaquismo"><option value=""></option>
+                <option>No</option><option>Si</option><option>Ex-fumador</option></select></div>
+            <div><label>Anticoagulantes</label>
+              <select id="q-Anticoagulantes"><option value=""></option>
+                <option>No</option><option>Si</option></select></div>
+            <div><label>Suspenderlos desde</label><input type="date" id="q-Suspension_Indicada_Desde"></div>
+            <div><label>¿Embarazo descartado?</label>
+              <select id="q-Embarazo_Descartado"><option value=""></option>
+                <option>Si</option><option>No</option><option>No aplica</option></select></div>
+            <div><label>Puntaje Caprini</label><input type="number" min="0" step="1" id="q-Caprini_Puntaje" inputmode="numeric"></div>
+            <div><label>Riesgo tromboembólico</label><input id="q-Riesgo_TVP" readonly placeholder="se calcula del puntaje"></div>
+            <div style="grid-column:1/-1"><label>Comorbilidades</label>
+              <input id="q-Comorbilidades"
+                placeholder="Si no se interrogó, déjelo vacío. Nunca escriba «ninguna» por omisión."></div>
+            <div style="grid-column:1/-1"><label>Tromboprofilaxis indicada</label>
+              <input id="q-Profilaxis_Indicada" placeholder="Qué, a qué dosis y desde cuándo."></div>
+          </div>
+
+          <h3 class="grupo">Internamiento</h3>
+          <div class="rejilla">
+            <div><label>Cama asignada</label><input id="q-Cama_Asignada"></div>
+            <div><label>Noches estimadas</label><input type="number" min="0" step="1" id="q-Noches_Estimadas"></div>
+          </div>
+          <p class="sub" style="margin:12px 0 0">Cambiar la cama revalida que esté libre en ese horario; si ya está
+            ocupada, el guardado se rechaza y nada se escribe.</p>
+
+          <div class="fila">
+            <button class="btn" id="q-guardar" type="button">Guardar la valoración</button>
+            <label style="display:flex;align-items:center;gap:7px;margin:0;font-weight:400;
+                          font-size:13.5px;text-transform:none;letter-spacing:0">
+              <input type="checkbox" id="q-realizada" style="width:auto;padding:0">
+              Dar por realizada la valoración preanestésica</label>
+            <span id="q-msg"></span>
+          </div>
+        </div>
+
         <div class="fila">
           <button class="btn sec" id="c-ficha" type="button">Abrir ficha del paciente</button>
           <button class="btn sec" id="c-expediente" type="button">Abrir expediente</button>
@@ -918,6 +985,7 @@ async function abreCaso(id){
   $('c-confirmar').classList.toggle('oculto',
     !(r.puedo_editar && String(r.caso.Estatus_Agenda) === 'Preaparto'));
   $('c-ficha').classList.toggle('oculto', !r.paciente);
+  pintaPrequirurgica(r.caso, !!r.puedo_editar);
   $('c-msg').textContent = '';
   muestra('vista-caso');
 }
@@ -931,6 +999,125 @@ $('c-confirmar').onclick = async function(){
     $('c-msg').innerHTML = '<span class="pastilla ok">Confirmado</span>';
     await cargaCasos();
   }catch(e){ $('c-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>'; }
+};
+
+/* ── Valoración prequirúrgica ──────────────────────────────────
+
+   Estas columnas ya existían en la hoja Casos y el expediente ya sabía
+   heredarlas; lo que no existía era la pantalla que las escribiera. El efecto
+   era que la nota preoperatoria, la preanestésica y la lista de verificación
+   pedían los mismos diez datos cada una, en blanco, y nadie sabía por qué.
+
+   La lista es la única fuente de verdad: de aquí se pinta y de aquí se guarda,
+   para que agregar un campo no obligue a acordarse de tocar dos lugares. Eso
+   de acordarse es justo lo que ya falló una vez en este sistema. */
+const PREQ = ['Lateralidad','Marcaje_Sitio_Requerido','Peso_Kg','Talla_Cm','IMC','ASA',
+              'Tabaquismo','Anticoagulantes','Suspension_Indicada_Desde','Embarazo_Descartado',
+              'Caprini_Puntaje','Riesgo_TVP','Comorbilidades','Profilaxis_Indicada',
+              'Cama_Asignada','Noches_Estimadas'];
+let PREQ_ORIGINAL = {};
+
+const qv = (col) => $('q-' + col);
+const hoyISO = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') +
+         '-' + String(d.getDate()).padStart(2,'0');
+};
+
+/* Las cinco bandas son las del catálogo caprini_riesgo del diccionario. El
+   riesgo se deriva del puntaje en vez de capturarse aparte: teclear los dos
+   por separado es teclear una contradicción tarde o temprano, y la que manda
+   en la profilaxis es la banda. */
+function riesgoCaprini(puntos){
+  const n = parseInt(puntos, 10);
+  if (isNaN(n) || n < 0) return '';
+  if (n === 0) return 'Muy bajo (0)';
+  if (n <= 2)  return 'Bajo (1-2)';
+  if (n <= 4)  return 'Moderado (3-4)';
+  if (n <= 6)  return 'Alto (5-6)';
+  return 'Muy alto (≥7)';
+}
+
+/* La talla se pide en centímetros, pero si alguien escribe 1.70 se entiende
+   igual. Un IMC imposible no se escribe: más vale el hueco que un número que
+   después nadie va a cuestionar. */
+function imcDe(peso, talla){
+  const p = parseFloat(peso), bruta = parseFloat(talla);
+  if (!p || !bruta) return '';
+  const t = bruta > 3 ? bruta / 100 : bruta;
+  const imc = p / (t * t);
+  if (!isFinite(imc) || imc < 5 || imc > 200) return '';
+  return imc.toFixed(1);
+}
+
+function recalculaPreq(){
+  qv('IMC').value = imcDe(qv('Peso_Kg').value, qv('Talla_Cm').value);
+  qv('Riesgo_TVP').value = riesgoCaprini(qv('Caprini_Puntaje').value);
+}
+
+function pintaPrequirurgica(caso, puedoEditar){
+  PREQ_ORIGINAL = {};
+  PREQ.forEach(function(col){
+    const el = qv(col);
+    if (!el) return;
+    const v = (caso[col] === undefined || caso[col] === null) ? '' : String(caso[col]);
+    el.value = (col === 'Suspension_Indicada_Desde') ? v.slice(0,10) : v;
+    PREQ_ORIGINAL[col] = el.value;
+    el.disabled = !puedoEditar;
+  });
+  recalculaPreq();
+  /* El IMC y el riesgo se recalculan al pintar, así que un caso viejo con un
+     IMC mal guardado se corrige solo en cuanto alguien lo abra y guarde. */
+  PREQ_ORIGINAL.IMC = qv('IMC').value;
+  PREQ_ORIGINAL.Riesgo_TVP = qv('Riesgo_TVP').value;
+
+  const yaHecha = String(caso.Valoracion_Preanestesica_Estatus || '').toLowerCase() === 'realizada';
+  const casilla = $('q-realizada');
+  casilla.checked = false;
+  casilla.disabled = !puedoEditar || yaHecha;
+  casilla.parentElement.style.opacity = casilla.disabled ? '.5' : '1';
+  $('q-guardar').disabled = !puedoEditar;
+  $('q-msg').innerHTML = !puedoEditar
+    ? '<span class="pastilla">Sólo lectura</span>'
+    : (yaHecha ? '<span class="pastilla ok">Valoración preanestésica realizada</span>' : '');
+  $('c-preq').classList.remove('oculto');
+}
+
+['Peso_Kg','Talla_Cm','Caprini_Puntaje'].forEach(function(col){
+  const el = qv(col);
+  if (el) el.addEventListener('input', recalculaPreq);
+});
+
+$('q-guardar').onclick = async function(){
+  if (!CASO_SEL) return;
+  recalculaPreq();
+  /* Sólo viaja lo que cambió. Mandar el renglón entero haría que dos personas
+     capturando al mismo tiempo se pisaran los campos que ni tocaron. */
+  const cambios = {};
+  PREQ.forEach(function(col){
+    const el = qv(col);
+    if (el && el.value !== PREQ_ORIGINAL[col]) cambios[col] = el.value;
+  });
+  if ($('q-realizada').checked){
+    cambios.Valoracion_Preanestesica_Estatus = 'Realizada';
+    cambios.Valoracion_Preanestesica_Fecha = hoyISO();
+  }
+  if (!Object.keys(cambios).length){
+    $('q-msg').innerHTML = '<span class="pastilla">No hubo cambios</span>';
+    return;
+  }
+  $('q-guardar').disabled = true;
+  $('q-msg').innerHTML = '<span class="pastilla">Guardando…</span>';
+  try{
+    await api('actualizarCaso', {caso_id: CASO_SEL.Caso_ID, cambios: cambios});
+    await abreCaso(CASO_SEL.Caso_ID);
+    $('q-msg').innerHTML = '<span class="pastilla ok">Guardado · ' +
+      Object.keys(cambios).length + ' campos</span>';
+    cargaPendientes();
+  }catch(e){
+    $('q-guardar').disabled = false;
+    $('q-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>';
+  }
 };
 
 /* ── Reservar ─────────────────────────────────────────────── */
