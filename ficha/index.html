@@ -246,8 +246,59 @@ details ul{font-size:13px;color:var(--tinta2);margin:8px 0 0;padding-left:18px}
       </div>
     </div>
 
+    <!-- ══════════════════════════════════════════════════════════════════
+         Alergias.
+
+         Las columnas Alergias_Tiene y Alergias_Cuales existen en la hoja
+         Pacientes desde el principio y CUATRO campos del expediente heredan de
+         ellas: la franja de alerta de la Hoja Frontal (que se imprime), el
+         apartado de alérgicos de anestesia y los dos de valoración de riesgo.
+         Nadie las preguntaba, así que esa franja salía en blanco.
+
+         El "¿tienes?" y el "¿cuáles?" van SEPARADOS a propósito. Con un solo
+         campo de texto, vacío significa a la vez "no tiene" y "no le
+         preguntamos", y esas dos cosas no se parecen en nada cuando quien lee
+         es el anestesiólogo cinco minutos antes de dormirlo.
+         ══════════════════════════════════════════════════════════════════ -->
     <div class="tarjeta">
-      <h2><span class="paso">5</span>Privacidad</h2>
+      <h2><span class="paso">5</span>Alergias</h2>
+      <p class="sub">Esto lo lee tu anestesiólogo antes de dormirte. Si dudas de algo,
+        escríbelo de todos modos con tus palabras.</p>
+
+      <div class="campo">
+        <label for="f-Alergias_Tiene">¿Eres alérgico a algún medicamento o sustancia?</label>
+        <select id="f-Alergias_Tiene">
+          <option value="">Selecciona…</option>
+          <option value="No">No que yo sepa</option>
+          <option value="Si">Sí</option>
+        </select>
+      </div>
+      <div class="campo" id="caja-alergias-cuales" hidden>
+        <label for="f-Alergias_Cuales">¿A cuáles?</label>
+        <input id="f-Alergias_Cuales" placeholder="Penicilina, sulfas, látex, yodo…">
+        <p class="pista">Si recuerdas qué te pasó (ronchas, hinchazón, falta de aire),
+          escríbelo también.</p>
+      </div>
+
+      <div class="campo">
+        <label for="f-Alergias_Alimentarias_Tiene">¿Eres alérgico o intolerante a algún
+          alimento?</label>
+        <select id="f-Alergias_Alimentarias_Tiene">
+          <option value="">Selecciona…</option>
+          <option value="No">No que yo sepa</option>
+          <option value="Si">Sí</option>
+        </select>
+      </div>
+      <div class="campo" id="caja-alergias-alim-cuales" hidden>
+        <label for="f-Alergias_Alimentarias_Cuales">¿A cuáles?</label>
+        <input id="f-Alergias_Alimentarias_Cuales" placeholder="Mariscos, nueces, huevo, lactosa…">
+        <p class="pista">Nos sirve para tu comida después de la cirugía y para algunos
+          medicamentos que se preparan con derivados de alimentos.</p>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2><span class="paso">6</span>Privacidad</h2>
       <p class="sub">Para atenderte necesitamos tratar datos de salud, y la ley nos obliga a
         decírtelo antes, no después.</p>
 
@@ -390,7 +441,18 @@ const TOKEN = new URLSearchParams(location.search).get('t') || '';
 
 const CAMPOS = ['Nombre','Apellido_Paterno','Apellido_Materno','Fecha_Nacimiento','Sexo',
   'CURP','Telefono','Correo','Calle_Numero','Colonia','CP','Alcaldia_Municipio','Estado',
-  'Contacto_Urgencia_Nombre','Contacto_Urgencia_Parentesco','Contacto_Urgencia_Telefono'];
+  'Contacto_Urgencia_Nombre','Contacto_Urgencia_Parentesco','Contacto_Urgencia_Telefono',
+  'Alergias_Tiene','Alergias_Cuales',
+  'Alergias_Alimentarias_Tiene','Alergias_Alimentarias_Cuales'];
+
+/* Cada "¿tienes?" con el "¿cuáles?" que destapa. El detalle sólo se muestra
+   --y sólo se manda-- cuando la respuesta es Sí: así nunca queda guardado un
+   "penicilina" debajo de un "no soy alérgico" porque alguien cambió de opinión
+   después de escribir. */
+const ALERGIAS = [
+  ['f-Alergias_Tiene',             'caja-alergias-cuales',      'f-Alergias_Cuales'],
+  ['f-Alergias_Alimentarias_Tiene','caja-alergias-alim-cuales', 'f-Alergias_Alimentarias_Cuales']
+];
 
 /* Cada casilla opcional con la columna que le toca en la hoja. El nombre de la
    columna se escribe UNA vez, aqui: si se teclea distinto en el listener y en
@@ -430,6 +492,19 @@ function mensaje(clase, texto) {
   if (clase !== 'malo') setTimeout(() => { $('mensaje').innerHTML = ''; }, 6000);
 }
 
+/* Abre o cierra el "¿a cuáles?" según la respuesta, y al cerrarlo BORRA lo que
+   hubiera escrito: un detalle huérfano debajo de un "no" es peor que nada. */
+function destapaAlergia(idSelect) {
+  const fila = ALERGIAS.find(f => f[0] === idSelect);
+  if (!fila) return;
+  const hay = $(fila[0]).value === 'Si';
+  $(fila[1]).hidden = !hay;
+  if (!hay) $(fila[2]).value = '';
+}
+ALERGIAS.forEach(([sel]) => {
+  $(sel).addEventListener('change', () => destapaAlergia(sel));
+});
+
 /* ── Arranque ─────────────────────────────────────────────────────────────── */
 (async function () {
   if (!TOKEN) {
@@ -441,6 +516,9 @@ function mensaje(clase, texto) {
     const d = await llamar({ accion: 'fichaAbrir' });
     if (d.saludo) $('saludo').textContent = 'Hola, ' + d.saludo;
     CAMPOS.forEach(k => { if ($('f-' + k) && d.datos[k]) $('f-' + k).value = d.datos[k]; });
+    /* Después de rellenar, no antes: si ya había contestado que sí, el "¿a
+       cuáles?" tiene que aparecer abierto con su texto adentro. */
+    ALERGIAS.forEach(([sel]) => destapaAlergia(sel));
     marcaINE('frente', d.ine.frente);
     marcaINE('reverso', d.ine.reverso);
     $('c-aviso').checked = !!d.aviso_aceptado;
@@ -543,6 +621,26 @@ $('btn-guardar').addEventListener('click', async () => {
     $('c-sensibles').scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
+  /* Las alergias se validan aquí y NO se dejan pasar en blanco. Que el
+     anestesiólogo lea "sin datos" cinco minutos antes de la inducción es
+     exactamente lo que esta pantalla existe para evitar. Contestar "no que yo
+     sepa" toma un segundo; no contestar no es una opción. */
+  for (const [sel, , detalle] of ALERGIAS) {
+    if (!$(sel).value) {
+      mensaje('warn', 'Contéstanos las dos preguntas de alergias. Si no tienes ninguna, ' +
+                      'elige "No que yo sepa" — necesitamos que quede por escrito.');
+      $(sel).scrollIntoView({ behavior: 'smooth', block: 'center' });
+      $(sel).focus();
+      return;
+    }
+    if ($(sel).value === 'Si' && !$(detalle).value.trim()) {
+      mensaje('warn', 'Dinos a qué eres alérgico. Con que lo escribas como lo recuerdes basta.');
+      $(detalle).scrollIntoView({ behavior: 'smooth', block: 'center' });
+      $(detalle).focus();
+      return;
+    }
+  }
+
   const curp = $('f-CURP').value.trim();
   if (curp && curp.length !== 18) {
     mensaje('warn', 'El CURP debe tener exactamente 18 caracteres. Revísalo en tu INE.');
@@ -579,7 +677,9 @@ const BONITO = {
   CURP:'tu CURP', Telefono:'tu teléfono', Calle_Numero:'tu calle y número',
   Colonia:'tu colonia', CP:'tu código postal',
   Contacto_Urgencia_Nombre:'el nombre de tu contacto de urgencia',
-  Contacto_Urgencia_Telefono:'el teléfono de tu contacto de urgencia'
+  Contacto_Urgencia_Telefono:'el teléfono de tu contacto de urgencia',
+  Alergias_Tiene:'si eres alérgico a algún medicamento',
+  Alergias_Alimentarias_Tiene:'si eres alérgico a algún alimento'
 };
 
 function pintaListo(r) {
