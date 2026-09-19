@@ -510,7 +510,7 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
         <h2>Credenciales pendientes</h2>
         <p class="sub">Casos apartados a nombre de un médico al que le faltan documentos. El espacio
           está apartado, pero el caso no se puede confirmar hasta que su expediente esté completo;
-          si no llegan, el preaparto vence y el quirófano se libera solo.</p>
+          si no llegan, el apartado vence y el quirófano se libera solo.</p>
         <div id="p-credenciales"></div>
       </div>
       <div class="tarjeta">
@@ -519,7 +519,7 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
         <div id="p-ficha"></div>
       </div>
       <div class="tarjeta">
-        <h2>Preapartos vencidos</h2>
+        <h2>Apartados vencidos</h2>
         <p class="sub">Nadie los confirmó y están ocupando quirófano.</p>
         <div id="p-preaparto"></div>
       </div>
@@ -685,6 +685,20 @@ const CLIENTE = '148311031818-4ku0lhia6qd0fgbmi379dvi7k4vp303g.apps.googleuserco
 let TOKEN = null, YO = null, PAQUETES = [], CASOS = [], PACIENTE_SEL = null, CASO_SEL = null;
 
 const $ = (id) => document.getElementById(id);
+/* El estatus se guarda con su nombre interno. En pantalla se lee lo que
+   significa: "Preaparto" es un apartado de quirofano que nadie ha confirmado
+   y que se libera solo al vencer. Escrito asi se confunde con un termino
+   obstetrico, que en un centro quirurgico no viene a cuento. */
+const ETIQUETA_AGENDA = {
+  'Preaparto': 'Sin confirmar',
+  'Confirmado': 'Confirmado',
+  'Liberado': 'Liberado',
+  'En curso': 'En curso',
+  'Realizado': 'Realizado',
+  'Cancelado': 'Cancelado'
+};
+const etiquetaAgenda = (v) => ETIQUETA_AGENDA[String(v || '')] || String(v || '\u2014');
+
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -868,7 +882,7 @@ function avisaPapeles(){
   if (pendientes.length){
     aviso('r-aviso-papeles','warn','Se puede apartar el quirófano, pero el caso no se va a poder ' +
       'confirmar hasta que el expediente del médico esté completo. ' + pendientes.join(' · ') +
-      ' Si los documentos no llegan, el preaparto vence y el espacio se libera solo.');
+      ' Si los documentos no llegan, el apartado vence y el espacio se libera solo.');
   } else {
     aviso('r-aviso-papeles','', '');
   }
@@ -956,7 +970,7 @@ async function cargaCasos(){
     const clase = est === 'Confirmado' ? 'ok' : (est === 'Preaparto' ? 'warn' : '');
     return '<div class="caso" data-id="'+esc(x.Caso_ID)+'">' +
       '<div class="top"><span class="folio">'+esc(x.Folio_Caso)+'</span>' +
-      '<span class="pastilla '+clase+'">'+esc(est)+'</span></div>' +
+      '<span class="pastilla '+clase+'">'+esc(etiquetaAgenda(est))+'</span></div>' +
       '<div class="nom">'+esc(x.Procedimiento_Principal || 'Procedimiento por definir')+'</div>' +
       '<div class="meta">'+esc(x.Fecha_Cirugia||'sin fecha')+' · '+esc(x.Hora_Inicio||'')+
         ' · '+esc(x.Quirofano||'')+'</div></div>';
