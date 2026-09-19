@@ -1411,7 +1411,7 @@ function armaImpresion(){
   const vals = leeFormulario();
   const campos = camposDe(DOC.Tipo);
   const val = function(c){
-    const t = textoDe(c, vals[c.id] !== undefined ? vals[c.id] : DOC.campos[c.id]);
+    const t = textoDe(c, sinLeyenda(vals[c.id] !== undefined ? vals[c.id] : DOC.campos[c.id]));
     return typeof t === 'string' ? nombreDeCorreo(t) : t;
   };
   const porId = {};
@@ -1608,6 +1608,26 @@ function indiceDelExpediente(){
   });
 }
 
+/* ── Leyendas de pantalla ───────────────────────────────────────
+   Un campo automático que se queda en blanco a propósito necesita decir por
+   qué, pero esa frase es una leyenda de PANTALLA y no el dato. `doc_hoja`
+   devolvía «Se numera al imprimir» como si fuera el folio de la hoja; de ahí
+   se guardaba con el documento —leeFormulario lee el recuadro aunque esté
+   bloqueado— y salía impresa tal cual: «Hoja Se numera al imprimir · …».
+
+   Ahora la frase va como placeholder: se ve, no se lee y no se guarda. Y las
+   que alcanzaron a guardarse en documentos viejos se descartan al pintarlos y
+   al imprimirlos, para que una hoja ya capturada no siga arrastrándola. */
+const LEYENDAS_VIEJAS = ['Se numera al imprimir'];
+
+function leyendaVacia(c){
+  if (c.id === 'doc_hoja') return 'Lo numera el diálogo de impresión';
+  return '';
+}
+function sinLeyenda(v){
+  return (typeof v === 'string' && LEYENDAS_VIEJAS.indexOf(v.trim()) >= 0) ? '' : v;
+}
+
 /* Valor heredado: de Pacientes, de Casos o del bloque de constantes del
    establecimiento. Se marca y se bloquea; no se recaptura nunca. */
 function heredado(campo){
@@ -1641,11 +1661,11 @@ function heredado(campo){
     return imcDe(DOC.campos.hc_sv_peso, DOC.campos.hc_sv_talla);
   if (campo.id === 'ci_ciudad_fecha') return ciudadYFecha(DOC.Fecha || hoyISO());
   if (campo.id === 'hf_indice')       return indiceDelExpediente();
-  /* El folio de hoja pertenece a la hoja impresa y no al formulario: cuántas
-     hojas son sólo se sabe al paginar, y el navegador no le presta ese dato a
-     la página. Lo pone el diálogo de impresión de Chrome en el pie. Aquí se
-     dice, en vez de dejar el renglón en blanco sin explicación. */
-  if (campo.id === 'doc_hoja') return 'Se numera al imprimir';
+  /* `doc_hoja` no se resuelve aquí a propósito: cuántas hojas son sólo se
+     sabe al paginar y el navegador no le presta ese dato a la página, así que
+     la app no tiene folio que dar. Lo que va en el recuadro es una leyenda de
+     pantalla —leyendaVacia()—, no un valor: devolver la frase desde aquí era
+     exactamente lo que la metía al documento guardado y a la hoja impresa. */
   return null;
 }
 
@@ -1752,7 +1772,7 @@ function sugerido(campo){
 }
 
 function pintaCampo(c){
-  const v = DOC.campos[c.id];
+  const v = sinLeyenda(DOC.campos[c.id]);
   const her = heredado(c);
   const hayHer = her !== null && her !== '' && !(Array.isArray(her) && !her.length);
   const bloq = hayHer || c.control === 'automatico';
@@ -1819,8 +1839,10 @@ function pintaCampo(c){
       cuerpo = pintaCuerpo(c, val, bloq, id); break;
     case 'adjunto_ref':
       cuerpo = pintaAdjuntoRef(c, val, bloq, id); break;
-    case 'automatico':
-      cuerpo = '<input type="text" id="'+id+'" class="bloqueado" readonly value="'+esc(val)+'">'; break;
+    case 'automatico': {
+      const ley = (val === '' || val === null || val === undefined) ? leyendaVacia(c) : '';
+      cuerpo = '<input type="text" id="'+id+'" class="bloqueado" readonly value="'+esc(val)+'"'+
+               (ley ? ' placeholder="'+esc(ley)+'"' : '')+'>'; break; }
     default:
       cuerpo = '<input type="text" id="'+id+'" value="'+esc(val)+'"'+(bloq?' readonly class="bloqueado"':'')+'>';
   }
@@ -2327,6 +2349,12 @@ function faltantes(){
        se colaban a la lista de pendientes. */
     if (c.control === 'automatico') return false;
     if (c.captura === 'Automático') return false;
+    /* Un dato que se hereda del internamiento no se le puede reclamar a un
+       documento que no tiene internamiento. El número de cama es el caso
+       claro: en un documento del paciente no hay cama que heredar y aun así
+       salía en rojo como obligatorio, pidiendo algo que no existe. Si el
+       documento sí está colgado de un internamiento, se sigue pidiendo. */
+    if (c.hereda && c.hereda.origen === 'Casos' && !DOC.Caso_ID) return false;
     if (heredado(c)) return false;
     const v = leeFormulario()[c.id];
     if (Array.isArray(v)) return v.length === 0;
