@@ -1681,11 +1681,12 @@ function pintaAdjuntos(c, val, bloq, id){
       '</li>';
   }).join('');
 
-  /* Se adjunta sobre un documento que ya existe: el servidor lo amarra al
-     folio de la nota. Pedirlo antes de guardar dejaria archivos sueltos. */
+  /* El boton sale siempre. Antes se escondia hasta que la nota tuviera folio
+     y en su lugar salia un "guarde la nota una vez", que es al reves de como
+     se trabaja: uno abre la hoja PORQUE trae el estudio en la mano. El folio
+     lo resuelve subeAdjunto() guardando el borrador solo. */
   const alta = bloq ? ''
-    : (DOC && DOC.Doc_ID
-        ? '<div class="alta-adjunto">'+
+    : ('<div class="alta-adjunto">'+
           /* El input de archivo nativo se lee "Elegir archivo" en gris y no
              parece un control: en una pantalla donde todo lo demas son botones
              con nombre, la gente no lo encuentra. Se esconde y se opera desde
@@ -1694,9 +1695,9 @@ function pintaAdjuntos(c, val, bloq, id){
           '<label class="btn chico alta-adjunto-btn" for="'+id+'_archivo">Adjuntar estudio\u2026</label>'+
           '<input type="file" id="'+id+'_archivo" class="sube-adjunto" data-para="'+id+'" '+
           'accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif">'+
-          '<span class="pista">PDF o imagen, hasta 8 MB.</span>'+
-          '</div>'
-        : '<span class="pista">Guarde la nota una vez y aqui aparece el boton para adjuntar.</span>');
+          '<span class="pista">PDF o imagen, hasta 8 MB.'+
+            (DOC && DOC.Doc_ID ? '' : ' La nota se guarda sola al adjuntar.')+'</span>'+
+          '</div>');
 
   return '<div class="adjuntos" id="'+id+'" data-v=\''+esc(JSON.stringify(lista))+'\'>'+
          (filas ? '<ul class="lista-adjuntos">'+filas+'</ul>'
@@ -1710,6 +1711,21 @@ async function subeAdjunto(cont, file){
     avisoGlobal('Ese archivo pesa '+bytesLegibles(file.size)+' y el tope son 8 MB.');
     return;
   }
+  /* El servidor amarra el archivo al folio de la nota, y una nota recien
+     abierta no tiene folio todavia. Se guarda como borrador en este momento
+     --sin exigir campos obligatorios, que para 'Borrador' no se piden-- y el
+     adjunto sigue de largo. Lo que ya estaba tecleado viaja en ese guardado,
+     asi que no se pierde nada. */
+  if (!DOC.Doc_ID){
+    const g = await api('documentoGuardar', {
+      doc_id: '', tipo: DOC.Tipo,
+      paciente_id: EXP.paciente.Paciente_ID, caso_id: DOC.Caso_ID || '',
+      estado: 'Borrador', campos: leeFormulario()
+    });
+    DOC.Doc_ID = g.doc_id; DOC.Estado = g.estado; DOC.Version = g.version;
+    $('doc-estado').textContent = g.estado;
+  }
+
   const b64 = await new Promise(function(res, rej){
     const fr = new FileReader();
     fr.onload = function(){ res(String(fr.result).split(',')[1] || ''); };
