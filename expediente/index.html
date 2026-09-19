@@ -1225,6 +1225,11 @@ function textoDe(c, v){
   if (v === undefined || v === null) return '';
   if (Array.isArray(v)){
     if (!v.length) return '';
+    /* Un adjunto en papel es una linea que dice que existe y de donde salio.
+       El id de Drive no le sirve a nadie con la hoja en la mano. */
+    if (c.control === 'archivo')
+      return v.map(a => (a.nombre || 'archivo') + ' (' + (a.subio || '') + ', ' +
+                        String(a.cuando || '').slice(0,16) + ')').join(' · ');
     if (typeof v[0] === 'object') return v;          /* tabla: se pinta aparte */
     return v.join(', ');
   }
@@ -1543,7 +1548,7 @@ function pintaCampo(c){
      reprogramada seguía imprimiendo la fecha anterior sin que nadie se enterara. */
   const val = hayHer ? her
             : ((v !== undefined && v !== null && v !== '') ? v : (her !== null ? her : ''));
-  const ancho = ['parrafo','tabla','serie','grafica','imagen','casillas'].indexOf(c.control) >= 0;
+  const ancho = ['parrafo','tabla','serie','grafica','imagen','casillas','archivo'].indexOf(c.control) >= 0;
   const id = 'f_' + c.id;
 
   let cuerpo = '';
@@ -1594,6 +1599,8 @@ function pintaCampo(c){
       cuerpo = pintaGrafica(c, val, bloq, id); break;
     case 'imagen':
       cuerpo = pintaCuerpo(c, val, bloq, id); break;
+    case 'archivo':
+      cuerpo = pintaAdjuntos(c, val, bloq, id); break;
     case 'automatico':
       cuerpo = '<input type="text" id="'+id+'" class="bloqueado" readonly value="'+esc(val)+'">'; break;
     default:
@@ -1632,6 +1639,91 @@ function pintaTabla(c, val, bloq, id){
     cols.map(k => '<th>'+esc(k)+'</th>').join('')+'<th></th></tr></thead><tbody>'+
     filas.map(tr).join('')+'</tbody></table></div>'+
     (bloq?'':'<button type="button" class="btn chico agrega" data-para="'+id+'">Agregar renglón</button>');
+}
+
+/* ── Control ARCHIVO: adjuntos del documento ────────────────────
+   El estudio que trae la paciente. Se sube a la carpeta del expediente y
+   aqui queda la referencia: nombre, quien lo subio y cuando.
+
+   NO sustituye la captura. Los valores se siguen escribiendo en el
+   documento, porque un PDF no entra en un semaforo ni en una grafica.
+   El adjunto es de donde salieron esos numeros.
+
+   Quitar un adjunto lo saca de ESTA nota; el archivo se queda en el
+   expediente del paciente y la subida sigue en la bitacora. Un expediente
+   clinico no borra evidencia, la corrige por escrito. */
+function bytesLegibles(n){
+  n = Number(n) || 0;
+  return n >= 1048576 ? (n/1048576).toFixed(1)+' MB'
+       : Math.max(1, Math.round(n/1024))+' KB';
+}
+
+function pintaAdjuntos(c, val, bloq, id){
+  const lista = Array.isArray(val) ? val : [];
+  const filas = lista.map(function(a, i){
+    return '<li>'+
+      '<button type="button" class="btn chico ver-adjunto" data-i="'+i+'" data-para="'+id+'">Ver</button> '+
+      esc(a.nombre || 'archivo')+
+      ' <span class="pista">'+esc(bytesLegibles(a.bytes))+' · '+
+        esc(nombreDeCorreo(a.subio || ''))+' · '+esc(String(a.cuando || '').slice(0,16))+'</span>'+
+      (bloq ? '' : ' <button type="button" class="btn chico quita-adjunto" data-i="'+i+'" data-para="'+id+'" '+
+                   'title="Quitar de esta nota. El archivo se queda en el expediente.">×</button>')+
+      '</li>';
+  }).join('');
+
+  /* Se adjunta sobre un documento que ya existe: el servidor lo amarra al
+     folio de la nota. Pedirlo antes de guardar dejaria archivos sueltos. */
+  const alta = bloq ? ''
+    : (DOC && DOC.Doc_ID
+        ? '<input type="file" class="sube-adjunto" data-para="'+id+'" '+
+          'accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif">'+
+          '<span class="pista">PDF o imagen, hasta 8 MB.</span>'
+        : '<span class="pista">Guarde la nota una vez y aqui aparece el boton para adjuntar.</span>');
+
+  return '<div class="adjuntos" id="'+id+'" data-v=\''+esc(JSON.stringify(lista))+'\'>'+
+         (filas ? '<ul class="lista-adjuntos">'+filas+'</ul>'
+                : '<p class="pista">Sin archivos adjuntos.</p>')+
+         alta+'</div>';
+}
+
+async function subeAdjunto(cont, file){
+  if (!file) return;
+  if (file.size > 8*1024*1024){
+    avisoGlobal('Ese archivo pesa '+bytesLegibles(file.size)+' y el tope son 8 MB.');
+    return;
+  }
+  const b64 = await new Promise(function(res, rej){
+    const fr = new FileReader();
+    fr.onload = function(){ res(String(fr.result).split(',')[1] || ''); };
+    fr.onerror = function(){ rej(new Error('No se pudo leer el archivo.')); };
+    fr.readAsDataURL(file);
+  });
+  const r = await api('adjuntoSubir', {
+    doc_id: DOC.Doc_ID, nombre: file.name,
+    mime: file.type || 'application/pdf', contenido_b64: b64
+  });
+  const lista = JSON.parse(cont.dataset.v || '[]');
+  lista.push(r.adjunto);
+  const cid = cont.closest('[data-campo]').dataset.campo;
+  /* Se conserva lo que ya estaba tecleado y sin guardar: repintar sin esto
+     borraria el parrafo que quien captura lleva a medias. */
+  Object.assign(DOC.campos, leeFormulario());
+  DOC.campos[cid] = lista;
+  pintaDocumento();
+  avisoGlobal('Adjuntado. Guarde la nota para dejarlo asentado.', 'bueno');
+}
+
+async function veAdjunto(cont, i){
+  const lista = JSON.parse(cont.dataset.v || '[]');
+  const a = lista[i];
+  if (!a) return;
+  const r = await api('adjuntoLeer', { doc_id: DOC.Doc_ID, archivo_id: a.archivo_id });
+  const bin = atob(r.datos);
+  const buf = new Uint8Array(bin.length);
+  for (let k = 0; k < bin.length; k++) buf[k] = bin.charCodeAt(k);
+  const url = URL.createObjectURL(new Blob([buf], { type: r.mime }));
+  window.open(url, '_blank');
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
 }
 
 /* ── Control SERIE: mismo criterio medido en momentos fijos ─────
@@ -1746,6 +1838,29 @@ function conecta(){
     else this.closest('tr').querySelectorAll('input').forEach(i => i.value = '');
     redibuja();
   });
+  document.querySelectorAll('.sube-adjunto').forEach(function(inp){
+    inp.onchange = function(){
+      const f = this.files && this.files[0];
+      this.value = '';
+      subeAdjunto($(this.dataset.para), f).catch(e => avisoGlobal(e.message));
+    };
+  });
+  document.querySelectorAll('.ver-adjunto').forEach(function(b){
+    b.onclick = function(){
+      veAdjunto($(this.dataset.para), Number(this.dataset.i)).catch(e => avisoGlobal(e.message));
+    };
+  });
+  document.querySelectorAll('.quita-adjunto').forEach(function(b){
+    b.onclick = function(){
+      const cont = $(this.dataset.para);
+      const lista = JSON.parse(cont.dataset.v || '[]');
+      lista.splice(Number(this.dataset.i), 1);
+      const cid = cont.closest('[data-campo]').dataset.campo;
+      Object.assign(DOC.campos, leeFormulario());
+      DOC.campos[cid] = lista;
+      pintaDocumento();
+    };
+  });
   document.querySelectorAll('.gfx input').forEach(i => i.oninput = redibuja);
   /* El IMC se recalcula mientras se teclean peso y talla. Si esperara al
      guardado, quien captura no vería el número en el momento en que le sirve
@@ -1821,6 +1936,7 @@ function leeFormulario(){
         const marcas = {};
         el.querySelectorAll('input[data-marca]').forEach(i => { if (i.value) marcas[i.dataset.marca] = i.value; });
         out[cid] = { puntos: leeGraficaPuntos(el), marcas: marcas }; break; }
+      case 'archivo': out[cid] = JSON.parse(el.dataset.v || '[]'); break;
       case 'imagen': {
         const marcas = Array.from(el.querySelectorAll('.marca'))
           .map(m => ({ x:Number(m.getAttribute('cx')), y:Number(m.getAttribute('cy')) }))
