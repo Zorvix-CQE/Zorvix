@@ -1690,6 +1690,26 @@ function pintaDocumento(){
   vista('documento');
 }
 
+/* Valor SUGERIDO. No es lo mismo que heredado y la diferencia importa.
+
+   Heredado se relee del caso cada vez y se bloquea: el cirujano tratante del
+   caso tiene que ser el del caso, porque ese campo es la llave por la que el
+   gateway decide quien ve el expediente. Cambiarlo a mano seria cambiar quien
+   tiene acceso.
+
+   Sugerido se propone la primera vez que se abre el documento, se guarda con
+   el y despues es del medico. El medico tratante casi siempre es el cirujano
+   que opero, pero no tiene por que serlo —puede ser el internista que sigue
+   al paciente—, asi que la app propone lo razonable y deja cambiarlo. Antes
+   estaba marcado como heredado: salia bloqueado con el cirujano y no habia
+   forma de asentar a alguien distinto. */
+function sugerido(campo){
+  if (!campo.sugiere) return '';
+  const f = campo.sugiere.origen === 'Casos' ? casoActual() : EXP.paciente;
+  if (!f) return '';
+  return f[campo.sugiere.columna] != null ? f[campo.sugiere.columna] : '';
+}
+
 function pintaCampo(c){
   const v = DOC.campos[c.id];
   const her = heredado(c);
@@ -1699,8 +1719,12 @@ function pintaCampo(c){
      ser una copia vieja de lo que hoy dicen el caso, el paciente o el cálculo.
      Por eso gana el valor vivo. Antes ganaba el guardado, y con eso una cirugía
      reprogramada seguía imprimiendo la fecha anterior sin que nadie se enterara. */
+  const guardado = (v !== undefined && v !== null && v !== '');
+  /* La sugerencia solo entra cuando el campo nunca se ha llenado. Si el medico
+     ya escribio algo —aunque sea lo mismo— manda lo guardado: una propuesta que
+     se reimpone sobre lo que alguien decidio no es una propuesta. */
   const val = hayHer ? her
-            : ((v !== undefined && v !== null && v !== '') ? v : (her !== null ? her : ''));
+            : (guardado ? v : (sugerido(c) || (her !== null ? her : '')));
   const ancho = ['parrafo','tabla','serie','grafica','imagen','casillas'].indexOf(c.control) >= 0;
   const id = 'f_' + c.id;
 
@@ -1764,13 +1788,15 @@ function pintaCampo(c){
      completa, envuelve el renglón y desalinea toda la rejilla. El detalle
      largo queda en el title, para quien pase el cursor. */
   const fuente = c.constante ? ['constante','Constante del establecimiento. No se recaptura.']
-    : (c.hereda ? ['heredado','Viene de AltaZorvixDB · '+c.hereda.origen+'.'+c.hereda.columna+'. No se recaptura.'] : null);
+    : (c.hereda ? ['heredado','Viene de AltaZorvixDB · '+c.hereda.origen+'.'+c.hereda.columna+'. No se recaptura.']
+    : (c.sugiere ? ['sugerido','Se propone del internamiento · '+c.sugiere.origen+'.'+c.sugiere.columna+
+                    '. Puede cambiarse: queda guardado lo que usted deje.'] : null));
 
   return '<div class="campo'+(ancho?' ancho':'')+'" data-campo="'+esc(c.id)+'" data-control="'+esc(c.control)+'">'+
     '<label for="'+id+'">'+esc(c.etiqueta)+(c.obligatorio?' <span class="req">*</span>':'')+
       (fuente?' <span class="heredado" title="'+esc(fuente[1])+'">'+esc(fuente[0])+'</span>':'')+'</label>'+
     cuerpo +
-    (c.notas && c.notas.length < 110 && !c.hereda && !c.constante ? '<span class="pista">'+esc(c.notas)+'</span>' : '')+
+    (c.notas && c.notas.length < 110 && !c.hereda && !c.sugiere && !c.constante ? '<span class="pista">'+esc(c.notas)+'</span>' : '')+
     '</div>';
 }
 
