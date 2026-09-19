@@ -1463,8 +1463,12 @@ function armaImpresion(){
       '<div class="imp-campo"><div class="v">'+esc(suelto)+'</div></div>'
     : '';
 
-  const cedula = v('med_cedula');
-  const cedEsp = v('med_cedula_esp');
+  /* El pie se arma del medico tratante en este momento, no de lo que quedo
+     guardado: si el caso cambio de cirujano, la hoja que se imprime hoy tiene
+     que decir quien responde hoy. */
+  const firma  = medicoQueFirma();
+  const cedula = firma.cedula;
+  const cedEsp = firma.cedula_esp;
 
   $('impresion').innerHTML =
     '<div class="imp-corre">'+esc(ident)+'</div>' +
@@ -1482,14 +1486,16 @@ function armaImpresion(){
     cuerpo + bloqueSuelto +
     '<div class="imp-firma">'+
       '<div class="linea"></div>'+
-      '<div class="pie"><b>'+esc(v('med_nombre') || YO.nombre || '')+'</b>'+
+      '<div class="pie"><b>'+esc(firma.nombre || '______________________________')+'</b>'+
         (cedula ? ' · Cédula profesional '+esc(cedula) : ' · Cédula profesional ______________')+
         (cedEsp ? ' · Cédula de especialidad '+esc(cedEsp) : '')+
-        '<br>Firma autógrafa</div>'+
+        '<br>Firma autógrafa del médico tratante</div>'+
     '</div>' +
     '<div class="imp-nota">Documento '+esc(DOC.Doc_ID || '(sin guardar)')+
       ' · versión '+esc(String(DOC.Version || 1))+
       ' · capturó '+esc(YO.correo || '')+
+      (firma.correo && String(firma.correo).toLowerCase() !== String(YO.correo||'').toLowerCase()
+        ? ' por cuenta de '+esc(firma.correo) : '')+
       '. El expediente es propiedad del establecimiento y se conserva cinco años '+
       'contados desde el último acto médico (NOM-004-SSA3-2012, 5.4).</div>';
 }
@@ -1615,7 +1621,7 @@ function heredado(campo){
   if (campo.id === 'doc_hora')  return DOC.Hora  || new Date().toTimeString().slice(0,5);
   if (campo.id === 'doc_id')    return DOC.Doc_ID || '(al guardar)';
   if (campo.id === 'doc_capturo') return YO.correo;
-  if (campo.id === 'med_nombre')  return YO.nombre;
+  if (campo.id === 'med_nombre')  return medicoQueFirma().nombre;
   /* Estos tres estaban marcados «Automático» en el diccionario pero nadie los
      llenaba, así que salían vacíos Y se le reclamaban al médico como campos
      obligatorios. La app ya sabe los tres desde antes de abrir el documento:
@@ -1623,8 +1629,8 @@ function heredado(campo){
   /* La cédula viene de la hoja Medicos por la sesión. Si está vacía, se
      devuelve '' y la hoja impresa deja la línea en blanco para escribirla a
      mano. Un número de cédula no se inventa nunca. */
-  if (campo.id === 'med_cedula')     return YO.cedula || '';
-  if (campo.id === 'med_cedula_esp') return YO.cedula_esp || '';
+  if (campo.id === 'med_cedula')     return medicoQueFirma().cedula;
+  if (campo.id === 'med_cedula_esp') return medicoQueFirma().cedula_esp;
   if (campo.id === 'usuario_rol') return YO.rol || '';
   if (campo.id === 'doc_tipo')    return DOC.Tipo || '';
   if (campo.id === 'doc_estado')  return DOC.Estado || 'Borrador';
@@ -1703,6 +1709,41 @@ function pintaDocumento(){
    al paciente—, asi que la app propone lo razonable y deja cambiarlo. Antes
    estaba marcado como heredado: salia bloqueado con el cirujano y no habia
    forma de asentar a alguien distinto. */
+/* ── QUIEN FIRMA LA NOTA ─────────────────────────────────────
+
+   Esto estaba mal de origen y salia impreso. `med_nombre` y las dos cedulas
+   se llenaban con YO —la cuenta autenticada—, dando por hecho que quien
+   teclea es quien elabora la nota. En un centro quirurgico casi nunca es asi:
+   recepcion o la administracion capturan la hoja frontal del caso de otra
+   doctora. El resultado era un pie de firma con el nombre de quien capturo,
+   con renglon de cedula profesional, encima de las palabras "Firma autografa".
+   Es decir, una nota medica atribuida a alguien que no es el medico y que no
+   la leyo. Eso no se arregla con una aclaracion: se arregla no haciendolo.
+
+   Ahora la nota la firma el MEDICO TRATANTE del documento, y su cedula sale
+   del padron. Quien capturo sigue asentado aparte, en el pie: es la huella de
+   auditoria y esa si es de la cuenta autenticada.
+
+   Si no hay medico tratante asentado, no se inventa ninguno: el pie sale en
+   blanco para llenarse a mano y el campo se reclama como obligatorio. */
+function medicoQueFirma(){
+  const correo = String(DOC.campos.med_tratante ||
+                        ($('f_med_tratante') && $('f_med_tratante').value) ||
+                        sugerido(PORID.med_tratante || {}) || '').toLowerCase().trim();
+  if (!correo) return { correo:'', nombre:'', cedula:'', cedula_esp:'' };
+  const pad = (YO && YO.padron_medicos) || [];
+  for (let i = 0; i < pad.length; i++){
+    if (String(pad[i].correo || '').toLowerCase().trim() === correo){
+      return { correo: correo,
+               nombre: pad[i].nombre || correo,
+               cedula: pad[i].cedula || '',
+               cedula_esp: pad[i].cedula_esp || '' };
+    }
+  }
+  /* Fuera del padron no se inventa cedula: va el correo y la linea en blanco. */
+  return { correo: correo, nombre: correo, cedula:'', cedula_esp:'' };
+}
+
 function sugerido(campo){
   if (!campo.sugiere) return '';
   const f = campo.sugiere.origen === 'Casos' ? casoActual() : EXP.paciente;
