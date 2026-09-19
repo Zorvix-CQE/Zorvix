@@ -368,7 +368,7 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
 
 <div id="tabs" class="oculto">
   <button data-v="mios" class="sel">Mis pacientes</button>
-  <button data-v="agenda">Hoy en la casa</button>
+  <button data-v="agenda">Agenda de quirófano</button>
   <button data-v="buscar">Buscar paciente</button>
   <button data-v="expediente" class="oculto" id="tab-exp">Expediente</button>
   <button data-v="documento" class="oculto" id="tab-doc">Documento</button>
@@ -404,7 +404,7 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
     <div class="tarjeta">
       <div class="fila">
         <div class="crece">
-          <h2>Hoy en la casa</h2>
+          <h2>Agenda de quirófano</h2>
           <p class="sub" id="agenda-sub">Los casos del día que están en su alcance.</p>
         </div>
         <input type="date" id="agenda-fecha" style="width:auto">
@@ -1013,16 +1013,39 @@ async function cargaAgenda(){
   }catch(e){ aviso('agenda-sub','malo', e.message); }
 }
 
+/* El estatus se guarda con el nombre interno que escribe AltaZorvix. En
+   pantalla se lee lo que significa, no como se llama la columna. "Preaparto"
+   es un apartado de quirofano que todavia nadie confirma y que se libera solo
+   a las 48 h; escrito asi se lee como termino obstetrico, que aqui no viene
+   a cuento. */
+const ETIQUETA_AGENDA = {
+  'Preaparto': 'Sin confirmar',
+  'Confirmado': 'Confirmado',
+  'Liberado': 'Liberado',
+  'En curso': 'En curso',
+  'Realizado': 'Realizado',
+  'Cancelado': 'Cancelado'
+};
+const TITULO_AGENDA = {
+  'Preaparto': 'Quirofano apartado sin confirmar. Se libera solo si nadie lo confirma.',
+  'Liberado': 'El apartado vencio o se solto; el quirofano quedo libre.'
+};
+const etiquetaAgenda = v => ETIQUETA_AGENDA[String(v||'')] || String(v||'\u2014');
+const claseAgenda = v => String(v||'')==='Confirmado' ? ' ok'
+                       : (String(v||'')==='Preaparto' ? ' warn' : '');
+const tituloAgenda = v => TITULO_AGENDA[String(v||'')]
+                        ? ' title="'+esc(TITULO_AGENDA[String(v||'')])+'"' : '';
+
 function renglonCaso(c){
   const conf = String(c.Estatus_Agenda||'');
-  const clase = conf==='Confirmado' ? 'ok' : (conf==='Preaparto' ? 'warn' : '');
   return '<div class="renglon" data-pac="'+esc(c.Paciente_ID)+'">'+
     '<span class="hora">'+esc(String(c.Hora_Inicio||'').slice(0,5)||'—')+'</span>'+
     '<div class="crece"><div class="nom">'+esc(c.Paciente_Nombre || c.Paciente_ID)+'</div>'+
     '<div class="det">'+esc(c.Procedimiento_Principal||'Sin procedimiento capturado')+
       ' · '+esc(c.Quirofano||'—')+
       (esSi(c.Pernocta) ? ' · pernocta' : '')+'</div></div>'+
-    '<span class="etq '+clase+'">'+esc(conf||'—')+'</span></div>';
+    '<span class="etq'+claseAgenda(conf)+'"'+tituloAgenda(conf)+'>'+
+      esc(etiquetaAgenda(conf))+'</span></div>';
 }
 const esSi = v => ['si','sí','true','1','x'].indexOf(String(v||'').toLowerCase().trim())>=0;
 
@@ -1084,8 +1107,8 @@ function renglonMio(c, hoy){
       (c.Hora_Inicio ? ' '+esc(String(c.Hora_Inicio).slice(0,5)) : '')+
       (c.mi_papel ? ' · '+esc(c.mi_papel) : '')+
       (c.Expediente_No ? ' · '+esc(c.Expediente_No) : '')+'</div></div>'+
-    '<span class="etq'+(String(c.Estatus_Agenda)==='Confirmado'?' ok':'')+'">'+
-      esc(c.Estatus_Agenda||'—')+'</span></div>';
+    '<span class="etq'+claseAgenda(c.Estatus_Agenda)+'"'+tituloAgenda(c.Estatus_Agenda)+'>'+
+      esc(etiquetaAgenda(c.Estatus_Agenda))+'</span></div>';
 }
 
 /* ══════════ BUSCAR ══════════ */
