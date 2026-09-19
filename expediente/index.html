@@ -994,10 +994,32 @@ function indexa(e){
   });
 }
 
+/* Qué campos le tocan a un documento.
+
+   Además del formato, cuenta si el documento cuelga de un internamiento. El
+   expediente es del PACIENTE, no del internamiento —NOM-004-SSA3-2012, y por
+   eso se conserva cinco años desde el último acto médico—, así que la hoja
+   frontal y el aviso de privacidad son uno por persona y nacen con Caso_ID
+   vacío a propósito. En ellos, un campo que se hereda de `Casos` no tiene de
+   dónde llenarse.
+
+   El número de cama es el caso que lo destapó: en la hoja frontal salía como
+   recuadro vacío —y además editable, porque al no haber caso la herencia
+   devolvía cadena vacía y el campo se desbloqueaba—, invitando a capturar a
+   mano un dato del internamiento en la portada del expediente. Un paciente
+   que opera tres veces tiene tres camas distintas y una sola hoja frontal:
+   ese dato no cabe ahí. Se retira.
+
+   La regla es general, no un parche para la cama: vale para cualquier campo
+   heredado de `Casos`. En los documentos que sí pertenecen a un internamiento
+   no cambia nada. */
 function camposDe(tipo){
+  const sinCaso = !(DOC && DOC.Caso_ID);
   return ESQ.campos.filter(function(c){
     const a = c.aparece || [];
-    return a.indexOf(tipo) >= 0 || a.indexOf('Todos los formatos') >= 0;
+    if (a.indexOf(tipo) < 0 && a.indexOf('Todos los formatos') < 0) return false;
+    if (sinCaso && c.hereda && c.hereda.origen === 'Casos') return false;
+    return true;
   });
 }
 
