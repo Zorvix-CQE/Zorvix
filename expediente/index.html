@@ -126,6 +126,8 @@ main{max-width:1120px;margin:0 auto;padding:22px 18px 80px}
 .lista-adjuntos li{display:flex;align-items:center;gap:7px;flex-wrap:wrap;
   border:1px solid var(--linea);border-radius:var(--r-sm);padding:6px 9px;background:var(--papel-2)}
 .alta-adjunto{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.renglon .hora.urge{color:var(--morado-700);font-weight:700}
+#vista-mios .renglon{cursor:pointer}
 .adj-caso{border:1px solid var(--linea);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:10px}
 .adj-caso > summary{cursor:pointer;font-weight:600}
 .adj-caso > summary .etq{margin-left:7px}
@@ -365,7 +367,8 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
 </div>
 
 <div id="tabs" class="oculto">
-  <button data-v="agenda" class="sel">Hoy en la casa</button>
+  <button data-v="mios" class="sel">Mis pacientes</button>
+  <button data-v="agenda">Hoy en la casa</button>
   <button data-v="buscar">Buscar paciente</button>
   <button data-v="expediente" class="oculto" id="tab-exp">Expediente</button>
   <button data-v="documento" class="oculto" id="tab-doc">Documento</button>
@@ -373,8 +376,31 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
 
 <main id="app" class="oculto">
 
+  <!-- ══════════ MIS PACIENTES ══════════ -->
+  <section class="vista on" id="vista-mios">
+    <div class="tarjeta">
+      <div class="fila">
+        <div class="crece">
+          <h2>Lo que viene</h2>
+          <p class="sub" id="mios-sub">Sus cirugías de hoy en adelante, la más cercana primero.</p>
+        </div>
+      </div>
+      <div id="mios-proximas"></div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="fila">
+        <div class="crece">
+          <h2>Ya operadas</h2>
+          <p class="sub" id="mios-sub-pasadas">Las más recientes, para volver a una nota.</p>
+        </div>
+      </div>
+      <div id="mios-pasadas"></div>
+    </div>
+  </section>
+
   <!-- ══════════ AGENDA ══════════ -->
-  <section class="vista on" id="vista-agenda">
+  <section class="vista" id="vista-agenda">
     <div class="tarjeta">
       <div class="fila">
         <div class="crece">
@@ -901,6 +927,7 @@ async function entro(resp, silencioso){
     const e = await api('esquema');
     indexa(e.esquema);
     $('agenda-fecha').value = hoyISO();
+    await cargaMisPacientes();
     await cargaAgenda();
     /* Si llegamos desde Cirugías con un paciente señalado, se abre directo en
        vez de obligar a buscarlo otra vez. Se consume una sola vez: al recargar
@@ -998,6 +1025,68 @@ function renglonCaso(c){
     '<span class="etq '+clase+'">'+esc(conf||'—')+'</span></div>';
 }
 const esSi = v => ['si','sí','true','1','x'].indexOf(String(v||'').toLowerCase().trim())>=0;
+
+/* ══════════ MIS PACIENTES ══════════
+   La pantalla de entrada. Antes era la agenda del dia, y eso obligaba a
+   acordarse de que dia opera uno: si entras un martes a preparar lo del
+   viernes, la agenda de hoy no te sirve de nada y acabas escribiendo el
+   nombre de la paciente en el buscador. Nadie se acuerda de dieciocho
+   nombres; el que cree que si, se equivoca justo con el que importa. */
+async function cargaMisPacientes(){
+  try{
+    const r = await api('misPacientes', {});
+
+    const P = $('mios-proximas');
+    P.innerHTML = r.proximas.length
+      ? r.proximas.map(c => renglonMio(c, r.hoy)).join('')
+      : '<div class="vacio">No tiene cirugías programadas.</div>';
+
+    const Y = $('mios-pasadas');
+    Y.innerHTML = r.pasadas.length
+      ? r.pasadas.map(c => renglonMio(c, r.hoy)).join('')
+      : '<div class="vacio">Todavía no hay cirugías suyas registradas.</div>';
+
+    $('mios-sub').textContent = r.ve_todo
+      ? 'Todas las cirugías del centro, de hoy en adelante, la más cercana primero.'
+      : 'Sus cirugías de hoy en adelante, la más cercana primero.';
+    $('mios-sub-pasadas').textContent = r.pasadas_total > r.pasadas.length
+      ? 'Las ' + r.pasadas.length + ' más recientes de ' + r.pasadas_total +
+        '. Para una más vieja, use Buscar paciente.'
+      : 'Las más recientes, para volver a una nota.';
+
+    document.querySelectorAll('#vista-mios [data-pac]').forEach(el =>
+      el.onclick = () => abreExpediente(el.dataset.pac));
+  }catch(e){ aviso('mios-sub','malo', e.message); }
+}
+
+/* La fecha en palabras cuando está cerca. "En 3 días" se entiende de un
+   vistazo; "2026-09-21" hay que calcularlo, y calcular es justo lo que uno no
+   quiere hacer a las siete de la mañana. */
+function cuandoEs(fecha, hoy){
+  if (!fecha) return 'sin fecha';
+  const d = Math.round((Date.parse(fecha+'T12:00:00') - Date.parse(hoy+'T12:00:00')) / 86400000);
+  if (d === 0) return 'HOY';
+  if (d === 1) return 'mañana';
+  if (d === -1) return 'ayer';
+  if (d > 1 && d <= 14) return 'en ' + d + ' días';
+  if (d < -1 && d >= -14) return 'hace ' + (-d) + ' días';
+  return fecha;
+}
+
+function renglonMio(c, hoy){
+  const cuando = cuandoEs(c.Fecha_Cirugia, hoy);
+  const urge = cuando === 'HOY' || cuando === 'mañana';
+  return '<div class="renglon" data-pac="'+esc(c.Paciente_ID)+'">'+
+    '<span class="hora'+(urge?' urge':'')+'">'+esc(cuando)+'</span>'+
+    '<div class="crece"><div class="nom">'+esc(c.Paciente_Nombre || c.Paciente_ID)+'</div>'+
+    '<div class="det">'+esc(c.Procedimiento_Principal||'Sin procedimiento capturado')+
+      (c.Fecha_Cirugia ? ' · '+esc(c.Fecha_Cirugia) : '')+
+      (c.Hora_Inicio ? ' '+esc(String(c.Hora_Inicio).slice(0,5)) : '')+
+      (c.mi_papel ? ' · '+esc(c.mi_papel) : '')+
+      (c.Expediente_No ? ' · '+esc(c.Expediente_No) : '')+'</div></div>'+
+    '<span class="etq'+(String(c.Estatus_Agenda)==='Confirmado'?' ok':'')+'">'+
+      esc(c.Estatus_Agenda||'—')+'</span></div>';
+}
 
 /* ══════════ BUSCAR ══════════ */
 $('btn-buscar').onclick = buscar;
