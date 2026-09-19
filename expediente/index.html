@@ -121,6 +121,16 @@ main{max-width:1120px;margin:0 auto;padding:22px 18px 80px}
 .btn.peligro{color:var(--malo);border-color:var(--malo-linea)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.chico{padding:5px 10px;font-size:13px}
+.adjuntos{display:flex;flex-direction:column;gap:7px;align-items:flex-start}
+.lista-adjuntos{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;width:100%}
+.lista-adjuntos li{display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+  border:1px solid var(--linea);border-radius:var(--r-sm);padding:6px 9px;background:var(--papel-2)}
+.alta-adjunto{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.alta-adjunto-btn{cursor:pointer;display:inline-flex;align-items:center}
+/* No se oculta con display:none: asi la etiqueta lo sigue alcanzando por
+   teclado y el lector de pantalla lo anuncia. */
+.alta-adjunto input[type=file]{position:absolute;width:1px;height:1px;
+  opacity:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ── Selector de documento nuevo ─────────────────────────────
    Veintiún botones del mismo peso obligan a leerlos todos para
@@ -1675,9 +1685,17 @@ function pintaAdjuntos(c, val, bloq, id){
      folio de la nota. Pedirlo antes de guardar dejaria archivos sueltos. */
   const alta = bloq ? ''
     : (DOC && DOC.Doc_ID
-        ? '<input type="file" class="sube-adjunto" data-para="'+id+'" '+
+        ? '<div class="alta-adjunto">'+
+          /* El input de archivo nativo se lee "Elegir archivo" en gris y no
+             parece un control: en una pantalla donde todo lo demas son botones
+             con nombre, la gente no lo encuentra. Se esconde y se opera desde
+             una etiqueta que SI dice lo que hace. El input sigue siendo el
+             mismo elemento, asi que el cableado de conecta() no cambia. */
+          '<label class="btn chico alta-adjunto-btn" for="'+id+'_archivo">Adjuntar estudio\u2026</label>'+
+          '<input type="file" id="'+id+'_archivo" class="sube-adjunto" data-para="'+id+'" '+
           'accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif">'+
-          '<span class="pista">PDF o imagen, hasta 8 MB.</span>'
+          '<span class="pista">PDF o imagen, hasta 8 MB.</span>'+
+          '</div>'
         : '<span class="pista">Guarde la nota una vez y aqui aparece el boton para adjuntar.</span>');
 
   return '<div class="adjuntos" id="'+id+'" data-v=\''+esc(JSON.stringify(lista))+'\'>'+
