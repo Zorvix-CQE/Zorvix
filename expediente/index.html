@@ -963,6 +963,20 @@ function indexa(e){
   ESQ = e;
   PORID = {}; e.campos.forEach(c => PORID[c.id] = c);
   CATS = e.catalogos || {};
+  /* El diccionario trae `personal_medico` y `personal_quirurgico` con un solo
+     renglon que dice "POR CARGAR": nunca se cargaron. El efecto no era cosmetico.
+     `Anestesiologo asignado al caso` es la LLAVE DE ACCESO del anestesiologo, y
+     con la lista vacia no habia forma de asignarlo ni a mano, asi que quien no
+     quedara escrito en el alta no podia abrir el caso para su preanestesica.
+     El padron de la hoja Medicos ya viaja con la sesion —es el mismo que
+     convierte correos en nombres al imprimir—, de modo que la lista se arma de
+     ahi. Una sola fuente de verdad, y la del diccionario deja de estorbar. */
+  const padron = (YO && YO.padron_medicos) || [];
+  const correos = padron.map(m => m && m.correo).filter(Boolean);
+  if (correos.length) {
+    CATS.personal_medico = correos;
+    CATS.personal_quirurgico = correos;
+  }
   ORDEN_GRUPOS = e.grupos || [];
   EST = Object.assign({}, e.establecimiento || {}, EST);
   VITALES = (e.vitales || []).map(v => ({ sufijo:v.sufijo, re:new RegExp(v.re,'i'), arma:v.arma }));
