@@ -126,6 +126,12 @@ main{max-width:1120px;margin:0 auto;padding:22px 18px 80px}
 .lista-adjuntos li{display:flex;align-items:center;gap:7px;flex-wrap:wrap;
   border:1px solid var(--linea);border-radius:var(--r-sm);padding:6px 9px;background:var(--papel-2)}
 .alta-adjunto{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.adj-caso{border:1px solid var(--linea);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:10px}
+.adj-caso > summary{cursor:pointer;font-weight:600}
+.adj-caso > summary .etq{margin-left:7px}
+.adj-caso > *{margin-top:8px}
+.lista-adjuntos li .crece{flex:1;min-width:0}
+.lista-adjuntos li select{max-width:230px}
 .alta-adjunto-btn{cursor:pointer;display:inline-flex;align-items:center}
 /* No se oculta con display:none: asi la etiqueta lo sigue alcanzando por
    teclado y el lector de pantalla lo anuncia. */
@@ -423,6 +429,15 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
 
     <div class="tarjeta">
       <div class="fila">
+        <div class="crece"><h2>Estudios y archivos</h2>
+          <p class="sub">Laboratorios, imagen e interconsultas que llegan de fuera.
+            Cuelgan del internamiento, no de una nota.</p></div>
+      </div>
+      <div id="exp-adjuntos"></div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="fila">
         <div class="crece"><h2>Documentos</h2>
           <p class="sub" id="exp-docs-sub">Lo que ya está capturado en este expediente.</p></div>
       </div>
@@ -592,6 +607,7 @@ const ESTADO_HEREDADO  = 'Firmado y escaneado';   /* notas viejas */
 const esArchivada = e => e === ESTADO_ARCHIVADA || e === ESTADO_HEREDADO;
 
 let TOKEN=null, YO=null, ESQ=null, EXP=null, DOC=null, GRAB=null, AUDIO_ID=null;
+let ADJ={ adjuntos:[], puede_escribir:false };
 let PORID={}, CATS={}, ORDEN_GRUPOS=[], SECU={}, VITALES=[], EST={};
 
 const $  = (id) => document.getElementById(id);
@@ -1013,6 +1029,7 @@ $('btn-volver-agenda').onclick = () => vista('agenda');
 async function abreExpediente(pacienteId){
   try{
     EXP = await api('expediente', { paciente_id: pacienteId });
+    await cargaAdjuntos();
     $('tab-exp').classList.remove('oculto');
     pintaExpediente();
     vista('expediente');
@@ -1118,6 +1135,8 @@ function pintaExpediente(){
         ' · '+esc(c.Folio_Caso||c.Caso_ID)+'</div></div>'+
       '<span class="etq'+(c.hoja_enfermeria_completa?' warn':'')+'">'+
         (c.hoja_enfermeria_completa?'pernocta':'ambulatorio')+'</span></div>').join('');
+
+  pintaAdjuntosExpediente();
 
   const D = $('exp-docs');
   D.innerHTML = !EXP.documentos.length ? '<div class="vacio">Todavía no hay documentos capturados.</div>' :
@@ -1237,9 +1256,7 @@ function textoDe(c, v){
     if (!v.length) return '';
     /* Un adjunto en papel es una linea que dice que existe y de donde salio.
        El id de Drive no le sirve a nadie con la hoja en la mano. */
-    if (c.control === 'archivo')
-      return v.map(a => (a.nombre || 'archivo') + ' (' + (a.subio || '') + ', ' +
-                        String(a.cuando || '').slice(0,16) + ')').join(' · ');
+    if (c.control === 'adjunto_ref') return nombreDeAdjunto(v);
     if (typeof v[0] === 'object') return v;          /* tabla: se pinta aparte */
     return v.join(', ');
   }
@@ -1558,7 +1575,7 @@ function pintaCampo(c){
      reprogramada seguía imprimiendo la fecha anterior sin que nadie se enterara. */
   const val = hayHer ? her
             : ((v !== undefined && v !== null && v !== '') ? v : (her !== null ? her : ''));
-  const ancho = ['parrafo','tabla','serie','grafica','imagen','casillas','archivo'].indexOf(c.control) >= 0;
+  const ancho = ['parrafo','tabla','serie','grafica','imagen','casillas'].indexOf(c.control) >= 0;
   const id = 'f_' + c.id;
 
   let cuerpo = '';
@@ -1609,8 +1626,8 @@ function pintaCampo(c){
       cuerpo = pintaGrafica(c, val, bloq, id); break;
     case 'imagen':
       cuerpo = pintaCuerpo(c, val, bloq, id); break;
-    case 'archivo':
-      cuerpo = pintaAdjuntos(c, val, bloq, id); break;
+    case 'adjunto_ref':
+      cuerpo = pintaAdjuntoRef(c, val, bloq, id); break;
     case 'automatico':
       cuerpo = '<input type="text" id="'+id+'" class="bloqueado" readonly value="'+esc(val)+'">'; break;
     default:
@@ -1651,113 +1668,250 @@ function pintaTabla(c, val, bloq, id){
     (bloq?'':'<button type="button" class="btn chico agrega" data-para="'+id+'">Agregar renglón</button>');
 }
 
-/* ── Control ARCHIVO: adjuntos del documento ────────────────────
-   El estudio que trae la paciente. Se sube a la carpeta del expediente y
-   aqui queda la referencia: nombre, quien lo subio y cuando.
+/* ── ESTUDIOS Y ARCHIVOS DEL INTERNAMIENTO ──────────────────────
+   Un laboratorio no pertenece a una nota: pertenece al internamiento. La nota
+   lo INTERPRETA. Por eso los archivos se suben y se consultan desde el
+   expediente, en su propia tarjeta, y desde una nota lo unico que se hace es
+   APUNTAR a uno de ellos.
 
-   NO sustituye la captura. Los valores se siguen escribiendo en el
-   documento, porque un PDF no entra en un semaforo ni en una grafica.
-   El adjunto es de donde salieron esos numeros.
+   La primera version los colgaba de la nota, porque el servidor necesitaba un
+   folio al cual amarrar el archivo. Esa conveniencia tecnica no tenia por que
+   decidir el modelo de datos, y se noto en cuanto alguien quiso encontrar un
+   estudio: estaba escondido dentro de un documento que ademas podia no tener
+   nada escrito.
 
-   Quitar un adjunto lo saca de ESTA nota; el archivo se queda en el
-   expediente del paciente y la subida sigue en la bitacora. Un expediente
-   clinico no borra evidencia, la corrige por escrito. */
+   Retirar no borra. El archivo se queda y el renglon se queda; deja de
+   listarse y queda asentado quien lo retiro y por que. */
+
 function bytesLegibles(n){
   n = Number(n) || 0;
   return n >= 1048576 ? (n/1048576).toFixed(1)+' MB'
        : Math.max(1, Math.round(n/1024))+' KB';
 }
 
-function pintaAdjuntos(c, val, bloq, id){
-  const lista = Array.isArray(val) ? val : [];
-  const filas = lista.map(function(a, i){
-    return '<li>'+
-      '<button type="button" class="btn chico ver-adjunto" data-i="'+i+'" data-para="'+id+'">Ver</button> '+
-      esc(a.nombre || 'archivo')+
-      ' <span class="pista">'+esc(bytesLegibles(a.bytes))+' · '+
-        esc(nombreDeCorreo(a.subio || ''))+' · '+esc(String(a.cuando || '').slice(0,16))+'</span>'+
-      (bloq ? '' : ' <button type="button" class="btn chico quita-adjunto" data-i="'+i+'" data-para="'+id+'" '+
-                   'title="Quitar de esta nota. El archivo se queda en el expediente.">×</button>')+
-      '</li>';
-  }).join('');
-
-  /* El boton sale siempre. Antes se escondia hasta que la nota tuviera folio
-     y en su lugar salia un "guarde la nota una vez", que es al reves de como
-     se trabaja: uno abre la hoja PORQUE trae el estudio en la mano. El folio
-     lo resuelve subeAdjunto() guardando el borrador solo. */
-  const alta = bloq ? ''
-    : ('<div class="alta-adjunto">'+
-          /* El input de archivo nativo se lee "Elegir archivo" en gris y no
-             parece un control: en una pantalla donde todo lo demas son botones
-             con nombre, la gente no lo encuentra. Se esconde y se opera desde
-             una etiqueta que SI dice lo que hace. El input sigue siendo el
-             mismo elemento, asi que el cableado de conecta() no cambia. */
-          '<label class="btn chico alta-adjunto-btn" for="'+id+'_archivo">Adjuntar estudio\u2026</label>'+
-          '<input type="file" id="'+id+'_archivo" class="sube-adjunto" data-para="'+id+'" '+
-          'accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif">'+
-          '<span class="pista">PDF o imagen, hasta 8 MB.'+
-            (DOC && DOC.Doc_ID ? '' : ' La nota se guarda sola al adjuntar.')+'</span>'+
-          '</div>');
-
-  return '<div class="adjuntos" id="'+id+'" data-v=\''+esc(JSON.stringify(lista))+'\'>'+
-         (filas ? '<ul class="lista-adjuntos">'+filas+'</ul>'
-                : '<p class="pista">Sin archivos adjuntos.</p>')+
-         alta+'</div>';
+function adjuntoPorId(id){
+  return (ADJ.adjuntos || []).find(a => String(a.adjunto_id) === String(id)) || null;
+}
+function nombreDeAdjunto(id){
+  const a = adjuntoPorId(id);
+  return a ? a.nombre : (id ? String(id)+' (ya no está en el expediente)' : '');
+}
+function adjuntosDeCaso(casoId){
+  return (ADJ.adjuntos || []).filter(a => String(a.caso_id||'') === String(casoId||''));
 }
 
-async function subeAdjunto(cont, file){
+/* Que el expediente abra aunque esto falle. Si el Gateway todavia no tiene la
+   accion, o el papel no consulta estudios, la tarjeta lo dice y el resto de la
+   pantalla sigue sirviendo. Un expediente que no abre es peor que uno sin
+   adjuntos. */
+async function cargaAdjuntos(){
+  try{
+    ADJ = await api('adjuntoLista', { paciente_id: EXP.paciente.Paciente_ID });
+    ADJ.error = null;
+  }catch(e){
+    ADJ = { adjuntos: [], puede_escribir: false, error: e.message };
+  }
+}
+
+function pintaAdjuntosExpediente(){
+  const cont = $('exp-adjuntos');
+  if (!cont) return;
+
+  if (ADJ.error){
+    cont.innerHTML = '<div class="vacio">No se pudieron cargar los estudios: '+esc(ADJ.error)+'</div>';
+    return;
+  }
+
+  const puede = !!ADJ.puede_escribir;
+  const casos = EXP.casos.slice().sort(function(a,b){
+    return String(b.Fecha_Cirugia).localeCompare(String(a.Fecha_Cirugia));
+  });
+
+  const fila = function(a, huerfano){
+    return '<li>'+
+      '<button type="button" class="btn chico ver-adj" data-id="'+esc(a.adjunto_id)+'">Ver</button> '+
+      '<span class="crece">'+esc(a.nombre)+
+        (a.descripcion ? ' <span class="pista">— '+esc(a.descripcion)+'</span>' : '')+
+        '<br><span class="pista">'+esc(bytesLegibles(a.bytes))+' · '+
+        esc(nombreDeCorreo(a.subio||''))+' · '+esc(a.cuando)+'</span></span>'+
+      (huerfano && puede && casos.length
+        ? '<select class="asigna-adj" data-id="'+esc(a.adjunto_id)+'">'+
+          '<option value="">Asignar a…</option>'+
+          casos.map(function(c){
+            return '<option value="'+esc(c.Caso_ID)+'">'+
+              esc(String(c.Fecha_Cirugia||'').slice(0,10))+' · '+
+              esc(c.Procedimiento_Principal||c.Folio_Caso||c.Caso_ID)+'</option>';
+          }).join('')+'</select>'
+        : '')+
+      (puede ? ' <button type="button" class="btn chico peligro retira-adj" data-id="'+esc(a.adjunto_id)+'" '+
+               'title="Retirar del expediente. El archivo se conserva.">Retirar</button>' : '')+
+      '</li>';
+  };
+
+  const bloque = function(clave, titulo, sub, items, huerfano){
+    const idInput = 'adjfile_' + String(clave || 'sin').replace(/[^A-Za-z0-9_-]/g,'');
+    return '<details class="adj-caso" open><summary>'+esc(titulo)+
+        ' <span class="etq">'+items.length+'</span></summary>'+
+      (sub ? '<p class="pista">'+esc(sub)+'</p>' : '')+
+      (items.length
+        ? '<ul class="lista-adjuntos">'+items.map(function(a){ return fila(a, huerfano); }).join('')+'</ul>'
+        : '<p class="pista">Sin estudios adjuntos.</p>')+
+      (puede
+        ? '<div class="alta-adjunto">'+
+          '<label class="btn chico alta-adjunto-btn" for="'+idInput+'">Adjuntar estudio…</label>'+
+          '<input type="file" id="'+idInput+'" class="sube-adj" data-caso="'+esc(clave||'')+'" '+
+          'accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif">'+
+          '<span class="pista">PDF o imagen, hasta 8 MB.</span></div>'
+        : '')+
+      '</details>';
+  };
+
+  const huerfanos = adjuntosDeCaso('');
+  let html = casos.map(function(c){
+    return bloque(c.Caso_ID,
+      (String(c.Fecha_Cirugia||'').slice(0,10) || 'Sin fecha') + ' · ' +
+        (c.Procedimiento_Principal || c.Folio_Caso || c.Caso_ID),
+      '', adjuntosDeCaso(c.Caso_ID), false);
+  }).join('');
+
+  /* El preoperatorio que llego antes de que hubiera internamiento. No se
+     esconde: se muestra con su selector para colgarlo donde va. */
+  if (huerfanos.length || !casos.length){
+    html += bloque('', 'Sin internamiento',
+      'Estudios del paciente que todavía no cuelgan de una cirugía. Asígnelos cuando se agende.',
+      huerfanos, true);
+  }
+
+  if (!puede && !(ADJ.adjuntos||[]).length){
+    html = '<div class="vacio">Su papel en este paciente no consulta estudios adjuntos.</div>';
+  }
+
+  cont.innerHTML = html;
+  conectaAdjuntos();
+}
+
+function conectaAdjuntos(){
+  document.querySelectorAll('.sube-adj').forEach(function(inp){
+    inp.onchange = function(){
+      const f = this.files && this.files[0];
+      const caso = this.dataset.caso || '';
+      this.value = '';
+      subeAdjuntoCaso(caso, f).catch(e => avisoGlobal(e.message));
+    };
+  });
+  document.querySelectorAll('.ver-adj').forEach(function(b){
+    b.onclick = function(){ veAdjunto(this.dataset.id).catch(e => avisoGlobal(e.message)); };
+  });
+  document.querySelectorAll('.retira-adj').forEach(function(b){
+    b.onclick = function(){ retiraAdjunto(this.dataset.id).catch(e => avisoGlobal(e.message)); };
+  });
+  document.querySelectorAll('.asigna-adj').forEach(function(sel){
+    sel.onchange = function(){
+      if (!this.value) return;
+      asignaAdjunto(this.dataset.id, this.value).catch(e => avisoGlobal(e.message));
+    };
+  });
+}
+
+async function subeAdjuntoCaso(casoId, file){
   if (!file) return;
   if (file.size > 8*1024*1024){
     avisoGlobal('Ese archivo pesa '+bytesLegibles(file.size)+' y el tope son 8 MB.');
     return;
   }
-  /* El servidor amarra el archivo al folio de la nota, y una nota recien
-     abierta no tiene folio todavia. Se guarda como borrador en este momento
-     --sin exigir campos obligatorios, que para 'Borrador' no se piden-- y el
-     adjunto sigue de largo. Lo que ya estaba tecleado viaja en ese guardado,
-     asi que no se pierde nada. */
-  if (!DOC.Doc_ID){
-    const g = await api('documentoGuardar', {
-      doc_id: '', tipo: DOC.Tipo,
-      paciente_id: EXP.paciente.Paciente_ID, caso_id: DOC.Caso_ID || '',
-      estado: 'Borrador', campos: leeFormulario()
-    });
-    DOC.Doc_ID = g.doc_id; DOC.Estado = g.estado; DOC.Version = g.version;
-    $('doc-estado').textContent = g.estado;
-  }
-
   const b64 = await new Promise(function(res, rej){
     const fr = new FileReader();
     fr.onload = function(){ res(String(fr.result).split(',')[1] || ''); };
     fr.onerror = function(){ rej(new Error('No se pudo leer el archivo.')); };
     fr.readAsDataURL(file);
   });
-  const r = await api('adjuntoSubir', {
-    doc_id: DOC.Doc_ID, nombre: file.name,
-    mime: file.type || 'application/pdf', contenido_b64: b64
+  avisoGlobal('Subiendo '+file.name+'…', 'ok');
+  await api('adjuntoSubir', {
+    paciente_id: EXP.paciente.Paciente_ID, caso_id: casoId || '',
+    nombre: file.name, mime: file.type || 'application/pdf', contenido_b64: b64
   });
-  const lista = JSON.parse(cont.dataset.v || '[]');
-  lista.push(r.adjunto);
-  const cid = cont.closest('[data-campo]').dataset.campo;
-  /* Se conserva lo que ya estaba tecleado y sin guardar: repintar sin esto
-     borraria el parrafo que quien captura lleva a medias. */
-  Object.assign(DOC.campos, leeFormulario());
-  DOC.campos[cid] = lista;
-  pintaDocumento();
-  avisoGlobal('Adjuntado. Guarde la nota para dejarlo asentado.', 'bueno');
+  await cargaAdjuntos();
+  pintaAdjuntosExpediente();
+  /* NO se repinta el documento aqui aunque haya uno abierto: pintaDocumento()
+     termina con vista('documento') y eso sacaria de la pantalla a quien esta
+     subiendo archivos. El selector de la nota se refresca solo la proxima vez
+     que se abra. */
+  avisoGlobal('Adjuntado al expediente.', 'bueno');
 }
 
-async function veAdjunto(cont, i){
-  const lista = JSON.parse(cont.dataset.v || '[]');
-  const a = lista[i];
-  if (!a) return;
-  const r = await api('adjuntoLeer', { doc_id: DOC.Doc_ID, archivo_id: a.archivo_id });
+async function veAdjunto(adjuntoId){
+  const r = await api('adjuntoLeer', { adjunto_id: adjuntoId });
   const bin = atob(r.datos);
   const buf = new Uint8Array(bin.length);
   for (let k = 0; k < bin.length; k++) buf[k] = bin.charCodeAt(k);
   const url = URL.createObjectURL(new Blob([buf], { type: r.mime }));
   window.open(url, '_blank');
   setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+}
+
+async function retiraAdjunto(adjuntoId){
+  const a = adjuntoPorId(adjuntoId);
+  const ok = await confirma('Retirar del expediente',
+    'Se retira "' + (a ? a.nombre : adjuntoId) + '".\n\nEl archivo NO se borra: se conserva en la ' +
+    'carpeta del expediente y queda asentado quién lo retiró y por qué. Deja de aparecer en la lista.',
+    'Retirar');
+  if (!ok) return;
+  const motivo = prompt('¿Por qué se retira? Queda en el expediente.', '');
+  if (motivo === null || !String(motivo).trim()){
+    avisoGlobal('No se retiró: hace falta el motivo.');
+    return;
+  }
+  await api('adjuntoRetirar', { adjunto_id: adjuntoId, motivo: motivo });
+  await cargaAdjuntos();
+  pintaAdjuntosExpediente();
+  avisoGlobal('Retirado. El archivo se conserva en el expediente.', 'bueno');
+}
+
+async function asignaAdjunto(adjuntoId, casoId){
+  await api('adjuntoAsignar', { adjunto_id: adjuntoId, caso_id: casoId });
+  await cargaAdjuntos();
+  pintaAdjuntosExpediente();
+  avisoGlobal('Movido al internamiento.', 'bueno');
+}
+
+/* ── Control ADJUNTO_REF: señalar, no subir ─────────────────────
+   Dentro de una nota no se sube nada. Se apunta a uno de los estudios que ya
+   cuelgan de este internamiento, para que quien audite pueda ir del resultado
+   capturado al archivo que lo respalda sin buscarlo a mano. Suben una vez,
+   se referencia las veces que haga falta. */
+function pintaAdjuntoRef(c, val, bloq, id){
+  /* Los del internamiento mas los que todavia no cuelgan de ninguno. Si la
+     nota es del paciente y no de una cirugia, Caso_ID viene vacio y las dos
+     listas serian la misma: por eso se descartan repetidos. */
+  const casoDoc = String((DOC && DOC.Caso_ID) || '');
+  const propios = adjuntosDeCaso(casoDoc)
+    .concat(casoDoc ? adjuntosDeCaso('') : []);
+  const v = String(val || '');
+
+  if (!propios.length){
+    return '<div class="adjuntos"><p class="pista">Todavía no hay estudios adjuntos en este ' +
+           'internamiento. Se suben en el expediente, en «Estudios y archivos».</p></div>';
+  }
+
+  /* Una referencia guardada que ya no existe --se retiró-- no se borra en
+     silencio: se deja visible para que se note. */
+  const hay = propios.some(a => String(a.adjunto_id) === v);
+  const perdida = (v && !hay)
+    ? '<option value="'+esc(v)+'" selected>'+esc(nombreDeAdjunto(v))+'</option>' : '';
+
+  return '<div class="adjuntos">'+
+    '<div class="alta-adjunto">'+
+    '<select id="'+id+'"'+(bloq?' disabled':'')+'>'+
+      '<option value="">— ninguno —</option>'+ perdida +
+      propios.map(function(a){
+        return '<option value="'+esc(a.adjunto_id)+'"'+(String(a.adjunto_id)===v?' selected':'')+'>'+
+          esc(a.nombre)+'</option>';
+      }).join('')+
+    '</select>'+
+    (v ? ' <button type="button" class="btn chico ver-adj" data-id="'+esc(v)+'">Ver</button>' : '')+
+    '</div>'+
+    '<span class="pista">Se sube en «Estudios y archivos» del expediente; aquí sólo se señala.</span>'+
+    '</div>';
 }
 
 /* ── Control SERIE: mismo criterio medido en momentos fijos ─────
@@ -1872,28 +2026,10 @@ function conecta(){
     else this.closest('tr').querySelectorAll('input').forEach(i => i.value = '');
     redibuja();
   });
-  document.querySelectorAll('.sube-adjunto').forEach(function(inp){
-    inp.onchange = function(){
-      const f = this.files && this.files[0];
-      this.value = '';
-      subeAdjunto($(this.dataset.para), f).catch(e => avisoGlobal(e.message));
-    };
-  });
-  document.querySelectorAll('.ver-adjunto').forEach(function(b){
-    b.onclick = function(){
-      veAdjunto($(this.dataset.para), Number(this.dataset.i)).catch(e => avisoGlobal(e.message));
-    };
-  });
-  document.querySelectorAll('.quita-adjunto').forEach(function(b){
-    b.onclick = function(){
-      const cont = $(this.dataset.para);
-      const lista = JSON.parse(cont.dataset.v || '[]');
-      lista.splice(Number(this.dataset.i), 1);
-      const cid = cont.closest('[data-campo]').dataset.campo;
-      Object.assign(DOC.campos, leeFormulario());
-      DOC.campos[cid] = lista;
-      pintaDocumento();
-    };
+  /* Dentro de una nota lo unico que hay es el boton de Ver del selector: ni se
+     sube ni se retira desde aqui. Eso vive en «Estudios y archivos». */
+  document.querySelectorAll('#doc-campos .ver-adj').forEach(function(b){
+    b.onclick = function(){ veAdjunto(this.dataset.id).catch(e => avisoGlobal(e.message)); };
   });
   document.querySelectorAll('.gfx input').forEach(i => i.oninput = redibuja);
   /* El IMC se recalcula mientras se teclean peso y talla. Si esperara al
@@ -1970,7 +2106,7 @@ function leeFormulario(){
         const marcas = {};
         el.querySelectorAll('input[data-marca]').forEach(i => { if (i.value) marcas[i.dataset.marca] = i.value; });
         out[cid] = { puntos: leeGraficaPuntos(el), marcas: marcas }; break; }
-      case 'archivo': out[cid] = JSON.parse(el.dataset.v || '[]'); break;
+      case 'adjunto_ref': out[cid] = el.value || ''; break;
       case 'imagen': {
         const marcas = Array.from(el.querySelectorAll('.marca'))
           .map(m => ({ x:Number(m.getAttribute('cx')), y:Number(m.getAttribute('cy')) }))
