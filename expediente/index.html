@@ -326,6 +326,15 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   .imp-firma .pie{font-size:9pt;font-family:system-ui,sans-serif}
   .imp-nota{font-size:8pt;font-family:system-ui,sans-serif;color:#444;margin-top:14px;
     border-top:.5pt solid #bbb;padding-top:4px}
+
+  /* Hoja de identificación: frente arriba, reverso abajo, en una sola carta.
+     Cada lado cabe en media hoja; no se fuerza tamaño real porque una foto
+     de celular sin recortar saldría diminuta. */
+  .imp-ine{display:flex;flex-direction:column;align-items:center;gap:6mm;margin-top:2mm}
+  .imp-ine figure{margin:0;text-align:center;break-inside:avoid}
+  .imp-ine img{display:block;max-width:140mm;max-height:88mm;width:auto;height:auto;
+    border:.5pt solid #999}
+  .imp-ine figcaption{font-size:8pt;font-family:system-ui,sans-serif;color:#333;margin-top:2px}
 }
 .membrete{display:none;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:12px}
 .membrete .n{font-weight:700;font-size:13pt}
@@ -1274,13 +1283,90 @@ function pintaIdentificacion(){
   $('t-identificacion').hidden = !docs.length;
   if (!docs.length) return;
 
+  /* Con los dos lados de la INE hay botón para imprimirlos juntos. */
+  const hayPar = docs.some(d => d.llave === 'ine_frente') &&
+                 docs.some(d => d.llave === 'ine_reverso');
+
   caja.innerHTML = '<div class="marcas">' + docs.map(d =>
     '<button type="button" class="btn" data-ident="' + esc(d.llave) + '">' +
-    esc(d.etiqueta) + '</button>').join(' ') + '</div>';
+    esc(d.etiqueta) + '</button>').join(' ') + '</div>' +
+    (hayPar ? '<div style="margin-top:10px"><button type="button" class="btn primario" ' +
+      'id="btn-imprimir-ine">Imprimir INE · frente y reverso</button></div>' : '');
 
   caja.querySelectorAll('[data-ident]').forEach(b => {
     b.onclick = () => abreIdentificacion(b.dataset.ident, b.textContent);
   });
+  if (hayPar) $('btn-imprimir-ine').onclick = imprimeINE;
+}
+
+/* ── Imprimir INE: frente y reverso en la misma hoja ──────────────────────
+   Pide los dos lados por el mismo camino que el visor (pacienteArchivo), así
+   que cada lado queda en la bitácora igual que una consulta. Se arma en
+   #impresion, que es lo único que sale al imprimir, y se vacía al terminar:
+   las imágenes no se quedan en la página. */
+let IMPRIMIENDO_INE = false;
+
+async function imprimeINE(){
+  if (IMPRIMIENDO_INE) return;
+  IMPRIMIENDO_INE = true;
+  const boton = $('btn-imprimir-ine');
+  const visor = $('exp-ident-visor');
+  boton.disabled = true;
+  IDENT_ABIERTO = '';
+  visor.innerHTML = '<div class="vacio">Preparando la hoja de la INE…</div>';
+  try{
+    const pid = EXP.paciente.Paciente_ID;
+    const lados = await Promise.all(['ine_frente', 'ine_reverso'].map(cual =>
+      api('pacienteArchivo', { paciente_id: pid, cual: cual })));
+
+    const enPdf = lados.filter(r => String(r.mime).indexOf('image/') !== 0);
+    if (enPdf.length){
+      throw new Error(enPdf.map(r => r.etiqueta).join(' y ') +
+        ' no es imagen (' + enPdf.map(r => r.mime).join(', ') + '). ' +
+        'Ábralo con su botón e imprímalo desde el visor.');
+    }
+
+    const p = EXP.paciente;
+    const ahora = new Date();
+    const cuando = ahora.getFullYear() + '-' + String(ahora.getMonth()+1).padStart(2,'0') + '-' +
+      String(ahora.getDate()).padStart(2,'0') + ' ' + String(ahora.getHours()).padStart(2,'0') +
+      ':' + String(ahora.getMinutes()).padStart(2,'0');
+    const quien = (YO && (YO.nombre || YO.correo)) || '';
+
+    $('impresion').innerHTML =
+      '<div class="imp-membrete"><div class="n">' + esc(EST.nombre || 'Zorvix') + '</div>' +
+        '<div class="d">' + esc(EST.domicilio || '') +
+        (EST.licencia_sanitaria ? ' · Licencia sanitaria ' + esc(EST.licencia_sanitaria) : '') +
+        '</div></div>' +
+      '<div class="imp-titulo">Identificación oficial<span>' +
+        esc(p.Nombre_Completo || '') + ' · expediente ' + esc(EXP.expediente_no || '—') +
+      '</span></div>' +
+      '<div class="imp-ine">' + lados.map(r =>
+        '<figure><img alt="' + esc(r.etiqueta) + '" src="data:' + r.mime + ';base64,' + r.datos + '">' +
+        '<figcaption>' + esc(r.etiqueta) + '</figcaption></figure>').join('') +
+      '</div>' +
+      '<div class="imp-nota">Copia para uso exclusivo del expediente clínico. Impresa' +
+        (quien ? ' por ' + esc(quien) : '') + ' el ' + cuando +
+        '; la consulta quedó registrada en la bitácora.</div>';
+
+    /* Imprimir antes de que las imágenes estén decodificadas saca la hoja en blanco. */
+    await Promise.all(Array.from($('impresion').querySelectorAll('img')).map(img =>
+      img.decode ? img.decode().catch(() => {}) : Promise.resolve()));
+
+    visor.innerHTML = '';
+    window.addEventListener('afterprint', function limpia(){
+      window.removeEventListener('afterprint', limpia);
+      $('impresion').innerHTML = '';
+    });
+    window.print();
+  }catch(e){
+    $('impresion').innerHTML = '';
+    visor.innerHTML = '<div class="aviso malo" style="margin-top:12px">No se pudo imprimir la INE: ' +
+      esc(e.message) + '</div>';
+  } finally {
+    IMPRIMIENDO_INE = false;
+    boton.disabled = false;
+  }
 }
 
 async function abreIdentificacion(cual, etiqueta){
