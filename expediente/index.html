@@ -1413,38 +1413,188 @@ async function abreIdentificacion(cual, etiqueta){
   }
 }
 
-/* ── Registro de enfermería: formato para llenar a mano ───────────────────
-   Es el único formato que se llena en papel: las gráficas de 24 horas, los
-   balances y las firmas por turno se escriben junto a la cama. La app sólo
-   pone los datos generales (paciente e internamiento) sobre el formato
-   original y lo manda a la impresora. No crea ningún documento en el
-   expediente electrónico: el registro vive en la hoja de papel.
+/* ── Formatos de papel: se imprimen prellenados y se llenan a mano ────────
+   Hay papeles del internamiento que NO se capturan en la computadora: los
+   consentimientos los firma el paciente, la lista de verificación se palomea
+   en el quirófano y el registro de enfermería se escribe junto a la cama.
+   Lo que sí sabemos —quién es el paciente, qué se le va a hacer y quién lo
+   opera— no tiene por qué volver a escribirse a mano en cada hoja: la app lo
+   imprime sobre el formato original y deja en blanco lo demás.
 
-   Las cuatro hojas son el PDF de Zorvix pasado a SVG (vector, se imprime
-   nítido). Las coordenadas están en puntos del PDF: 612 × 792 = carta. */
-const FORMATO_ENFERMERIA = [1,2,3,4].map(n => 'registro-enfermeria-' + n + '.svg');
+   Cada formato es su PDF de Zorvix pasado a SVG, hoja por hoja (vector, se
+   imprime nítido). Las coordenadas están en puntos del PDF: 612 × 792 = carta.
+   Salieron de leer los propios formatos: cada dato va sobre la línea que tiene
+   debajo su etiqueta impresa, así que si el formato cambia hay que volver a
+   sacarlas. Lo que no está aquí se imprime en blanco, a propósito:
+   riesgos, beneficios, alternativas, lateralidad, marcaje, horas y firmas.
 
-/* Dónde va cada dato en la hoja 1: x, y (arriba) y ancho disponible, en pt;
-   alto 14.7 pt, el de las etiquetas impresas. sobreRenglon: el dato va sobre
-   una línea subrayada, no dentro de una barra. */
-const ENF_CAMPOS = {
-  nombre:   { x:142, y:75.1,  w:436 },
-  fnac:     { x:140, y:89.5,  w:81  },
-  edad:     { x:256, y:89.5,  w:45  },
-  sexo:     { x:333, y:89.5,  w:31  },
-  hab:      { x:424, y:89.5,  w:49  },
-  fecha:    { x:510, y:89.5,  w:68  },
-  medico:   { x:117, y:103.9, w:461 },
-  dx:       { x:240, y:130.8, w:338 , sobreRenglon:true },
-  peso:     { x:61,  y:145.2, w:53  , sobreRenglon:true },
-  talla:    { x:146, y:145.2, w:59  , sobreRenglon:true },
-  sc:       { x:279, y:145.2, w:299 , sobreRenglon:true },
-  alergias: { x:76,  y:159.6, w:502 , sobreRenglon:true }
+   La lateralidad NO se prellena aunque la agenda la traiga: marcar el lado
+   por el que se va a operar es del cirujano, delante del paciente. */
+const FORMATOS = {
+  'hoja-frontal': { titulo:'Hoja frontal', hojas:2, campos:[
+    {p:1,x:45.1,y:191.8,w:522.1,k:'nombre'},
+    {p:1,x:50.5,y:218.5,w:122.5,k:'expediente'},
+    {p:1,x:181.0,y:218.5,w:122.5,k:'fnac'},
+    {p:1,x:311.5,y:218.5,w:122.5,k:'edad'},
+    {p:1,x:442.0,y:218.5,w:125.2,k:'sexo_largo'},
+    {p:1,x:50.5,y:244.3,w:165.9,k:'curp'},
+    {p:1,x:45.1,y:270.0,w:522.1,k:'domicilio'},
+    {p:1,x:50.5,y:296.8,w:253.0,k:'telefono'},
+    {p:1,x:311.5,y:296.8,w:255.8,k:'correo'},
+    {p:1,x:50.5,y:391.1,w:166.0,k:'urg_nombre'},
+    {p:1,x:224.5,y:391.1,w:166.0,k:'urg_parentesco'},
+    {p:1,x:398.5,y:391.1,w:168.8,k:'urg_telefono'},
+    {p:1,x:228.0,y:442.0,w:334.0,k:'alergias'},
+    {p:1,x:50.5,y:498.3,w:166.0,k:'grupo'},
+    {p:1,x:45.1,y:524.1,w:522.1,k:'antecedentes'},
+    {p:1,x:50.5,y:576.9,w:166.0,k:'fecha'}
+  ],
+  /* Los internamientos del propio expediente: la hoja frontal es del paciente
+     y los lista todos, no sólo por el que se está imprimiendo. */
+  tabla: { p:1, filas:[681.1, 701.5, 721.8, 742.0], alto:20.4, cols:[
+    {x:49.1,w:67,k:'folio'}, {x:124.1,w:67,k:'fecha'}, {x:199.1,w:177,k:'procedimiento'},
+    {x:384.1,w:117,k:'cirujano'}, {x:509.1,w:54,k:'cama'} ] } },
+  'ci-quirurgico': { titulo:'CI procedimiento quirúrgico', hojas:5, campos:[
+    {p:1,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:1,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:1,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:1,x:138.4,y:245.4,w:34.8,k:'dia',c:1},
+    {p:1,x:188.0,y:245.4,w:124.4,k:'mes',c:1},
+    {p:1,x:336.6,y:245.4,w:33.0,k:'anio',c:1},
+    {p:1,x:54.1,y:302.2,w:503.9,k:'nombre'},
+    {p:1,x:54.1,y:340.4,w:157.2,k:'expediente'},
+    {p:1,x:219.3,y:340.4,w:74.9,k:'edad'},
+    {p:1,x:302.2,y:340.4,w:255.8,k:'sexo'},
+    {p:1,x:54.1,y:378.6,w:503.9,k:'cirujano'},
+    {p:1,x:54.1,y:463.5,w:503.9,k:'procedimiento'},
+    {p:2,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:2,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:2,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:3,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:3,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:3,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:4,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:4,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:4,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:4,x:54.1,y:535.4,w:138.8,k:'cedula'},
+    {p:4,x:200.9,y:535.4,w:357.6,k:'cedula_esp'},
+    {p:5,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:5,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:5,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:5,x:138.4,y:150.7,w:34.8,k:'dia',c:1},
+    {p:5,x:188.0,y:150.7,w:124.4,k:'mes',c:1},
+    {p:5,x:336.6,y:150.7,w:33.0,k:'anio',c:1}
+  ] },
+  'ci-anestesia': { titulo:'CI para anestesia', hojas:5, campos:[
+    {p:1,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:1,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:1,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:1,x:138.4,y:246.6,w:34.8,k:'dia',c:1},
+    {p:1,x:188.0,y:246.6,w:124.4,k:'mes',c:1},
+    {p:1,x:336.6,y:246.6,w:33.0,k:'anio',c:1},
+    {p:1,x:54.1,y:303.4,w:503.9,k:'nombre'},
+    {p:1,x:54.1,y:341.6,w:157.2,k:'expediente'},
+    {p:1,x:219.3,y:341.6,w:74.9,k:'edad'},
+    {p:1,x:302.2,y:341.6,w:255.8,k:'sexo'},
+    {p:1,x:54.1,y:379.8,w:503.9,k:'procedimiento'},
+    {p:1,x:54.1,y:418.0,w:503.9,k:'cirujano'},
+    {p:2,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:2,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:2,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:3,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:3,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:3,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:4,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:4,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:4,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:5,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
+    {p:5,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
+    {p:5,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
+    {p:5,x:54.1,y:113.8,w:138.8,k:'cedula'},
+    {p:5,x:200.9,y:113.8,w:357.1,k:'cedula_esp'}
+  ] },
+  'ci-marcaje': { titulo:'CI marcaje de sitio quirúrgico', hojas:3, campos:[
+    {p:1,x:82.0,y:52.4,w:141.9,k:'nombre',e:1},
+    {p:1,x:266.9,y:52.4,w:52.3,k:'expediente',e:1},
+    {p:1,x:391.1,y:52.4,w:58.1,k:'fnac',e:1},
+    {p:1,x:136.4,y:203.5,w:34.8,k:'dia',c:1},
+    {p:1,x:186.0,y:203.5,w:124.4,k:'mes',c:1},
+    {p:1,x:334.6,y:203.5,w:33.0,k:'anio',c:1},
+    {p:1,x:52.1,y:260.3,w:507.9,k:'nombre'},
+    {p:1,x:52.1,y:298.5,w:157.2,k:'expediente'},
+    {p:1,x:217.3,y:298.5,w:74.9,k:'edad'},
+    {p:1,x:300.2,y:298.5,w:259.8,k:'sexo'},
+    {p:1,x:52.1,y:336.7,w:507.9,k:'procedimiento'},
+    {p:1,x:52.1,y:374.9,w:507.9,k:'cirujano'},
+    {p:2,x:82.0,y:52.4,w:141.9,k:'nombre',e:1},
+    {p:2,x:266.9,y:52.4,w:52.3,k:'expediente',e:1},
+    {p:2,x:391.1,y:52.4,w:58.1,k:'fnac',e:1},
+    {p:3,x:82.0,y:52.4,w:141.9,k:'nombre',e:1},
+    {p:3,x:266.9,y:52.4,w:52.3,k:'expediente',e:1},
+    {p:3,x:391.1,y:52.4,w:58.1,k:'fnac',e:1},
+    {p:3,x:52.1,y:163.4,w:116.7,k:'cedula'},
+    {p:3,x:176.8,y:163.4,w:129.5,k:'cedula_esp'}
+  ] },
+  'lista-verificacion': { titulo:'Lista de verificación de la cirugía', hojas:2, campos:[
+    {p:1,x:80.0,y:50.4,w:141.9,k:'nombre',e:1},
+    {p:1,x:264.9,y:50.4,w:52.3,k:'expediente',e:1},
+    {p:1,x:389.1,y:50.4,w:58.1,k:'fnac',e:1},
+    {p:1,x:50.1,y:160.8,w:70.9,k:'fecha'},
+    {p:1,x:129.0,y:160.8,w:84.0,k:'quirofano'},
+    {p:1,x:221.0,y:160.8,w:341.0,k:'procedimiento'},
+    {p:1,x:50.1,y:199.0,w:163.3,k:'cirujano'},
+    {p:1,x:221.4,y:199.0,w:340.6,k:'anestesiologo'},
+    {p:1,x:50.1,y:237.2,w:214.7,k:'circulante'},
+    {p:1,x:272.8,y:237.2,w:289.2,k:'instrumentista'},
+    {p:2,x:80.0,y:50.4,w:141.9,k:'nombre',e:1},
+    {p:2,x:264.9,y:50.4,w:52.3,k:'expediente',e:1},
+    {p:2,x:389.1,y:50.4,w:58.1,k:'fnac',e:1}
+  ] },
+  'registro-enfermeria': { titulo:'Registro de enfermería', hojas:4, campos:[
+    {p:1,x:66.0,y:46.4,w:149.4,k:'nombre',e:1},
+    {p:1,x:258.3,y:46.4,w:44.8,k:'expediente',e:1},
+    {p:1,x:375.1,y:46.4,w:58.1,k:'fnac',e:1},
+    {p:1,x:459.1,y:46.4,w:29.9,k:'cama',e:1},
+    {p:1,x:515.7,y:46.4,w:58.1,k:'fecha',e:1},
+    {p:1,x:36.1,y:94.0,w:540.1,k:'dx'},
+    {p:1,x:36.1,y:117.6,w:48.6,k:'peso'},
+    {p:1,x:92.7,y:117.6,w:48.5,k:'talla'},
+    {p:1,x:149.2,y:117.6,w:85.8,k:'sc'},
+    {p:1,x:243.0,y:117.6,w:333.2,k:'cirujano'},
+    {p:1,x:36.1,y:141.2,w:540.1,k:'alergias'},
+    {p:2,x:66.0,y:46.4,w:149.4,k:'nombre',e:1},
+    {p:2,x:258.3,y:46.4,w:44.8,k:'expediente',e:1},
+    {p:2,x:375.1,y:46.4,w:58.1,k:'fnac',e:1},
+    {p:2,x:459.1,y:46.4,w:29.9,k:'cama',e:1},
+    {p:2,x:515.7,y:46.4,w:58.1,k:'fecha',e:1},
+    {p:3,x:66.0,y:46.4,w:149.4,k:'nombre',e:1},
+    {p:3,x:258.3,y:46.4,w:44.8,k:'expediente',e:1},
+    {p:3,x:375.1,y:46.4,w:58.1,k:'fnac',e:1},
+    {p:3,x:459.1,y:46.4,w:29.9,k:'cama',e:1},
+    {p:3,x:515.7,y:46.4,w:58.1,k:'fecha',e:1},
+    {p:4,x:66.0,y:46.4,w:149.4,k:'nombre',e:1},
+    {p:4,x:258.3,y:46.4,w:44.8,k:'expediente',e:1},
+    {p:4,x:375.1,y:46.4,w:58.1,k:'fnac',e:1},
+    {p:4,x:459.1,y:46.4,w:29.9,k:'cama',e:1},
+    {p:4,x:515.7,y:46.4,w:58.1,k:'fecha',e:1}
+  ] }
 };
+/* El paquete de ingreso: lo que se imprime cuando se abre el expediente
+   físico en recepción, en el orden en que se archiva. */
+const PAQUETE_INGRESO = ['hoja-frontal', 'ci-quirurgico', 'ci-anestesia', 'ci-marcaje',
+                         'lista-verificacion', 'registro-enfermeria'];
 
-let IMPRIMIENDO_ENF = false;
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+               'septiembre','octubre','noviembre','diciembre'];
 
-/* Si una impresión del formato no alcanzó a limpiar (afterprint no llegó),
+let IMPRIMIENDO_FORMATO = false;
+
+function fechaMx(v){
+  const s = String(v || '').slice(0,10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(8,10) + '/' + s.slice(5,7) + '/' + s.slice(0,4) : s;
+}
+
+/* Si una impresión de formato no alcanzó a limpiar (afterprint no llegó),
    la siguiente nota no debe salir sin márgenes ni con la clase del formato. */
 function quitaModoFormato(){
   const m = document.getElementById('margenes-formato');
@@ -1452,24 +1602,34 @@ function quitaModoFormato(){
   $('impresion').classList.remove('imp-formato');
 }
 
-function fechaMx(v){
-  const s = String(v || '').slice(0,10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(8,10) + '/' + s.slice(5,7) + '/' + s.slice(0,4) : s;
-}
-
 /* Achica la letra hasta que quepa en el recuadro; nunca por debajo de 6 pt.
    Se mide con canvas porque #impresion no se pinta en pantalla. */
-function tamanoQueCabe(texto, ancho){
+function tamanoQueCabe(texto, ancho, desde){
   const ctx = (tamanoQueCabe.c = tamanoQueCabe.c || document.createElement('canvas')).getContext('2d');
-  for (let pt = 9.5; pt >= 6; pt -= 0.5){
+  for (let pt = desde; pt >= 6; pt -= 0.5){
     ctx.font = pt + 'pt "Helvetica Neue", Helvetica, Arial, sans-serif';
     if (ctx.measureText(texto).width * 0.75 <= ancho) return pt;
   }
   return 6;
 }
 
-function datosGeneralesEnfermeria(caso){
+/* La cédula no se inventa: si el cirujano no está en el padrón de médicos,
+   las dos líneas de cédula salen en blanco para escribirse a mano. */
+function medicoDelCaso(caso){
+  const correo = String(caso.Cirujano_Email || '').toLowerCase().trim();
+  const pad = (YO && YO.padron_medicos) || [];
+  for (let i = 0; i < pad.length; i++){
+    if (String(pad[i].correo || '').toLowerCase().trim() === correo){
+      return { nombre: pad[i].nombre || caso.Cirujano_Nombre || '',
+               cedula: pad[i].cedula || '', cedula_esp: pad[i].cedula_esp || '' };
+    }
+  }
+  return { nombre: caso.Cirujano_Nombre || caso.Cirujano_Email || '', cedula:'', cedula_esp:'' };
+}
+
+function datosDeFormato(caso){
   const p = EXP.paciente || {};
+  const hoy = hoyISO();
   const num = v => { const n = parseFloat(String(v || '').replace(',', '.')); return isFinite(n) && n > 0 ? n : null; };
   const peso = num(caso.Peso_Kg);
   let talla = num(caso.Talla_Cm);
@@ -1481,31 +1641,104 @@ function datosGeneralesEnfermeria(caso){
   if (esSi(p.Alergias_Tiene)) alergias = p.Alergias_Cuales || 'Sí, sin especificar';
   else if (/^no/i.test(String(p.Alergias_Tiene || '').trim())) alergias = 'Negadas';
 
-  const dx = [caso.Diagnostico_Preoperatorio || caso.Diagnostico || '',
-              caso.Procedimiento_Principal || ''].filter(Boolean).join(' · ');
+  const proc = [caso.Procedimiento_Principal || '', caso.Procedimientos_Adicionales || '']
+                 .filter(Boolean).join(' + ');
+  const med = medicoDelCaso(caso);
 
   return {
     nombre: p.Nombre_Completo || '',
-    fnac:   fechaMx(p.Fecha_Nacimiento),
-    edad:   edadAl(p.Fecha_Nacimiento, hoyISO()),
-    /* El recuadro de sexo mide 31 pt: «Femenino» completo saldría en 6 pt. */
-    sexo:   /^fem/i.test(p.Sexo || '') ? 'Fem.' : /^masc/i.test(p.Sexo || '') ? 'Masc.' : (p.Sexo || ''),
-    hab:    caso.Cama_Asignada || '',
-    fecha:  fechaMx(hoyISO()),
-    medico: caso.Cirujano_Nombre || caso.Cirujano_Email || '',
-    dx:     dx,
-    peso:   peso ? String(peso).replace(/\.0+$/, '') + ' kg' : '',
-    talla:  talla ? Math.round(talla) + ' cm' : '',
-    sc:     sc,
+    expediente: EXP.expediente_no || '',
+    fnac: fechaMx(p.Fecha_Nacimiento),
+    edad: edadAl(p.Fecha_Nacimiento, hoy),
+    /* El recuadro de sexo de algunos formatos mide 31 pt. */
+    sexo: /^fem/i.test(p.Sexo || '') ? 'Fem.' : /^masc/i.test(p.Sexo || '') ? 'Masc.' : (p.Sexo || ''),
+    sexo_largo: p.Sexo || '',
+    curp: p.CURP || '',
+    calle: p.Calle_Numero || '',
+    colonia: p.Colonia || '',
+    alcaldia: p.Alcaldia_Municipio || '',
+    estado: p.Estado || '',
+    cp: p.CP || '',
+    telefono: p.Telefono || '',
+    correo: p.Correo || '',
+    urg_nombre: p.Contacto_Urgencia_Nombre || '',
+    urg_parentesco: p.Contacto_Urgencia_Parentesco || '',
+    urg_telefono: p.Contacto_Urgencia_Telefono || '',
+    domicilio: [p.Calle_Numero, p.Colonia, p.Alcaldia_Municipio, p.Estado,
+                p.CP ? 'C.P. ' + p.CP : ''].filter(Boolean).join(', '),
+    grupo: p.Grupo_Sanguineo || '',
+    antecedentes: p.Antecedentes_Relevantes_Nota || '',
+    cama: caso.Cama_Asignada || '',
+    fecha: fechaMx(hoy),
+    dia: hoy.slice(8,10),
+    mes: MESES[parseInt(hoy.slice(5,7), 10) - 1] || '',
+    anio: hoy.slice(2,4),
+    procedimiento: proc,
+    dx: [caso.Diagnostico_Preoperatorio || caso.Diagnostico || '', proc].filter(Boolean).join(' · '),
+    cirujano: med.nombre,
+    cedula: med.cedula,
+    cedula_esp: med.cedula_esp,
+    anestesiologo: caso.Anestesiologo_Nombre || caso.Anestesiologo_Email || '',
+    instrumentista: caso.Instrumentista || '',
+    circulante: caso.Enfermera_Circulante || '',
+    quirofano: caso.Quirofano || '',
+    peso: peso ? String(peso).replace(/\.0+$/, '') + ' kg' : '',
+    talla: talla ? Math.round(talla) + ' cm' : '',
+    sc: sc,
     alergias: alergias
   };
 }
 
-async function imprimeRegistroEnfermeria(casoId, boton){
-  if (IMPRIMIENDO_ENF) return;
+/* La tabla de internamientos de la hoja frontal: un renglón por cirugía, los
+   más recientes primero, hasta donde alcancen los renglones impresos. Si hay
+   más, el último renglón lo dice en vez de callárselo. */
+function renglonesDeTabla(tabla, hoja){
+  if (!tabla || tabla.p !== hoja) return '';
+  const casos = (EXP.casos || []).slice()
+    .sort((a,b) => String(b.Fecha_Cirugia).localeCompare(String(a.Fecha_Cirugia)));
+  let html = '';
+  tabla.filas.forEach((y, i) => {
+    const c = casos[i];
+    if (!c) return;
+    const sobran = casos.length - tabla.filas.length;
+    const ultimo = (i === tabla.filas.length - 1) && sobran > 0;
+    const val = {
+      folio: ultimo ? '' : (c.Folio_Caso || c.Caso_ID || ''),
+      fecha: ultimo ? '' : fechaMx(c.Fecha_Cirugia),
+      procedimiento: ultimo
+        ? '… y ' + (sobran + 1) + ' internamiento(s) más en este expediente'
+        : (c.Procedimiento_Principal || ''),
+      cirujano: ultimo ? '' : (c.Cirujano_Nombre || c.Cirujano_Email || ''),
+      cama: ultimo ? '' : (c.Cama_Asignada || '')
+    };
+    tabla.cols.forEach(col => {
+      if (!val[col.k]) return;
+      const pt = tamanoQueCabe(val[col.k], col.w, 8.5);
+      html += '<div class="imp-dato" style="left:' + col.x + 'pt;top:' + (y + 4) +
+        'pt;width:' + col.w + 'pt;height:12pt;font-size:' + pt + 'pt">' + esc(val[col.k]) + '</div>';
+    });
+  });
+  return html;
+}
+
+function hojaDeFormato(clave, hoja, d){
+  const f = FORMATOS[clave];
+  const campos = f.campos.filter(c => c.p === hoja && d[c.k]).map(c => {
+    const base = c.t ? 8.5 : c.e ? 8 : c.c ? 9 : 10;
+    const pt = tamanoQueCabe(d[c.k], c.w, base);
+    return '<div class="imp-dato" style="left:' + c.x + 'pt;top:' + (c.y - 12) +
+      'pt;width:' + c.w + 'pt;height:12pt;font-size:' + pt + 'pt' +
+      (c.c ? ';justify-content:center' : '') + '">' + esc(d[c.k]) + '</div>';
+  }).join('');
+  return '<div class="imp-hoja"><img alt="" src="' + clave + '-' + hoja + '.svg">' +
+         campos + renglonesDeTabla(f.tabla, hoja) + '</div>';
+}
+
+async function imprimeFormatos(casoId, claves, boton){
+  if (IMPRIMIENDO_FORMATO) return;
   const caso = (EXP.casos || []).filter(c => String(c.Caso_ID) === String(casoId))[0];
   if (!caso) return;
-  IMPRIMIENDO_ENF = true;
+  IMPRIMIENDO_FORMATO = true;
   const textoBoton = boton.textContent;
   boton.disabled = true;
   boton.textContent = 'Preparando…';
@@ -1514,52 +1747,38 @@ async function imprimeRegistroEnfermeria(casoId, boton){
   const margenes = document.createElement('style');
   margenes.id = 'margenes-formato';
   try{
-    const d = datosGeneralesEnfermeria(caso);
-    const p = EXP.paciente || {};
-    const corre = esc(p.Nombre_Completo || '') + ' · expediente ' + esc(EXP.expediente_no || '—') +
-      (d.hab ? ' · habitación ' + esc(d.hab) : '') + ' · fecha ' + esc(d.fecha);
-
-    const hoja1 = Object.keys(ENF_CAMPOS).filter(k => d[k]).map(k => {
-      const f = ENF_CAMPOS[k];
-      /* En las barras moradas la letra baja 1.3 pt para asentarse como la
-         etiqueta; en los renglones subrayados sube 2 pt para no cruzar la línea. */
-      return '<div class="imp-dato" style="left:' + f.x + 'pt;top:' + (f.y + (f.sobreRenglon ? -2 : 1.3)) + 'pt;width:' + f.w +
-        'pt;height:14.7pt;font-size:' + tamanoQueCabe(d[k], f.w) + 'pt">' + esc(d[k]) + '</div>';
-    }).join('');
-
+    const d = datosDeFormato(caso);
+    let html = '';
+    claves.forEach(clave => {
+      for (let h = 1; h <= FORMATOS[clave].hojas; h++) html += hojaDeFormato(clave, h, d);
+    });
     imp.classList.add('imp-formato');
-    imp.innerHTML = FORMATO_ENFERMERIA.map((src, i) =>
-      '<div class="imp-hoja"><img alt="" src="' + src + '">' +
-      (i === 0 ? hoja1
-               : '<div class="imp-corre-hoja">' + corre + ' · hoja ' + (i+1) + ' de ' +
-                 FORMATO_ENFERMERIA.length + '</div>') +
-      '</div>').join('');
+    imp.innerHTML = html;
 
-    /* Sin esperar a que carguen las cuatro hojas, se imprimen en blanco. */
+    /* Sin esperar a que carguen las hojas, se imprimen en blanco. */
     await Promise.all(Array.from(imp.querySelectorAll('img')).map(img =>
       img.decode().catch(() => { throw new Error('No se pudo cargar el formato (' + img.getAttribute('src') + ').'); })));
 
-    /* La hoja trae sus propios márgenes: los de las notas la encogerían. */
+    /* Los formatos traen sus propios márgenes: los de las notas los encogerían. */
     margenes.textContent = '@page{margin:0}';
     document.head.appendChild(margenes);
     window.addEventListener('afterprint', function limpia(){
       window.removeEventListener('afterprint', limpia);
-      margenes.remove();
-      imp.classList.remove('imp-formato');
+      quitaModoFormato();
       imp.innerHTML = '';
     });
     window.print();
   }catch(e){
-    margenes.remove();
-    imp.classList.remove('imp-formato');
+    quitaModoFormato();
     imp.innerHTML = '';
-    avisoGlobal('No se pudo imprimir el registro de enfermería: ' + e.message);
+    avisoGlobal('No se pudo imprimir: ' + e.message);
   } finally {
-    IMPRIMIENDO_ENF = false;
+    IMPRIMIENDO_FORMATO = false;
     boton.disabled = false;
     boton.textContent = textoBoton;
   }
 }
+
 
 function pintaExpediente(){
   const p = EXP.paciente;
@@ -1597,13 +1816,22 @@ function pintaExpediente(){
       '<div class="det">'+esc(c.Cirujano_Nombre||c.Cirujano_Email||'—')+
         ' · anestesia '+esc(c.Anestesiologo_Nombre||c.Anestesiologo_Email||'—')+
         ' · '+esc(c.Folio_Caso||c.Caso_ID)+'</div></div>'+
-      '<button type="button" class="btn" data-enf="'+esc(c.Caso_ID)+'" '+
-        'title="Imprime el formato en blanco con los datos generales ya puestos">'+
-        'Registro de enfermería</button> '+
+      '<button type="button" class="btn primario" data-imp="'+esc(c.Caso_ID)+'" '+
+        'data-formatos="paquete" title="Consentimientos, lista de verificación y '+
+        'registro de enfermería, prellenados con los datos de este internamiento">'+
+        'Paquete de ingreso</button> '+
+      '<button type="button" class="btn" data-imp="'+esc(c.Caso_ID)+'" '+
+        'data-formatos="ci-quirurgico,ci-anestesia,ci-marcaje">Consentimientos</button> '+
+      '<button type="button" class="btn" data-imp="'+esc(c.Caso_ID)+'" '+
+        'data-formatos="hoja-frontal">Hoja frontal</button> '+
+      '<button type="button" class="btn" data-imp="'+esc(c.Caso_ID)+'" '+
+        'data-formatos="registro-enfermeria">Registro de enfermería</button> '+
       '<span class="etq'+(c.hoja_enfermeria_completa?' warn':'')+'">'+
         (c.hoja_enfermeria_completa?'pernocta':'ambulatorio')+'</span></div>').join('');
-  C.querySelectorAll('[data-enf]').forEach(b => {
-    b.onclick = () => imprimeRegistroEnfermeria(b.dataset.enf, b);
+  C.querySelectorAll('[data-imp]').forEach(b => {
+    const claves = b.dataset.formatos === 'paquete'
+      ? PAQUETE_INGRESO : b.dataset.formatos.split(',');
+    b.onclick = () => imprimeFormatos(b.dataset.imp, claves, b);
   });
 
   pintaAdjuntosExpediente();
@@ -1653,7 +1881,7 @@ const MOMENTOS_DOC = [
       'Aviso de privacidad', 'Hoja frontal', 'Nota de ingreso', 'Historia clínica' ] },
   { titulo:'Consentimientos · los firma el paciente', firma:true, docs:[
       'CI procedimiento quirúrgico', 'CI para anestesia',
-      'CI marcaje de sitio quirúrgico', 'CI atención con riesgo de COVID-19' ] },
+      'CI marcaje de sitio quirúrgico' ] },
   { titulo:'Antes de la cirugía', docs:[
       'Nota preoperatoria', 'Nota preanestésica, vigilancia y registro anestésico',
       'Hoja de servicios auxiliares' ] },
@@ -1668,8 +1896,14 @@ const MOMENTOS_DOC = [
       'Hoja de notificación del ministerio público' ] }
 ];
 
+/* Documentos que ya no se usan. Siguen existiendo en el diccionario y en los
+   expedientes donde se llenaron —un documento firmado no se borra— pero no se
+   ofrecen para capturar uno nuevo. Para que desaparezca también del Gateway
+   hay que quitarlo del diccionario. */
+const DOCS_RETIRADOS = ['CI atención con riesgo de COVID-19'];
+
 function pintaSelectorDocumentos(){
-  const puedo = EXP.puedo_crear || [];
+  const puedo = (EXP.puedo_crear || []).filter(t => DOCS_RETIRADOS.indexOf(t) < 0);
   if (!puedo.length) {
     $('exp-crear').innerHTML =
       '<p class="sub">Su papel en este paciente no escribe ningún documento.</p>';
