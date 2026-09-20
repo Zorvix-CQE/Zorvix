@@ -2398,7 +2398,30 @@ $('btn-firmado').onclick = async function(){
   guarda(ESTADO_ARCHIVADA);
 };
 
+/* ── La reja del doble clic ─────────────────────────────────────
+   Dos clics seguidos en «Guardar» creaban DOS documentos. El segundo clic
+   entraba mientras el primero todavía esperaba al servidor, y en ese momento
+   `DOC.Doc_ID` seguía vacío: el servidor no tenía cómo saber que era el mismo
+   documento, así que abría otro. Así salieron las notas repetidas del 18 de
+   septiembre —dos «Nota de ingreso» a las 14:53 y dos «Nota postoperatoria»
+   a las 15:05, las cuatro en versión 1, el minuto idéntico es la firma del
+   doble clic—.
+
+   La barra de progreso no servía de reja: son tres píxeles con
+   `pointer-events:none`, decoración. Los botones seguían vivos.
+
+   Esto importa más aquí que en otras aplicaciones, porque el expediente
+   clínico no tiene borrar: un documento duplicado se queda. Más vale no
+   crearlo. */
+let GUARDANDO = false;
+
 async function guarda(estado){
+  if (GUARDANDO) return;
+  GUARDANDO = true;
+  const botonesGuardar = ['btn-guardar','btn-listo','btn-firmado']
+    .map(function(id){ return $(id); }).filter(Boolean);
+  botonesGuardar.forEach(function(b){ b.disabled = true; });
+  try{
   if (estado !== 'Borrador'){
     const f = faltantes();
     if (f.length){
@@ -2433,6 +2456,10 @@ async function guarda(estado){
     pintaExpediente();
     if (esArchivada(estado)) pintaDocumento();
   }catch(e){ aviso('doc-aviso','malo', e.message); }
+  } finally {
+    GUARDANDO = false;
+    botonesGuardar.forEach(function(b){ b.disabled = false; });
+  }
 }
 
 /* ══════════ DICTADO ══════════
