@@ -335,6 +335,19 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   .imp-ine img{display:block;max-width:140mm;max-height:88mm;width:auto;height:auto;
     border:.5pt solid #999}
   .imp-ine figcaption{font-size:8pt;font-family:system-ui,sans-serif;color:#333;margin-top:2px}
+
+  /* Registro de enfermería: el formato original, hoja por hoja, a tamaño
+     carta y sin márgenes (la hoja ya trae los suyos). Encima, en la misma
+     escala de puntos que el PDF, sólo los datos generales. */
+  #impresion.imp-formato{padding:0;font:initial}
+  .imp-hoja{position:relative;width:612pt;height:792pt;overflow:hidden;
+    break-after:page;page-break-after:always}
+  .imp-hoja:last-child{break-after:auto;page-break-after:auto}
+  .imp-hoja>img{position:absolute;inset:0;width:612pt;height:792pt}
+  .imp-dato{position:absolute;display:flex;align-items:center;white-space:nowrap;overflow:hidden;
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#000;line-height:1}
+  .imp-corre-hoja{position:absolute;top:12pt;right:32pt;font:7.5pt 'Helvetica Neue',Helvetica,Arial,sans-serif;
+    color:#222;white-space:nowrap}
 }
 .membrete{display:none;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:12px}
 .membrete .n{font-weight:700;font-size:13pt}
@@ -1316,6 +1329,7 @@ async function imprimeINE(){
   visor.innerHTML = '<div class="vacio">Preparando la hoja de la INE…</div>';
   try{
     const pid = EXP.paciente.Paciente_ID;
+    quitaModoFormato();
     const lados = await Promise.all(['ine_frente', 'ine_reverso'].map(cual =>
       api('pacienteArchivo', { paciente_id: pid, cual: cual })));
 
@@ -1399,6 +1413,154 @@ async function abreIdentificacion(cual, etiqueta){
   }
 }
 
+/* ── Registro de enfermería: formato para llenar a mano ───────────────────
+   Es el único formato que se llena en papel: las gráficas de 24 horas, los
+   balances y las firmas por turno se escriben junto a la cama. La app sólo
+   pone los datos generales (paciente e internamiento) sobre el formato
+   original y lo manda a la impresora. No crea ningún documento en el
+   expediente electrónico: el registro vive en la hoja de papel.
+
+   Las cuatro hojas son el PDF de Zorvix pasado a SVG (vector, se imprime
+   nítido). Las coordenadas están en puntos del PDF: 612 × 792 = carta. */
+const FORMATO_ENFERMERIA = [1,2,3,4].map(n => 'registro-enfermeria-' + n + '.svg');
+
+/* Dónde va cada dato en la hoja 1: x, y (arriba) y ancho disponible, en pt;
+   alto 14.7 pt, el de las etiquetas impresas. sobreRenglon: el dato va sobre
+   una línea subrayada, no dentro de una barra. */
+const ENF_CAMPOS = {
+  nombre:   { x:142, y:75.1,  w:436 },
+  fnac:     { x:140, y:89.5,  w:81  },
+  edad:     { x:256, y:89.5,  w:45  },
+  sexo:     { x:333, y:89.5,  w:31  },
+  hab:      { x:424, y:89.5,  w:49  },
+  fecha:    { x:510, y:89.5,  w:68  },
+  medico:   { x:117, y:103.9, w:461 },
+  dx:       { x:240, y:130.8, w:338 , sobreRenglon:true },
+  peso:     { x:61,  y:145.2, w:53  , sobreRenglon:true },
+  talla:    { x:146, y:145.2, w:59  , sobreRenglon:true },
+  sc:       { x:279, y:145.2, w:299 , sobreRenglon:true },
+  alergias: { x:76,  y:159.6, w:502 , sobreRenglon:true }
+};
+
+let IMPRIMIENDO_ENF = false;
+
+/* Si una impresión del formato no alcanzó a limpiar (afterprint no llegó),
+   la siguiente nota no debe salir sin márgenes ni con la clase del formato. */
+function quitaModoFormato(){
+  const m = document.getElementById('margenes-formato');
+  if (m) m.remove();
+  $('impresion').classList.remove('imp-formato');
+}
+
+function fechaMx(v){
+  const s = String(v || '').slice(0,10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(8,10) + '/' + s.slice(5,7) + '/' + s.slice(0,4) : s;
+}
+
+/* Achica la letra hasta que quepa en el recuadro; nunca por debajo de 6 pt.
+   Se mide con canvas porque #impresion no se pinta en pantalla. */
+function tamanoQueCabe(texto, ancho){
+  const ctx = (tamanoQueCabe.c = tamanoQueCabe.c || document.createElement('canvas')).getContext('2d');
+  for (let pt = 9.5; pt >= 6; pt -= 0.5){
+    ctx.font = pt + 'pt "Helvetica Neue", Helvetica, Arial, sans-serif';
+    if (ctx.measureText(texto).width * 0.75 <= ancho) return pt;
+  }
+  return 6;
+}
+
+function datosGeneralesEnfermeria(caso){
+  const p = EXP.paciente || {};
+  const num = v => { const n = parseFloat(String(v || '').replace(',', '.')); return isFinite(n) && n > 0 ? n : null; };
+  const peso = num(caso.Peso_Kg);
+  let talla = num(caso.Talla_Cm);
+  if (talla && talla < 3) talla = talla * 100;       /* vino en metros */
+  /* Superficie corporal por Mosteller: raíz de (talla cm × peso kg / 3600). */
+  const sc = (peso && talla) ? Math.sqrt(talla * peso / 3600).toFixed(2) + ' m²' : '';
+
+  let alergias = '';
+  if (esSi(p.Alergias_Tiene)) alergias = p.Alergias_Cuales || 'Sí, sin especificar';
+  else if (/^no/i.test(String(p.Alergias_Tiene || '').trim())) alergias = 'Negadas';
+
+  const dx = [caso.Diagnostico_Preoperatorio || caso.Diagnostico || '',
+              caso.Procedimiento_Principal || ''].filter(Boolean).join(' · ');
+
+  return {
+    nombre: p.Nombre_Completo || '',
+    fnac:   fechaMx(p.Fecha_Nacimiento),
+    edad:   edadAl(p.Fecha_Nacimiento, hoyISO()),
+    /* El recuadro de sexo mide 31 pt: «Femenino» completo saldría en 6 pt. */
+    sexo:   /^fem/i.test(p.Sexo || '') ? 'Fem.' : /^masc/i.test(p.Sexo || '') ? 'Masc.' : (p.Sexo || ''),
+    hab:    caso.Cama_Asignada || '',
+    fecha:  fechaMx(hoyISO()),
+    medico: caso.Cirujano_Nombre || caso.Cirujano_Email || '',
+    dx:     dx,
+    peso:   peso ? String(peso).replace(/\.0+$/, '') + ' kg' : '',
+    talla:  talla ? Math.round(talla) + ' cm' : '',
+    sc:     sc,
+    alergias: alergias
+  };
+}
+
+async function imprimeRegistroEnfermeria(casoId, boton){
+  if (IMPRIMIENDO_ENF) return;
+  const caso = (EXP.casos || []).filter(c => String(c.Caso_ID) === String(casoId))[0];
+  if (!caso) return;
+  IMPRIMIENDO_ENF = true;
+  const textoBoton = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = 'Preparando…';
+  const imp = $('impresion');
+  quitaModoFormato();
+  const margenes = document.createElement('style');
+  margenes.id = 'margenes-formato';
+  try{
+    const d = datosGeneralesEnfermeria(caso);
+    const p = EXP.paciente || {};
+    const corre = esc(p.Nombre_Completo || '') + ' · expediente ' + esc(EXP.expediente_no || '—') +
+      (d.hab ? ' · habitación ' + esc(d.hab) : '') + ' · fecha ' + esc(d.fecha);
+
+    const hoja1 = Object.keys(ENF_CAMPOS).filter(k => d[k]).map(k => {
+      const f = ENF_CAMPOS[k];
+      /* En las barras moradas la letra baja 1.3 pt para asentarse como la
+         etiqueta; en los renglones subrayados sube 2 pt para no cruzar la línea. */
+      return '<div class="imp-dato" style="left:' + f.x + 'pt;top:' + (f.y + (f.sobreRenglon ? -2 : 1.3)) + 'pt;width:' + f.w +
+        'pt;height:14.7pt;font-size:' + tamanoQueCabe(d[k], f.w) + 'pt">' + esc(d[k]) + '</div>';
+    }).join('');
+
+    imp.classList.add('imp-formato');
+    imp.innerHTML = FORMATO_ENFERMERIA.map((src, i) =>
+      '<div class="imp-hoja"><img alt="" src="' + src + '">' +
+      (i === 0 ? hoja1
+               : '<div class="imp-corre-hoja">' + corre + ' · hoja ' + (i+1) + ' de ' +
+                 FORMATO_ENFERMERIA.length + '</div>') +
+      '</div>').join('');
+
+    /* Sin esperar a que carguen las cuatro hojas, se imprimen en blanco. */
+    await Promise.all(Array.from(imp.querySelectorAll('img')).map(img =>
+      img.decode().catch(() => { throw new Error('No se pudo cargar el formato (' + img.getAttribute('src') + ').'); })));
+
+    /* La hoja trae sus propios márgenes: los de las notas la encogerían. */
+    margenes.textContent = '@page{margin:0}';
+    document.head.appendChild(margenes);
+    window.addEventListener('afterprint', function limpia(){
+      window.removeEventListener('afterprint', limpia);
+      margenes.remove();
+      imp.classList.remove('imp-formato');
+      imp.innerHTML = '';
+    });
+    window.print();
+  }catch(e){
+    margenes.remove();
+    imp.classList.remove('imp-formato');
+    imp.innerHTML = '';
+    avisoGlobal('No se pudo imprimir el registro de enfermería: ' + e.message);
+  } finally {
+    IMPRIMIENDO_ENF = false;
+    boton.disabled = false;
+    boton.textContent = textoBoton;
+  }
+}
+
 function pintaExpediente(){
   const p = EXP.paciente;
   $('exp-nombre').textContent = p.Nombre_Completo || '(sin nombre)';
@@ -1435,8 +1597,14 @@ function pintaExpediente(){
       '<div class="det">'+esc(c.Cirujano_Nombre||c.Cirujano_Email||'—')+
         ' · anestesia '+esc(c.Anestesiologo_Nombre||c.Anestesiologo_Email||'—')+
         ' · '+esc(c.Folio_Caso||c.Caso_ID)+'</div></div>'+
+      '<button type="button" class="btn" data-enf="'+esc(c.Caso_ID)+'" '+
+        'title="Imprime el formato en blanco con los datos generales ya puestos">'+
+        'Registro de enfermería</button> '+
       '<span class="etq'+(c.hoja_enfermeria_completa?' warn':'')+'">'+
         (c.hoja_enfermeria_completa?'pernocta':'ambulatorio')+'</span></div>').join('');
+  C.querySelectorAll('[data-enf]').forEach(b => {
+    b.onclick = () => imprimeRegistroEnfermeria(b.dataset.enf, b);
+  });
 
   pintaAdjuntosExpediente();
 
@@ -1603,6 +1771,7 @@ function filaImp(etiqueta, valor){
 }
 
 function armaImpresion(){
+  quitaModoFormato();
   const vals = leeFormulario();
   const campos = camposDe(DOC.Tipo);
   const val = function(c){
