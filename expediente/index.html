@@ -200,6 +200,13 @@ html[data-tema="oscuro"] .vacio{background-image:url("../assets/zorvix-iso-blanc
 .campo label{font-size:12.5px;color:var(--tinta2);font-weight:500;display:flex;gap:6px;align-items:baseline}
 .campo label .req{color:var(--malo)}
 .campo .pista{font-size:11.5px;color:var(--tinta3)}
+/* El cuadro de «anular» pide un motivo y necesita su propia pista, fuera de
+   .campo. Y los documentos anulados se ven apagados, sin desaparecer. */
+#conf-pista{display:block;margin-top:6px;font-size:11.5px;color:var(--tinta3)}
+.renglon.tenue{opacity:.55}
+.renglon.tenue .nom{text-decoration:line-through}
+.cabeza-anulados{font-size:12.5px;font-weight:600;color:var(--tinta2);
+  margin:14px 0 2px;padding-top:10px;border-top:1px solid var(--linea)}
 input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{
   width:100%;border:1px solid var(--linea);background:var(--papel);color:var(--tinta);
   border-radius:var(--r-sm);padding:9px 11px;font:inherit;font-size:14px;transition:var(--transicion)}
@@ -491,6 +498,7 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
       <button class="btn" id="btn-guardar">Guardar borrador</button>
       <button class="btn" id="btn-listo">Marcar listo para firma</button>
       <button class="btn primario" id="btn-firmado">Archivar — impresa y firmada</button>
+      <button class="btn" id="btn-anular">Anular</button>
     </div>
   </section>
 
@@ -507,6 +515,10 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   <div class="caja" style="max-width:520px">
     <h2 style="margin:0 0 8px" id="conf-titulo"></h2>
     <div id="conf-texto" class="sub" style="white-space:pre-wrap;margin-bottom:16px"></div>
+    <div id="conf-campo" class="oculto" style="margin-bottom:16px">
+      <textarea id="conf-entrada" rows="3" style="width:100%"></textarea>
+      <span class="pista" id="conf-pista"></span>
+    </div>
     <div class="fila" id="conf-botones"></div>
   </div>
 </div>
@@ -630,7 +642,12 @@ function nombreDeCorreo(v){
 
 const ESTADO_ARCHIVADA = 'Impresa y archivada';
 const ESTADO_HEREDADO  = 'Firmado y escaneado';   /* notas viejas */
+const ESTADO_ANULADO   = 'Anulado';
 const esArchivada = e => e === ESTADO_ARCHIVADA || e === ESTADO_HEREDADO;
+const esAnulada   = e => e === ESTADO_ANULADO;
+/* Lo mismo que exige el servidor. Se repite aqui para poder decirlo antes de
+   mandar el viaje, no para confiar en ello: la reja que cuenta es la de alla. */
+const MIN_MOTIVO_ANULAR = 10;
 
 let TOKEN=null, YO=null, ESQ=null, EXP=null, DOC=null, GRAB=null, AUDIO_ID=null;
 let ADJ={ adjuntos:[], puede_escribir:false };
@@ -754,6 +771,10 @@ function elige(titulo, texto, opciones){
   return new Promise(function(res){
     $('conf-titulo').textContent = titulo;
     $('conf-texto').textContent = texto;
+    /* El cuadro es uno solo y se reusa. Si la pregunta anterior traia campo de
+       texto y esta no, hay que apagarlo: si no, se queda pidiendo algo que ya
+       nadie va a leer. */
+    $('conf-campo').classList.add('oculto');
     const caja = $('conf-botones');
     caja.innerHTML = '<span class="crece"></span>';
     const cierra = function(v){
@@ -782,6 +803,53 @@ function elige(titulo, texto, opciones){
       console.error('[Zorvix] el diálogo de confirmación estaba tapado por',
                     enMedio && (enMedio.id || enMedio.className));
     }
+  });
+}
+
+/* Como elige(), pero con un renglon de texto que hay que llenar. Devuelve lo
+   escrito, ya recortado, o null si se cancela. El boton no se habilita hasta
+   que hay suficiente: mas vale que el freno se vea antes de apretar, y no como
+   un error del servidor despues. */
+function pideTexto(titulo, texto, textoSi, pista, minimo){
+  return new Promise(function(res){
+    $('conf-titulo').textContent = titulo;
+    $('conf-texto').textContent = texto;
+    $('conf-pista').textContent = pista || '';
+    const campo = $('conf-campo');
+    const entrada = $('conf-entrada');
+    entrada.value = '';
+    campo.classList.remove('oculto');
+
+    const caja = $('conf-botones');
+    caja.innerHTML = '<span class="crece"></span>';
+    const cierra = function(v){
+      $('confirmar').classList.add('oculto');
+      campo.classList.add('oculto');
+      caja.innerHTML = '';
+      entrada.oninput = null;
+      document.removeEventListener('keydown', tecla);
+      res(v);
+    };
+    const tecla = function(e){ if (e.key === 'Escape') cierra(null); };
+
+    const bNo = document.createElement('button');
+    bNo.className = 'btn';
+    bNo.textContent = 'Cancelar';
+    bNo.onclick = () => cierra(null);
+    const bSi = document.createElement('button');
+    bSi.className = 'btn primario';
+    bSi.textContent = textoSi;
+    bSi.onclick = () => cierra(entrada.value.trim());
+    caja.appendChild(bNo);
+    caja.appendChild(bSi);
+
+    const revisa = function(){ bSi.disabled = entrada.value.trim().length < (minimo || 1); };
+    entrada.oninput = revisa;
+    revisa();
+
+    document.addEventListener('keydown', tecla);
+    $('confirmar').classList.remove('oculto');
+    entrada.focus();
   });
 }
 
@@ -1286,15 +1354,31 @@ function pintaExpediente(){
 
   pintaAdjuntosExpediente();
 
-  const D = $('exp-docs');
-  D.innerHTML = !EXP.documentos.length ? '<div class="vacio">Todavía no hay documentos capturados.</div>' :
-    EXP.documentos.map(d =>
-      '<div class="renglon" data-doc="'+esc(d.Doc_ID)+'">'+
+  /* Las anuladas no se esconden: asi es como se pierden los expedientes. Se
+     bajan a su propia seccion, contadas y en gris, para que la lista de arriba
+     sea la del expediente vivo y la de abajo siga estando ahi para quien la
+     busque. Se pueden abrir y leer; lo que no se puede es editarlas. */
+  const renglon = function(d, anulada){
+    return '<div class="renglon'+(anulada ? ' tenue' : '')+'" data-doc="'+esc(d.Doc_ID)+'">'+
       '<div class="crece"><div class="nom">'+esc(d.Tipo)+'</div>'+
       '<div class="det">'+esc(d.Fecha||'')+' '+esc(d.Hora||'')+
         ' · '+esc(d.Capturo_Nombre||d.Capturo_Email||'')+' · v'+esc(d.Version||1)+'</div></div>'+
-      '<span class="etq '+(esArchivada(d.Estado)?'ok':(d.Estado==='Listo para firma'?'warn':''))+'">'+
-        esc(d.Estado)+'</span></div>').join('');
+      '<span class="etq '+(anulada ? '' : (esArchivada(d.Estado)?'ok':(d.Estado==='Listo para firma'?'warn':'')))+'">'+
+        esc(d.Estado)+'</span></div>';
+  };
+  const vivos    = (EXP.documentos||[]).filter(d => !esAnulada(d.Estado));
+  const anulados = (EXP.documentos||[]).filter(d =>  esAnulada(d.Estado));
+
+  const D = $('exp-docs');
+  D.innerHTML = (!vivos.length
+      ? '<div class="vacio">Todavía no hay documentos capturados.</div>'
+      : vivos.map(d => renglon(d, false)).join('')) +
+    (anulados.length
+      ? '<div class="cabeza-anulados">Anulados ('+anulados.length+')</div>'+
+        '<div class="sub" style="margin-bottom:6px">No cuentan como parte del expediente. '+
+        'La razón de cada uno está en la bitácora.</div>'+
+        anulados.map(d => renglon(d, true)).join('')
+      : '');
   D.querySelectorAll('[data-doc]').forEach(el => el.onclick = () => abreDocumento(el.dataset.doc));
 
   pintaSelectorDocumentos();
@@ -1341,7 +1425,10 @@ function pintaSelectorDocumentos(){
   /* Cuántos hay ya de cada tipo. No sirve para bloquear —de notas de
      evolución van varias— sino para que se vea de un vistazo qué falta. */
   const hechos = {};
-  (EXP.documentos || []).forEach(d => { hechos[d.Tipo] = (hechos[d.Tipo] || 0) + 1; });
+  (EXP.documentos || []).forEach(d => {
+    if (esAnulada(d.Estado)) return;   /* un documento anulado no cuenta como hecho */
+    hechos[d.Tipo] = (hechos[d.Tipo] || 0) + 1;
+  });
 
   const pendientes = new Set(puedo);
   const bloques = [];
@@ -1622,7 +1709,10 @@ function ciudadYFecha(iso){
    los cuatro marca también la entrada genérica. */
 function indiceDelExpediente(){
   const hay = {};
-  (EXP.documentos || []).forEach(d => { hay[String(d.Tipo)] = true; });
+  (EXP.documentos || []).forEach(d => {
+    if (esAnulada(d.Estado)) return;   /* tampoco cuenta para el Índice Guía */
+    hay[String(d.Tipo)] = true;
+  });
   const algunCI = Object.keys(hay).some(t => /^CI /.test(t));
   return (CATS['indice_guia'] || []).filter(function(o){
     if (hay[o]) return true;
@@ -1706,12 +1796,26 @@ function pintaDocumento(){
       ' · expediente '+esc(EXP.expediente_no||'')+'</div>';
 
   const archivada = esArchivada(DOC.Estado);
-  ['btn-guardar','btn-listo','btn-firmado'].forEach(b => $(b).disabled = false);
+  const anulada   = esAnulada(DOC.Estado);
+  /* Un documento anulado se puede abrir y leer —queda en el expediente— pero
+     no se edita ni se vuelve a anular. Guardar encima seria revivirlo por la
+     puerta de atras, y el servidor lo rechaza de todos modos; esto es para que
+     el boton no invite a intentarlo. */
+  ['btn-guardar','btn-listo','btn-firmado'].forEach(b => $(b).disabled = anulada);
+  $('btn-anular').disabled = anulada || !DOC.Doc_ID;
+  $('btn-anular').title = !DOC.Doc_ID
+    ? 'Primero hay que guardarlo: todavía no existe como documento.'
+    : (anulada ? 'Ya está anulado.' : 'Retira este documento del expediente, dejando constancia.');
   /* El dictado tiene una segunda condicion ademas de que el documento este
      abierto: que este paciente haya autorizado que se le grabe. El aviso de
      privacidad lo pide en una casilla propia y dice, con esas palabras, que
      dejarla en blanco significa que no autoriza. */
   $('btn-dictar').disabled = !audioAutorizado();
+  if (anulada){
+    aviso('doc-aviso', 'malo',
+      'Este documento está ANULADO. Sigue en el expediente y se puede leer, pero ya no ' +
+      'cuenta y no se puede editar. Quién lo anuló y por qué está en la bitácora.');
+  } else
   aviso('doc-aviso', archivada ? 'ok' : '', archivada ?
     'Esta nota ya está impresa, firmada y archivada en el expediente físico (versión ' +
     (DOC.Version || '?') + '). Se puede seguir editando: si la cambia, reimprímala, ' +
@@ -2414,6 +2518,51 @@ $('btn-firmado').onclick = async function(){
    clínico no tiene borrar: un documento duplicado se queda. Más vale no
    crearlo. */
 let GUARDANDO = false;
+
+/* ── Anular ────────────────────────────────────────────────────
+   El expediente clinico no tiene borrar: se conserva cinco anos desde el
+   ultimo acto medico. Lo que si tiene es dejar de contar, con constancia de
+   quien y por que. El motivo no es tramite: es lo unico que va a quedar
+   explicando el hueco, asi que el boton no se habilita hasta que hay algo
+   escrito de verdad. */
+let ANULANDO = false;
+
+$('btn-anular').onclick = async function(){
+  if (ANULANDO || !DOC || !DOC.Doc_ID) return;
+
+  const motivo = await pideTexto(
+    'Anular «' + DOC.Tipo + '»',
+    esArchivada(DOC.Estado)
+      ? 'Este documento YA SE IMPRIMIÓ y está en el expediente físico. Anularlo aquí no ' +
+        'retira esa hoja: hay que ir por ella. Queda asentado en la bitácora para que se ' +
+        'pueda rastrear.\n\nEl documento no se borra: se queda en el expediente, marcado ' +
+        'como anulado y sin poder editarse.'
+      : 'El documento no se borra: se queda en el expediente, marcado como anulado y sin ' +
+        'poder editarse. Deja de contar como parte del expediente vivo.\n\nSi tenía audio ' +
+        'de dictado, se elimina.',
+    'Anular', 'Diga por qué. Mínimo ' + MIN_MOTIVO_ANULAR + ' caracteres; es lo único que ' +
+    'va a quedar explicando este hueco.', MIN_MOTIVO_ANULAR);
+
+  if (motivo === null) return;
+
+  ANULANDO = true;
+  $('btn-anular').disabled = true;
+  try{
+    const r = await api('documentoAnular', { doc_id: DOC.Doc_ID, motivo: motivo });
+    DOC.Estado = r.estado || ESTADO_ANULADO;
+    aviso('doc-aviso', 'ok', 'Anulado.' +
+      (r.audio_borrado ? ' Se eliminaron ' + r.audio_borrado + ' audio(s).' : '') +
+      (r.estaba_archivada ? ' OJO: esta nota ya estaba impresa — hay que retirar la hoja del expediente físico.' : ''));
+    EXP = await api('expediente', { paciente_id: EXP.paciente.Paciente_ID });
+    pintaExpediente();
+    pintaDocumento();
+  }catch(e){
+    aviso('doc-aviso', 'malo', 'No se pudo anular: ' + e.message);
+  } finally {
+    ANULANDO = false;
+    if (!esAnulada(DOC.Estado)) $('btn-anular').disabled = false;
+  }
+};
 
 async function guarda(estado){
   if (GUARDANDO) return;
