@@ -655,8 +655,21 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
           <button class="btn sec" id="c-ficha" type="button">Abrir ficha del paciente</button>
           <button class="btn sec" id="c-expediente" type="button">Abrir expediente</button>
           <button class="btn sec" id="c-confirmar" type="button">Confirmar el caso</button>
+          <button class="btn sec" id="c-cancelar" type="button">Cancelar la cirugía</button>
           <button class="btn sec" id="c-volver" type="button">Volver</button>
           <span id="c-msg"></span>
+        </div>
+
+        <!-- La cancelación pide motivo antes de tocar nada: es lo único que va
+             a quedar explicando el hueco en la agenda. -->
+        <div class="fila oculto" id="c-cancelar-caja" style="flex-direction:column;align-items:stretch;gap:8px">
+          <label for="c-cancelar-motivo">Por qué se cancela — mínimo 10 caracteres</label>
+          <textarea id="c-cancelar-motivo" rows="2"
+            placeholder="El paciente la pospuso, no llegaron los estudios, se dio de baja…"></textarea>
+          <div class="fila">
+            <button class="btn sec" id="c-cancelar-ok" type="button">Sí, cancelar la cirugía</button>
+            <button class="btn sec" id="c-cancelar-no" type="button">Mejor no</button>
+          </div>
         </div>
       </div>
     </section>
@@ -998,6 +1011,14 @@ async function abreCaso(id){
   }).join('') + '</table></div>';
   $('c-confirmar').classList.toggle('oculto',
     !(r.puedo_editar && String(r.caso.Estatus_Agenda) === 'Preaparto'));
+
+  /* Cancelar se ofrece mientras la cirugía siga por delante. Una que ya está
+     en curso o realizada no se cancela: eso se corrige por otro lado. */
+  const est = String(r.caso.Estatus_Agenda || '').toLowerCase().trim();
+  $('c-cancelar').classList.toggle('oculto',
+    !(r.puedo_editar && ['en curso', 'realizado', 'cancelado'].indexOf(est) < 0));
+  $('c-cancelar-caja').classList.add('oculto');
+  $('c-cancelar-motivo').value = '';
   $('c-ficha').classList.toggle('oculto', !r.paciente);
   pintaPrequirurgica(r.caso, !!r.puedo_editar);
   $('c-msg').textContent = '';
@@ -1005,6 +1026,41 @@ async function abreCaso(id){
 }
 
 $('c-volver').onclick = function(){ muestra('agenda'); };
+
+/* ── Cancelar la cirugía ───────────────────────────────────────
+   No se borra el caso: se marca cancelado, con motivo y con quién lo hizo. El
+   folio, la fecha y el paciente se quedan, porque hubo un quirófano apartado y
+   una fecha que alguien le dio al paciente. El horario se libera solo: para la
+   disponibilidad, un caso cancelado ya no aparta nada. */
+$('c-cancelar').onclick = function(){
+  $('c-cancelar-caja').classList.remove('oculto');
+  $('c-cancelar-motivo').focus();
+};
+$('c-cancelar-no').onclick = function(){
+  $('c-cancelar-caja').classList.add('oculto');
+  $('c-cancelar-motivo').value = '';
+};
+$('c-cancelar-ok').onclick = async function(){
+  const motivo = String($('c-cancelar-motivo').value || '').trim();
+  if (motivo.length < 10){
+    $('c-msg').innerHTML = '<span class="pastilla warn">Diga por qué se cancela: ' +
+      'mínimo 10 caracteres.</span>';
+    $('c-cancelar-motivo').focus();
+    return;
+  }
+  const boton = $('c-cancelar-ok');
+  boton.disabled = true;
+  try{
+    await api('cancelarCaso', { caso_id: CASO_SEL.Caso_ID, motivo: motivo });
+    $('c-cancelar-caja').classList.add('oculto');
+    $('c-cancelar-motivo').value = '';
+    await cargaCasos();
+    await abreCaso(CASO_SEL.Caso_ID);
+    /* El aviso va al final: abreCaso limpia el renglón de mensajes. */
+    $('c-msg').innerHTML = '<span class="pastilla warn">Cancelada. El quirófano quedó libre.</span>';
+  }catch(e){ $('c-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>'; }
+  finally { boton.disabled = false; }
+};
 $('c-ficha').onclick  = function(){ abreFicha(PACIENTE_SEL); };
 $('c-confirmar').onclick = async function(){
   try{
