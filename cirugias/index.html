@@ -376,6 +376,25 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
   .caso:hover{transform:none}
   .btn:hover{transform:none}
 }
+/* ── COMPUTADORA COMPARTIDA ────────────────────────────────────
+   Sólo se enciende en la computadora del quirófano. */
+#cinta-compartida{display:none;align-items:center;gap:10px;padding:7px 16px;
+  background:#4c2a86;color:#fff;font-size:13px}
+#cinta-compartida.on{display:flex}
+#cinta-compartida b{font-weight:700}
+#cinta-compartida .crece{flex:1}
+#cinta-compartida button{background:#fff;color:#4c2a86;border:0;border-radius:6px;
+  padding:4px 11px;font:inherit;font-weight:700;cursor:pointer}
+#cinta-inactividad{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;display:none;
+  align-items:center;gap:14px;padding:13px 18px;background:#8a1c1c;color:#fff;font-size:14px;
+  box-shadow:0 -4px 18px rgba(0,0,0,.25)}
+#cinta-inactividad.on{display:flex}
+#cinta-inactividad .crece{flex:1}
+#cinta-inactividad button{background:#fff;color:#8a1c1c;border:0;border-radius:6px;
+  padding:7px 16px;font:inherit;font-weight:700;cursor:pointer}
+.opcion-compartida{margin-top:16px;font-size:12.5px;opacity:.85;
+  display:flex;gap:8px;align-items:flex-start;text-align:left;line-height:1.45}
+.opcion-compartida input{margin-top:2px;flex:none}
 </style>
 </head>
 <body>
@@ -409,6 +428,14 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
   </div>
 </div>
 
+<!-- Sólo en la computadora compartida: quién está dentro, a la vista. -->
+<div id="cinta-compartida">
+  <span>Trabajando como <b id="cinta-quien">—</b></span>
+  <span class="crece"></span>
+  <span>¿No es usted?</span>
+  <button type="button" id="cinta-salir">Salir</button>
+</div>
+
 <!-- ── Entrada ────────────────────────────────────────────────────────── -->
 <div id="pantalla-entrada">
   <div id="lienzo">
@@ -433,6 +460,12 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
       <p class="sub">Use la cuenta de Google que Zorvix dio de alta a su nombre.</p>
       <div id="boton-google"></div>
       <div id="entrada-error"></div>
+      <label class="opcion-compartida">
+        <input type="checkbox" id="chk-compartida">
+        <span>Esta computadora es compartida (la del quirófano). Al salir se cierra
+        también la sesión de Google, y la sesión se cierra sola a los
+        <span id="min-inactividad">10</span> minutos sin uso.</span>
+      </label>
       <div class="pie">
         Si su correo no está dado de alta, el sistema no lo va a dejar pasar.
         Pídalo en <b>dirección de Zorvix</b>.
@@ -676,6 +709,12 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
   </main>
 </div>
 
+<div id="cinta-inactividad">
+  <span class="crece">Nadie ha usado esta pantalla en un rato. La sesión se cierra en
+    <b id="cuenta-inactividad">60</b> s. <b>Guarde lo que lleve escrito.</b></span>
+  <button type="button" id="sigo-aqui">Sigo aquí</button>
+</div>
+
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 /* ===========================================================================
@@ -782,6 +821,93 @@ function guardaSesion(c){ try{ sessionStorage.setItem(LLAVE_SESION, c); }catch(e
 function olvidaSesion(){ try{ sessionStorage.removeItem(LLAVE_SESION); }catch(e){} }
 function sesionHeredada(){ try{ return sessionStorage.getItem(LLAVE_SESION); }catch(e){ return null; } }
 
+/* ── COMPUTADORA COMPARTIDA ────────────────────────────────────
+   Mismo bloque que en Expediente, y a propósito idéntico: la marca vive en
+   localStorage del mismo origen, así que encenderla en un ala la enciende en
+   las tres. En la computadora del quirófano «Salir» tiene que cerrar también
+   la sesión de Google: si sólo se borra la de Zorvix, el siguiente que se
+   siente entra como el anterior de un clic y sin contraseña, y el alcance de
+   cada médico se decide justamente por su correo.
+
+   Se puede dejar puesta de una vez abriendo la app con ?quirofano=1. */
+const LLAVE_COMPARTIDA = 'zorvix-computadora-compartida';
+const MINUTOS_INACTIVIDAD = 10;
+const SEGUNDOS_DE_GRACIA = 60;
+
+function esCompartida(){
+  try{ return localStorage.getItem(LLAVE_COMPARTIDA) === '1'; }catch(e){ return false; }
+}
+function marcaCompartida(si){
+  try{
+    if (si) localStorage.setItem(LLAVE_COMPARTIDA, '1');
+    else localStorage.removeItem(LLAVE_COMPARTIDA);
+  }catch(e){}
+}
+(function(){
+  try{
+    const q = new URLSearchParams(location.search).get('quirofano');
+    if (q === '1') marcaCompartida(true);
+    if (q === '0') marcaCompartida(false);
+  }catch(e){}
+})();
+
+function salirDeZorvix(){
+  paraInactividad();
+  olvidaSesion();
+  try{ google.accounts.id.disableAutoSelect(); }catch(e){}
+  if (esCompartida()){
+    location.replace('https://accounts.google.com/Logout');
+    return;
+  }
+  location.reload();
+}
+
+let RELOJ_QUIETO = null, RELOJ_CUENTA = null, QUEDAN = 0;
+
+function paraInactividad(){
+  clearTimeout(RELOJ_QUIETO); clearInterval(RELOJ_CUENTA);
+  RELOJ_QUIETO = null; RELOJ_CUENTA = null;
+  const c = $('cinta-inactividad'); if (c) c.classList.remove('on');
+}
+
+function reiniciaInactividad(){
+  if (!esCompartida() || !TOKEN) return;
+  paraInactividad();
+  RELOJ_QUIETO = setTimeout(avisaInactividad, MINUTOS_INACTIVIDAD * 60000);
+}
+
+function avisaInactividad(){
+  const c = $('cinta-inactividad'); if (!c) return;
+  QUEDAN = SEGUNDOS_DE_GRACIA;
+  $('cuenta-inactividad').textContent = QUEDAN;
+  c.classList.add('on');
+  RELOJ_CUENTA = setInterval(function(){
+    QUEDAN--;
+    $('cuenta-inactividad').textContent = QUEDAN;
+    if (QUEDAN <= 0){ paraInactividad(); salirDeZorvix(); }
+  }, 1000);
+}
+
+/* Mientras el aviso está puesto, el movimiento del ratón NO cuenta: un roce
+   accidental no debe cancelar el cierre de una computadora que quedó sola.
+   Para quedarse hay que apretar el botón. */
+['mousedown','keydown','touchstart','wheel'].forEach(function(ev){
+  document.addEventListener(ev, function(){
+    const c = $('cinta-inactividad');
+    if (c && c.classList.contains('on')) return;
+    reiniciaInactividad();
+  }, true);
+});
+
+function pintaCompartida(){
+  const cinta = $('cinta-compartida');
+  if (cinta) cinta.classList.toggle('on', esCompartida() && !!TOKEN);
+  const chk = $('chk-compartida');
+  if (chk) chk.checked = esCompartida();
+  const min = $('min-inactividad');
+  if (min) min.textContent = MINUTOS_INACTIVIDAD;
+}
+
 /* ── Entrada ──────────────────────────────────────────────── */
 window.onload = function(){
   /* Si venimos del Portal o de la otra ala, la credencial ya está puesta:
@@ -800,8 +926,13 @@ window.onload = function(){
        nada más en memoria y se va al recargar, así que no queda una credencial
        legible para cualquier script del dominio. Se puede tener las dos cosas:
        sin clic y sin guardar nada. */
+    /* En la computadora compartida auto_select va apagado a propósito. Con él
+       encendido, Google reemite la credencial del médico anterior sin un solo
+       clic: el siguiente que se sienta entra como él, y la nota se captura a
+       nombre de quien no la escribió. En la computadora propia de cada quien
+       se queda encendido, que es lo que evita estar entrando todo el día. */
     google.accounts.id.initialize({
-      client_id: CLIENTE, callback: entro, auto_select: true
+      client_id: CLIENTE, callback: entro, auto_select: !esCompartida()
     });
     google.accounts.id.renderButton($('boton-google'),
       {theme:'outline', size:'large', text:'signin_with', locale:'es', width:300});
@@ -822,6 +953,9 @@ async function entro(resp, silencioso){
     $('quien-txt').textContent = s.nombre;
     $('quien-rol').textContent = s.rol;
     $('quien-ini').textContent = String(s.nombre || '?').trim().charAt(0).toUpperCase();
+    $('cinta-quien').textContent = s.nombre;
+    pintaCompartida();
+    reiniciaInactividad();
     if (s.rol === 'medico' && !s.credenciales_vigentes){
       aviso('aviso-credenciales','warn',
         'No va a poder reservar hasta que sus documentos estén al día. ' + (s.credenciales_motivo||''));
@@ -832,17 +966,19 @@ async function entro(resp, silencioso){
   }catch(e){
     TOKEN = null;
     olvidaSesion();
+    paraInactividad();
+    const cinta = $('cinta-compartida'); if (cinta) cinta.classList.remove('on');
     /* Silencioso quiere decir que veníamos con una credencial heredada que ya
        no sirve. Eso no es un error que la persona deba leer: se cae al botón. */
     if (!silencioso) aviso('entrada-error','malo', e.message);
   }
 }
 
-$('salir').onclick = function(){
-  olvidaSesion();
-  try{ google.accounts.id.disableAutoSelect(); }catch(e){}
-  location.reload();
-};
+$('salir').onclick = salirDeZorvix;
+$('cinta-salir').onclick = salirDeZorvix;
+$('sigo-aqui').onclick = function(){ paraInactividad(); reiniciaInactividad(); };
+$('chk-compartida').onchange = function(){ marcaCompartida(this.checked); pintaCompartida(); };
+pintaCompartida();
 
 /* Del caso al expediente de ese mismo paciente, sin volver a buscarlo. El
    Paciente_ID viaja por sessionStorage y no por la URL: mismo origen, así que
