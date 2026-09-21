@@ -355,6 +355,12 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   .imp-hoja>img{position:absolute;inset:0;width:612pt;height:792pt}
   .imp-dato{position:absolute;display:flex;align-items:center;white-space:nowrap;overflow:hidden;
     font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#000;line-height:1}
+  /* La hoja que se deja en blanco para que el siguiente documento empiece en
+     el frente de una hoja nueva. Se rotula: una hoja en blanco sin explicación
+     dentro de un expediente parece un error de impresión o una hoja faltante. */
+  .imp-blanca{display:flex;align-items:center;justify-content:center;
+    font:9pt 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#777}
+
   .imp-corre-hoja{position:absolute;top:12pt;right:32pt;font:7.5pt 'Helvetica Neue',Helvetica,Arial,sans-serif;
     color:#222;white-space:nowrap}
 }
@@ -488,6 +494,10 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
     <div class="tarjeta">
       <h2>Internamientos</h2>
       <p class="sub">Cada cirugía es un episodio con sus propios documentos.</p>
+      <label class="sub" style="display:flex;gap:8px;align-items:center;margin:6px 0 0">
+        <input type="checkbox" id="chk-doble-cara" checked style="width:auto;margin:0">
+        Imprimir a doble cara: cada documento empieza en el frente de una hoja nueva
+      </label>
       <div id="exp-casos"></div>
     </div>
 
@@ -1775,6 +1785,26 @@ function renglonesDeTabla(tabla, hoja){
   return html;
 }
 
+/* ── Doble cara: cada documento empieza en el frente de una hoja ──────────
+   Imprimiendo por los dos lados, un documento de cinco hojas deja libre el
+   reverso de la tercera, y ahí caía la primera hoja del siguiente: el
+   consentimiento de anestesia terminaba atrás de la última hoja del
+   quirúrgico. En un expediente de papel eso es un problema real, porque las
+   hojas se separan, se firman y se archivan por documento.
+
+   Se arregla completando con una hoja en blanco cuando un documento ocupa un
+   número impar de hojas. La casilla se recuerda en esta computadora: quien
+   imprime de un solo lado no tiene por qué gastar papel en blanco. */
+function dobleCara(){
+  const c = $('chk-doble-cara');
+  return c ? c.checked : true;
+}
+
+function hojaEnBlanco(){
+  return '<div class="imp-hoja imp-blanca">Esta hoja se dejó en blanco a propósito. ' +
+         'El documento siguiente empieza en la hoja de enfrente.</div>';
+}
+
 function hojaDeFormato(clave, hoja, d){
   const f = FORMATOS[clave];
   const campos = f.campos.filter(c => c.p === hoja && d[c.k]).map(c => {
@@ -1853,8 +1883,10 @@ async function imprimeFormatos(casoId, claves, boton){
     const d = datosDeFormato(caso);
     let html = '';
     let avisoIdent = '';
+    const par = dobleCara();
     for (let i = 0; i < claves.length; i++) {
       const clave = claves[i];
+      let hojas = 0;
       /* «identificacion» no está en FORMATOS: son las fotos de la INE. Si no
          se puede armar, el paquete sale igual y se avisa cuál hoja faltó: que
          falte la INE no es razón para dejar sin consentimientos a recepción. */
@@ -1862,9 +1894,14 @@ async function imprimeFormatos(casoId, claves, boton){
         const r = await hojaDeIdentificacion();
         html += r.hoja;
         avisoIdent = r.aviso;
-        continue;
+        hojas = r.hoja ? 1 : 0;
+      } else {
+        hojas = FORMATOS[clave].hojas;
+        for (let h = 1; h <= hojas; h++) html += hojaDeFormato(clave, h, d);
       }
-      for (let h = 1; h <= FORMATOS[clave].hojas; h++) html += hojaDeFormato(clave, h, d);
+      /* Se completa sólo si hay otro documento atrás: rellenar al final sería
+         una hoja en blanco suelta al fondo del folder. */
+      if (par && hojas % 2 === 1 && i < claves.length - 1) html += hojaEnBlanco();
     }
     imp.classList.add('imp-formato');
     imp.innerHTML = html;
@@ -1926,6 +1963,15 @@ function pintaExpediente(){
   C.innerHTML = !EXP.casos.length ? '<div class="vacio">Sin internamientos registrados.</div>' :
     EXP.casos.slice().sort((a,b)=>String(b.Fecha_Cirugia).localeCompare(String(a.Fecha_Cirugia)))
       .map(renglonDeCaso).join('');
+  const chk = $('chk-doble-cara');
+  if (chk && !chk.dataset.listo){
+    chk.dataset.listo = '1';
+    try{ chk.checked = localStorage.getItem('zorvix-doble-cara') !== 'no'; }catch(e){}
+    chk.onchange = () => { try{
+      localStorage.setItem('zorvix-doble-cara', chk.checked ? 'si' : 'no');
+    }catch(e){} };
+  }
+
   C.querySelectorAll('[data-imp]').forEach(b => {
     const claves = b.dataset.formatos === 'paquete'
       ? PAQUETE_INGRESO : b.dataset.formatos.split(',');
