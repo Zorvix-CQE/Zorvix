@@ -1611,12 +1611,16 @@ function renglonDeCaso(c){
     (e.cancelada
       ? '<span class="det">Cancelada: no se imprime nada de este internamiento.</span> '
       : boton('paquete', 'Paquete de ingreso', 'primario',
-              'Hoja frontal, consentimientos, lista de verificación y registro de ' +
-              'enfermería, prellenados con los datos de este internamiento') +
+              'Hoja frontal, identificación, consentimientos, verificación ' +
+              'preoperatoria, listas de verificación y las hojas de enfermería y ' +
+              'anestesia, prellenadas con los datos de este internamiento') +
         boton('ci-quirurgico,ci-anestesia,ci-marcaje', 'Consentimientos') +
         boton('hoja-frontal', 'Hoja frontal') +
         boton('registro-enfermeria', 'Registro de enfermería') +
-        boton('registro-anestesia', 'Registro de anestesia')) +
+        boton('registro-anestesia', 'Registro de anestesia') +
+        boton('verificacion-preop', 'Verificación preoperatoria') +
+        boton('hoja-enfermeria', 'Hoja quirúrgica de enfermería') +
+        boton('registro-cateter', 'Registro de catéter')) +
     etqEstatus +
     '<span class="etq' + (c.hoja_enfermeria_completa ? ' warn' : '') + '">' +
       (c.hoja_enfermeria_completa ? 'pernocta' : 'ambulatorio') + '</span></div>';
@@ -1640,6 +1644,62 @@ function renglonDeCaso(c){
    La lateralidad NO se prellena aunque la agenda la traiga: marcar el lado
    por el que se va a operar es del cirujano, delante del paciente. */
 const FORMATOS = {
+  /* ── Los tres de enfermería ──────────────────────────────────────────
+     Misma familia que la hoja frontal: el rótulo va DEBAJO del renglón, así
+     que el dato se escribe encima de la raya. Las hojas de continuación
+     llevan todas la misma cabecera —paciente, expediente, nacimiento y
+     fecha—, y se prellena en todas: una hoja suelta del expediente tiene que
+     poder decir de quién es sin ir a buscar la primera. */
+  'verificacion-preop': { titulo:'Verificación preoperatoria', hojas:2, campos:[
+    {p:1,x:44.0,y:147.3,w:525.0,k:'nombre'},
+    {p:1,x:49.4,y:172.3,w:110.0,k:'expediente'},
+    {p:1,x:176.6,y:172.3,w:46.0,k:'edad'},
+    {p:1,x:240.2,y:172.3,w:328.0,k:'procedimiento'},
+    {p:1,x:49.4,y:196.3,w:247.0,k:'cirujano'},
+    {p:1,x:314.4,y:196.3,w:254.0,k:'anestesiologo'},
+    {p:2,x:70.1,y:45.0,w:130.0,k:'nombre',e:1},
+    {p:2,x:242.6,y:45.0,w:40.0,k:'expediente',e:1},
+    {p:2,x:351.5,y:45.0,w:52.0,k:'fnac',e:1},
+    {p:2,x:430.6,y:45.0,w:52.0,k:'fecha',e:1}
+  ] },
+
+  'hoja-enfermeria': { titulo:'Hoja quirúrgica de enfermería', hojas:4, campos:[
+    {p:1,x:44.0,y:142.1,w:525.0,k:'nombre'},
+    {p:1,x:49.4,y:167.1,w:94.0,k:'expediente'},
+    {p:1,x:160.7,y:167.1,w:30.0,k:'edad_num',c:1},
+    {p:1,x:208.4,y:167.1,w:62.0,k:'fecha'},
+    {p:1,x:287.9,y:167.1,w:30.0,k:'quirofano',c:1},
+    {p:1,x:335.6,y:167.1,w:233.0,k:'alergias'},
+    {p:1,x:44.0,y:214.2,w:525.0,k:'diagnostico'},
+    {p:1,x:44.0,y:239.4,w:525.0,k:'procedimiento'},
+    /* Celdas de la tabla del equipo: van a 8.5 pt y centradas en su renglón. */
+    {p:1,x:172.3,y:326.1,w:236.0,k:'cirujano_ced',t:1},
+    {p:1,x:172.3,y:375.4,w:236.0,k:'anestesiologo_ced',t:1},
+    {p:2,x:70.1,y:45.0,w:130.0,k:'nombre',e:1},
+    {p:2,x:242.6,y:45.0,w:40.0,k:'expediente',e:1},
+    {p:2,x:351.5,y:45.0,w:52.0,k:'fnac',e:1},
+    {p:2,x:430.6,y:45.0,w:52.0,k:'fecha',e:1},
+    {p:3,x:70.1,y:45.0,w:130.0,k:'nombre',e:1},
+    {p:3,x:242.6,y:45.0,w:40.0,k:'expediente',e:1},
+    {p:3,x:351.5,y:45.0,w:52.0,k:'fnac',e:1},
+    {p:3,x:430.6,y:45.0,w:52.0,k:'fecha',e:1},
+    {p:4,x:70.1,y:45.0,w:130.0,k:'nombre',e:1},
+    {p:4,x:242.6,y:45.0,w:40.0,k:'expediente',e:1},
+    {p:4,x:351.5,y:45.0,w:52.0,k:'fnac',e:1},
+    {p:4,x:430.6,y:45.0,w:52.0,k:'fecha',e:1}
+  ] },
+
+  'registro-cateter': { titulo:'Registro de catéter', hojas:2, campos:[
+    {p:1,x:44.0,y:142.1,w:525.0,k:'nombre'},
+    {p:1,x:49.4,y:167.1,w:99.0,k:'expediente'},
+    {p:1,x:166.0,y:167.1,w:35.0,k:'edad_num',c:1},
+    {p:1,x:219.0,y:167.1,w:205.0,k:'diagnostico'},
+    {p:2,x:70.1,y:45.0,w:130.0,k:'nombre',e:1},
+    {p:2,x:242.6,y:45.0,w:40.0,k:'expediente',e:1},
+    {p:2,x:351.5,y:45.0,w:52.0,k:'fnac',e:1},
+    {p:2,x:430.6,y:45.0,w:52.0,k:'fecha',e:1}
+  ] },
+
   'registro-anestesia': { titulo:'Registro de anestesia', hojas:4, campos:[
     {p:1,x:91.8,y:69.3,w:197.8,k:'diagnostico',t:1},
     {p:1,x:385.2,y:69.3,w:199.8,k:'procedimiento',t:1},
@@ -1813,9 +1873,14 @@ const FORMATOS = {
 };
 /* El paquete de ingreso: lo que se imprime cuando se abre el expediente
    físico en recepción, en el orden en que se archiva. */
+/* El orden es el del folder físico, no el de captura: primero lo que
+   identifica al paciente, luego lo que firma, luego lo que se llena en el
+   quirófano y al final lo que llena enfermería junto a la cama. */
 const PAQUETE_INGRESO = ['hoja-frontal', 'identificacion',
                          'ci-quirurgico', 'ci-anestesia', 'ci-marcaje',
-                         'lista-verificacion', 'registro-anestesia', 'registro-enfermeria'];
+                         'verificacion-preop', 'lista-verificacion',
+                         'registro-anestesia', 'hoja-enfermeria',
+                         'registro-enfermeria', 'registro-cateter'];
 
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
                'septiembre','octubre','noviembre','diciembre'];
@@ -1915,9 +1980,13 @@ function datosDeFormato(caso){
     procedimiento: proc,
     dx: [caso.Diagnostico_Preoperatorio || caso.Diagnostico || '', proc].filter(Boolean).join(' · '),
     cirujano: med.nombre,
+    /* La hoja quirúrgica de enfermería pide «nombre y cédula profesional» en
+       una sola celda, así que se arma aquí y no se parte en dos recuadros. */
+    cirujano_ced: [med.nombre, med.cedula ? 'Céd. ' + med.cedula : ''].filter(Boolean).join('  ·  '),
     cedula: med.cedula,
     cedula_esp: med.cedula_esp,
     anestesiologo: anest.nombre,
+    anestesiologo_ced: [anest.nombre, anest.cedula ? 'Céd. ' + anest.cedula : ''].filter(Boolean).join('  ·  '),
     cedula_anest: anest.cedula,
     cedula_esp_anest: anest.cedula_esp,
     instrumentista: caso.Instrumentista || '',
