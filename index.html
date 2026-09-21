@@ -52,6 +52,12 @@
         Acceso del personal
       </p>
       <div class="aviso oculto" id="error-acceso" role="alert"></div>
+      <label style="margin-top:16px;font-size:11.5px;color:var(--zx-txt-3);display:flex;
+                    gap:8px;align-items:flex-start;text-align:left;line-height:1.45">
+        <input type="checkbox" id="chk-compartida" style="margin-top:2px;flex:none">
+        <span>Esta computadora es compartida (la del quirófano). Al cerrar sesión se
+        cierra también la de Google, y no se entra solo: siempre hay que elegir cuenta.</span>
+      </label>
     </div>
   </section>
 
@@ -74,6 +80,15 @@
         <button id="salir" style="background:none;border:none;padding:0;margin-top:3px;cursor:pointer;
                 font-family:var(--zx-texto);font-size:10.5px;color:var(--zx-txt-3)">Cerrar sesión</button>
       </div>
+    </div>
+
+    <div id="cinta-compartida" style="display:none;align-items:center;gap:10px;padding:7px 12px;
+         margin:0 0 14px;border-radius:8px;background:#4c2a86;color:#fff;font-size:12.5px">
+      <span>Sesión de <b id="cinta-quien">—</b></span>
+      <span style="flex:1"></span>
+      <span>¿No es usted?</span>
+      <button type="button" id="cinta-salir" style="background:#fff;color:#4c2a86;border:0;
+              border-radius:6px;padding:4px 11px;font:inherit;font-weight:700;cursor:pointer">Cerrar sesión</button>
     </div>
 
     <div class="mosaicos" id="mosaicos"></div>
@@ -108,9 +123,51 @@ async function api(action, datos = {}) {
   return res.data;
 }
 
+/* ── COMPUTADORA COMPARTIDA ────────────────────────────────────
+   En la computadora del quirófano, cerrar sesión tiene que cerrar también la
+   de Google: si sólo se borra la de Zorvix, el siguiente que se siente entra
+   como el anterior. Y auto_select se apaga ahí, porque con él encendido ni
+   siquiera hace falta un clic. La marca es de la máquina, así que vive en
+   localStorage y la comparten las tres alas del mismo origen.
+
+   Se puede dejar puesta abriendo el portal con ?quirofano=1. */
+const LLAVE_COMPARTIDA = 'zorvix-computadora-compartida';
+function esCompartida() {
+  try { return localStorage.getItem(LLAVE_COMPARTIDA) === '1'; } catch (e) { return false; }
+}
+function marcaCompartida(si) {
+  try {
+    if (si) localStorage.setItem(LLAVE_COMPARTIDA, '1');
+    else localStorage.removeItem(LLAVE_COMPARTIDA);
+  } catch (e) {}
+}
+(function () {
+  try {
+    const q = new URLSearchParams(location.search).get('quirofano');
+    if (q === '1') marcaCompartida(true);
+    if (q === '0') marcaCompartida(false);
+  } catch (e) {}
+})();
+
+function salirDelPortal() {
+  sessionStorage.removeItem('zx_token');
+  if (window.google?.accounts) google.accounts.id.disableAutoSelect();
+  if (esCompartida()) { location.replace('https://accounts.google.com/Logout'); return; }
+  mostrar('vista-acceso');
+}
+
+function pintaCompartida() {
+  const cinta = document.getElementById('cinta-compartida');
+  const dentro = !document.getElementById('vista-lanzador').classList.contains('oculto');
+  if (cinta) cinta.style.display = (esCompartida() && dentro) ? 'flex' : 'none';
+  const chk = document.getElementById('chk-compartida');
+  if (chk) chk.checked = esCompartida();
+}
+
 function mostrar(id) {
   ['vista-acceso', 'vista-lanzador'].forEach(v =>
     document.getElementById(v).classList.toggle('oculto', v !== id));
+  pintaCompartida();
 }
 
 function mostrarError(msg) {
@@ -127,7 +184,7 @@ window.onload = () => {
       callback: r => { sessionStorage.setItem('zx_token', r.credential); iniciar(); },
       // Al expirar el token, si ya hay sesión de Google la renueva sin un clic.
       // Es lo que evita que el staff sienta que se está logueando todo el día.
-      auto_select: true
+      auto_select: !esCompartida()
     });
     google.accounts.id.renderButton(document.getElementById('boton-google'),
       { theme: 'filled_black', size: 'large', width: 320, text: 'continue_with', locale: 'es' });
@@ -144,6 +201,7 @@ async function iniciar() {
     if (s.redirigir) { location.href = s.redirigir; return; }
 
     document.getElementById('quien').textContent = s.nombre || s.correo;
+    document.getElementById('cinta-quien').textContent = s.nombre || s.correo;
     mostrar('vista-lanzador');
     cargarApps();
   } catch (e) {
@@ -179,11 +237,12 @@ function etiqueta(a) {
   return '<span style="display:block;height:9px"></span>';
 }
 
-document.getElementById('salir').onclick = () => {
-  sessionStorage.removeItem('zx_token');
-  if (window.google?.accounts) google.accounts.id.disableAutoSelect();
-  mostrar('vista-acceso');
+document.getElementById('salir').onclick = salirDelPortal;
+document.getElementById('cinta-salir').onclick = salirDelPortal;
+document.getElementById('chk-compartida').onchange = function () {
+  marcaCompartida(this.checked); pintaCompartida();
 };
+pintaCompartida();
 </script>
 </body>
 </html>
