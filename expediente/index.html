@@ -373,6 +373,26 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   .grupo .cuerpo{grid-template-columns:1fr}
   #acciones{margin:0 -14px -80px}
 }
+/* ── COMPUTADORA COMPARTIDA ────────────────────────────────────
+   Las dos cintas de abajo sólo aparecen en la computadora del quirófano.
+   En la propia de cada quien no se encienden nunca. */
+#cinta-compartida{display:none;align-items:center;gap:10px;padding:7px 16px;
+  background:var(--morado-700);color:#fff;font-size:13px}
+#cinta-compartida.on{display:flex}
+#cinta-compartida b{font-weight:700}
+#cinta-compartida .crece{flex:1}
+#cinta-compartida button{background:#fff;color:var(--morado-700);border:0;border-radius:6px;
+  padding:4px 11px;font:inherit;font-weight:700;cursor:pointer}
+#cinta-inactividad{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;display:none;
+  align-items:center;gap:14px;padding:13px 18px;background:#8a1c1c;color:#fff;font-size:14px;
+  box-shadow:0 -4px 18px rgba(0,0,0,.25)}
+#cinta-inactividad.on{display:flex}
+#cinta-inactividad .crece{flex:1}
+#cinta-inactividad button{background:#fff;color:#8a1c1c;border:0;border-radius:6px;
+  padding:7px 16px;font:inherit;font-weight:700;cursor:pointer}
+.opcion-compartida{margin-top:16px;font-size:12.5px;color:var(--tinta2);
+  display:flex;gap:8px;align-items:flex-start;text-align:left;line-height:1.45}
+.opcion-compartida input{margin-top:2px;flex:none}
 </style>
 </head>
 <body>
@@ -387,6 +407,12 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
     <p>Zorvix · Centro Quirúrgico Especializado</p>
     <div id="boton-google"></div>
     <div id="entrada-error"></div>
+    <label class="opcion-compartida">
+      <input type="checkbox" id="chk-compartida">
+      <span>Esta computadora es compartida (la del quirófano). Al salir se cierra
+      también la sesión de Google, y la sesión se cierra sola a los
+      <span id="min-inactividad">10</span> minutos sin uso.</span>
+    </label>
     <div class="pie-legal">
       Cada consulta y cada nota quedan registradas con su nombre y la hora.
       El expediente es propiedad del establecimiento y se conserva cinco años
@@ -408,6 +434,14 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   <button class="iconbtn" id="salir" title="Salir" aria-label="Salir">
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
   </button>
+</div>
+
+<!-- Sólo en la computadora compartida: quién está dentro, a la vista. -->
+<div id="cinta-compartida">
+  <span>Escribiendo como <b id="cinta-quien">—</b></span>
+  <span class="crece"></span>
+  <span>¿No es usted?</span>
+  <button type="button" id="cinta-salir">Salir</button>
 </div>
 
 <div id="tabs" class="oculto">
@@ -568,6 +602,14 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
      navegador, que congela la pestaña entera y no deja ni leer lo de atrás. -->
 <div id="aviso-global" class="oculto"
      style="position:fixed;left:50%;transform:translateX(-50%);top:14px;z-index:60;max-width:580px;width:calc(100% - 32px)"></div>
+
+<!-- El aviso de que la sesión se va a cerrar sola. Va abajo y en rojo para que
+     se vea aunque quien captura esté mirando el formulario, no la barra. -->
+<div id="cinta-inactividad">
+  <span class="crece">Nadie ha usado esta pantalla en un rato. La sesión se cierra en
+    <b id="cuenta-inactividad">60</b> s. <b>Guarde lo que lleve escrito.</b></span>
+  <button type="button" id="sigo-aqui">Sigo aquí</button>
+</div>
 
 <!-- ══════════ DICTADO ══════════ -->
 <div id="dictado" class="oculto">
@@ -950,6 +992,107 @@ function guardaSesion(c){ try{ sessionStorage.setItem(LLAVE_SESION, c); }catch(e
 function olvidaSesion(){ try{ sessionStorage.removeItem(LLAVE_SESION); }catch(e){} }
 function sesionHeredada(){ try{ return sessionStorage.getItem(LLAVE_SESION); }catch(e){ return null; } }
 
+/* ── COMPUTADORA COMPARTIDA ────────────────────────────────────
+   En Zorvix hay una computadora del quirófano para que los médicos externos
+   escriban sus notas. Ahí «Salir» no puede limitarse a borrar la sesión de
+   Zorvix: la sesión de Google sigue viva en ese Chrome y el siguiente que se
+   siente vuelve a entrar como el anterior de un clic y sin contraseña. La nota
+   quedaría capturada a nombre de quien no la escribió, y el expediente que ese
+   correo abre no es el suyo: el alcance de cada médico se decide justamente
+   por su correo.
+
+   La marca es de la MÁQUINA, no de la cuenta, así que vive en localStorage y
+   no en la sesión. En la computadora propia de cada quien no se enciende nada
+   de esto: su «Salir» sigue siendo el de siempre, sin tumbarle su Gmail.
+
+   Se puede dejar puesta de una vez abriendo la app con ?quirofano=1, para que
+   el acceso directo de esa computadora la traiga ya marcada. */
+const LLAVE_COMPARTIDA = 'zorvix-computadora-compartida';
+const MINUTOS_INACTIVIDAD = 10;
+const SEGUNDOS_DE_GRACIA = 60;
+
+function esCompartida(){
+  try{ return localStorage.getItem(LLAVE_COMPARTIDA) === '1'; }catch(e){ return false; }
+}
+function marcaCompartida(si){
+  try{
+    if (si) localStorage.setItem(LLAVE_COMPARTIDA, '1');
+    else localStorage.removeItem(LLAVE_COMPARTIDA);
+  }catch(e){}
+}
+(function(){
+  try{
+    const q = new URLSearchParams(location.search).get('quirofano');
+    if (q === '1') marcaCompartida(true);
+    if (q === '0') marcaCompartida(false);
+  }catch(e){}
+})();
+
+/* Salir. En la compartida se va a la página de cierre de sesión de Google, que
+   termina la sesión del navegador entero; el siguiente médico tendrá que poner
+   su contraseña, que es justo lo que se busca. */
+function salirDeZorvix(){
+  paraInactividad();
+  olvidaSesion();
+  try{ google.accounts.id.disableAutoSelect(); }catch(e){}
+  if (esCompartida()){
+    location.replace('https://accounts.google.com/Logout');
+    return;
+  }
+  location.reload();
+}
+
+/* ── Cierre por inactividad ────────────────────────────────────
+   Sólo en la compartida. Antes de cerrar avisa un minuto entero y en rojo:
+   perderle a un cirujano una nota a medio escribir sería peor que el problema
+   que esto resuelve. Cualquier tecla o clic reinicia la cuenta. */
+let RELOJ_QUIETO = null, RELOJ_CUENTA = null, QUEDAN = 0;
+
+function paraInactividad(){
+  clearTimeout(RELOJ_QUIETO); clearInterval(RELOJ_CUENTA);
+  RELOJ_QUIETO = null; RELOJ_CUENTA = null;
+  const c = $('cinta-inactividad'); if (c) c.classList.remove('on');
+}
+
+function reiniciaInactividad(){
+  if (!esCompartida() || !TOKEN) return;
+  paraInactividad();
+  RELOJ_QUIETO = setTimeout(avisaInactividad, MINUTOS_INACTIVIDAD * 60000);
+}
+
+function avisaInactividad(){
+  const c = $('cinta-inactividad'); if (!c) return;
+  QUEDAN = SEGUNDOS_DE_GRACIA;
+  $('cuenta-inactividad').textContent = QUEDAN;
+  c.classList.add('on');
+  RELOJ_CUENTA = setInterval(function(){
+    QUEDAN--;
+    $('cuenta-inactividad').textContent = QUEDAN;
+    if (QUEDAN <= 0){ paraInactividad(); salirDeZorvix(); }
+  }, 1000);
+}
+
+/* Mientras el aviso está puesto, el movimiento del ratón NO cuenta: si contara,
+   un roce accidental cancelaría el cierre en una computadora que en realidad
+   quedó sola. Para quedarse hay que apretar el botón. */
+['mousedown','keydown','touchstart','wheel'].forEach(function(ev){
+  document.addEventListener(ev, function(){
+    const c = $('cinta-inactividad');
+    if (c && c.classList.contains('on')) return;
+    reiniciaInactividad();
+  }, true);
+});
+
+/* Pinta la cinta de quién está dentro y deja la casilla de la entrada acorde. */
+function pintaCompartida(){
+  const cinta = $('cinta-compartida');
+  if (cinta) cinta.classList.toggle('on', esCompartida() && !!TOKEN);
+  const chk = $('chk-compartida');
+  if (chk) chk.checked = esCompartida();
+  const min = $('min-inactividad');
+  if (min) min.textContent = MINUTOS_INACTIVIDAD;
+}
+
 /* ── Entrada ────────────────────────────────────────────────── */
 window.onload = function(){
   /* Si venimos del Portal o de la otra ala, la credencial ya está puesta:
@@ -970,8 +1113,13 @@ window.onload = function(){
        nada más en memoria y se va al recargar, así que no queda una credencial
        legible para cualquier script del dominio. Se puede tener las dos cosas:
        sin clic y sin guardar nada. */
+    /* En la computadora compartida auto_select va apagado a propósito. Con él
+       encendido, Google reemite la credencial del médico anterior sin un solo
+       clic: el siguiente que se sienta entra como él, y la nota se captura a
+       nombre de quien no la escribió. En la computadora propia de cada quien
+       se queda encendido, que es lo que evita estar entrando todo el día. */
     google.accounts.id.initialize({
-      client_id: CLIENTE, callback: entro, auto_select: true
+      client_id: CLIENTE, callback: entro, auto_select: !esCompartida()
     });
     google.accounts.id.renderButton($('boton-google'),
       {theme:'outline', size:'large', text:'signin_with', locale:'es', width:300});
@@ -999,6 +1147,8 @@ window.onload = function(){
 let SESION_GEN = 0;
 
 function muestraEntrada(){
+  paraInactividad();
+  const cinta = $('cinta-compartida'); if (cinta) cinta.classList.remove('on');
   $('pantalla-entrada').classList.remove('oculto');
   $('barra').classList.add('oculto');
   $('tabs').classList.add('oculto');
@@ -1033,6 +1183,9 @@ async function entro(resp, silencioso){
     $('quien-txt').textContent = s.nombre;
     $('quien-rol').textContent = s.rol;
     $('quien-ini').textContent = String(s.nombre||'?').trim().charAt(0).toUpperCase();
+    $('cinta-quien').textContent = s.nombre;
+    pintaCompartida();
+    reiniciaInactividad();
     const e = await api('esquema');
     indexa(e.esquema);
     $('agenda-fecha').value = hoyISO();
@@ -1061,11 +1214,11 @@ async function entro(resp, silencioso){
   }
 }
 
-$('salir').onclick = function(){
-  olvidaSesion();
-  try{ google.accounts.id.disableAutoSelect(); }catch(e){}
-  location.reload();
-};
+$('salir').onclick = salirDeZorvix;
+$('cinta-salir').onclick = salirDeZorvix;
+$('sigo-aqui').onclick = function(){ paraInactividad(); reiniciaInactividad(); };
+$('chk-compartida').onchange = function(){ marcaCompartida(this.checked); pintaCompartida(); };
+pintaCompartida();
 
 /* ── El esquema, indexado una sola vez ──────────────────────── */
 function indexa(e){
