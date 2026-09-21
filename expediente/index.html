@@ -1413,6 +1413,61 @@ async function abreIdentificacion(cual, etiqueta){
   }
 }
 
+/* ── El estatus de la cirugía en la agenda ────────────────────────────────
+   El dato viaja desde siempre en Estatus_Agenda —lo manda el Gateway— pero la
+   pantalla no lo pintaba: un internamiento apartado y uno confirmado se veían
+   igual, y quien imprime el paquete de ingreso no tenía cómo saber cuál era
+   cuál. Quien decide el estatus es AltaZorvix, que es quien aparta quirófano;
+   aquí sólo se muestra.
+
+   No se listan estatus conocidos a mano porque se escriben en otra app y
+   pueden cambiar: se reconoce por lo que dice el texto y, si no se reconoce,
+   se muestra tal cual. Lo único que cambia el comportamiento es «cancelada»:
+   ahí no se ofrece imprimir. Un paquete de ingreso de una cirugía cancelada es
+   papel que acaba en un expediente de alguien que no se operó. */
+function estatusDelCaso(c){
+  const txt = String(c.Estatus_Agenda || '').trim();
+  const k = txt.toLowerCase();
+  return {
+    texto: txt,
+    cancelada: /cancel/.test(k),
+    confirmada: /confirm/.test(k) && !/sin confirm|por confirm|no confirm/.test(k),
+    realizada: /realiz|operad/.test(k)
+  };
+}
+
+function renglonDeCaso(c){
+  const e = estatusDelCaso(c);
+  const boton = (formatos, texto, clase, titulo) =>
+    '<button type="button" class="btn' + (clase ? ' ' + clase : '') + '" data-imp="' +
+    esc(c.Caso_ID) + '" data-formatos="' + formatos + '"' +
+    (titulo ? ' title="' + esc(titulo) + '"' : '') + '>' + esc(texto) + '</button> ';
+
+  const etqEstatus = e.texto
+    ? '<span class="etq' + (e.cancelada ? '' : e.confirmada || e.realizada ? ' ok' : ' warn') +
+      '">' + esc(e.texto) + '</span> '
+    : '<span class="etq warn" title="Este internamiento no trae estatus en la agenda">' +
+      'sin estatus</span> ';
+
+  return '<div class="renglon' + (e.cancelada ? ' tenue' : '') + '" style="cursor:default">' +
+    '<span class="hora">' + esc(String(c.Fecha_Cirugia || '').slice(5,10) || '—') + '</span>' +
+    '<div class="crece"><div class="nom">' + esc(c.Procedimiento_Principal || 'Sin procedimiento') + '</div>' +
+    '<div class="det">' + esc(c.Cirujano_Nombre || c.Cirujano_Email || '—') +
+      ' · anestesia ' + esc(c.Anestesiologo_Nombre || c.Anestesiologo_Email || '—') +
+      ' · ' + esc(c.Folio_Caso || c.Caso_ID) + '</div></div>' +
+    (e.cancelada
+      ? '<span class="det">Cancelada: no se imprime nada de este internamiento.</span> '
+      : boton('paquete', 'Paquete de ingreso', 'primario',
+              'Hoja frontal, consentimientos, lista de verificación y registro de ' +
+              'enfermería, prellenados con los datos de este internamiento') +
+        boton('ci-quirurgico,ci-anestesia,ci-marcaje', 'Consentimientos') +
+        boton('hoja-frontal', 'Hoja frontal') +
+        boton('registro-enfermeria', 'Registro de enfermería')) +
+    etqEstatus +
+    '<span class="etq' + (c.hoja_enfermeria_completa ? ' warn' : '') + '">' +
+      (c.hoja_enfermeria_completa ? 'pernocta' : 'ambulatorio') + '</span></div>';
+}
+
 /* ── Formatos de papel: se imprimen prellenados y se llenan a mano ────────
    Hay papeles del internamiento que NO se capturan en la computadora: los
    consentimientos los firma el paciente, la lista de verificación se palomea
@@ -1809,25 +1864,8 @@ function pintaExpediente(){
 
   const C = $('exp-casos');
   C.innerHTML = !EXP.casos.length ? '<div class="vacio">Sin internamientos registrados.</div>' :
-    EXP.casos.slice().sort((a,b)=>String(b.Fecha_Cirugia).localeCompare(String(a.Fecha_Cirugia))).map(c =>
-      '<div class="renglon" style="cursor:default">'+
-      '<span class="hora">'+esc(String(c.Fecha_Cirugia||'').slice(5,10)||'—')+'</span>'+
-      '<div class="crece"><div class="nom">'+esc(c.Procedimiento_Principal||'Sin procedimiento')+'</div>'+
-      '<div class="det">'+esc(c.Cirujano_Nombre||c.Cirujano_Email||'—')+
-        ' · anestesia '+esc(c.Anestesiologo_Nombre||c.Anestesiologo_Email||'—')+
-        ' · '+esc(c.Folio_Caso||c.Caso_ID)+'</div></div>'+
-      '<button type="button" class="btn primario" data-imp="'+esc(c.Caso_ID)+'" '+
-        'data-formatos="paquete" title="Consentimientos, lista de verificación y '+
-        'registro de enfermería, prellenados con los datos de este internamiento">'+
-        'Paquete de ingreso</button> '+
-      '<button type="button" class="btn" data-imp="'+esc(c.Caso_ID)+'" '+
-        'data-formatos="ci-quirurgico,ci-anestesia,ci-marcaje">Consentimientos</button> '+
-      '<button type="button" class="btn" data-imp="'+esc(c.Caso_ID)+'" '+
-        'data-formatos="hoja-frontal">Hoja frontal</button> '+
-      '<button type="button" class="btn" data-imp="'+esc(c.Caso_ID)+'" '+
-        'data-formatos="registro-enfermeria">Registro de enfermería</button> '+
-      '<span class="etq'+(c.hoja_enfermeria_completa?' warn':'')+'">'+
-        (c.hoja_enfermeria_completa?'pernocta':'ambulatorio')+'</span></div>').join('');
+    EXP.casos.slice().sort((a,b)=>String(b.Fecha_Cirugia).localeCompare(String(a.Fecha_Cirugia)))
+      .map(renglonDeCaso).join('');
   C.querySelectorAll('[data-imp]').forEach(b => {
     const claves = b.dataset.formatos === 'paquete'
       ? PAQUETE_INGRESO : b.dataset.formatos.split(',');
