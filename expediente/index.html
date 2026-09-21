@@ -1555,8 +1555,8 @@ const FORMATOS = {
     {p:5,x:84.0,y:53.4,w:141.9,k:'nombre',e:1},
     {p:5,x:268.9,y:53.4,w:52.3,k:'expediente',e:1},
     {p:5,x:393.1,y:53.4,w:58.1,k:'fnac',e:1},
-    {p:5,x:54.1,y:113.8,w:138.8,k:'cedula'},
-    {p:5,x:200.9,y:113.8,w:357.1,k:'cedula_esp'}
+    {p:5,x:54.1,y:113.8,w:138.8,k:'cedula_anest'},
+    {p:5,x:200.9,y:113.8,w:357.1,k:'cedula_esp_anest'}
   ] },
   'ci-marcaje': { titulo:'CI marcaje de sitio quirúrgico', hojas:3, campos:[
     {p:1,x:82.0,y:52.4,w:141.9,k:'nombre',e:1},
@@ -1659,18 +1659,23 @@ function tamanoQueCabe(texto, ancho, desde){
   return 6;
 }
 
-/* La cédula no se inventa: si el cirujano no está en el padrón de médicos,
-   las dos líneas de cédula salen en blanco para escribirse a mano. */
-function medicoDelCaso(caso){
-  const correo = String(caso.Cirujano_Email || '').toLowerCase().trim();
+/* La cédula no se inventa: si el médico no está en el padrón, las dos líneas
+   de cédula salen en blanco para escribirse a mano.
+
+   Cada consentimiento lo firma quien informa, y no siempre es el cirujano: la
+   carta de anestesia la firma el anestesiólogo, así que ahí van SUS cédulas.
+   Poner las del cirujano bajo la firma del anestesiólogo sería atribuirle a
+   alguien una cédula que no es suya. */
+function medicoDelPadron(correo, nombreSuelto){
+  const c = String(correo || '').toLowerCase().trim();
   const pad = (YO && YO.padron_medicos) || [];
   for (let i = 0; i < pad.length; i++){
-    if (String(pad[i].correo || '').toLowerCase().trim() === correo){
-      return { nombre: pad[i].nombre || caso.Cirujano_Nombre || '',
+    if (c && String(pad[i].correo || '').toLowerCase().trim() === c){
+      return { nombre: pad[i].nombre || nombreSuelto || '',
                cedula: pad[i].cedula || '', cedula_esp: pad[i].cedula_esp || '' };
     }
   }
-  return { nombre: caso.Cirujano_Nombre || caso.Cirujano_Email || '', cedula:'', cedula_esp:'' };
+  return { nombre: nombreSuelto || correo || '', cedula: '', cedula_esp: '' };
 }
 
 function datosDeFormato(caso){
@@ -1689,7 +1694,8 @@ function datosDeFormato(caso){
 
   const proc = [caso.Procedimiento_Principal || '', caso.Procedimientos_Adicionales || '']
                  .filter(Boolean).join(' + ');
-  const med = medicoDelCaso(caso);
+  const med = medicoDelPadron(caso.Cirujano_Email, caso.Cirujano_Nombre);
+  const anest = medicoDelPadron(caso.Anestesiologo_Email, caso.Anestesiologo_Nombre);
 
   return {
     nombre: p.Nombre_Completo || '',
@@ -1724,7 +1730,9 @@ function datosDeFormato(caso){
     cirujano: med.nombre,
     cedula: med.cedula,
     cedula_esp: med.cedula_esp,
-    anestesiologo: caso.Anestesiologo_Nombre || caso.Anestesiologo_Email || '',
+    anestesiologo: anest.nombre,
+    cedula_anest: anest.cedula,
+    cedula_esp_anest: anest.cedula_esp,
     instrumentista: caso.Instrumentista || '',
     circulante: caso.Enfermera_Circulante || '',
     quirofano: caso.Quirofano || '',
