@@ -2562,11 +2562,53 @@ function sugerido(campo){
   return f[campo.sugiere.columna] != null ? f[campo.sugiere.columna] : '';
 }
 
+/* ── EQUIPO QUIRÚRGICO: se escribe, no se elige ─────────────────
+   El diccionario declara al 1er y 2do ayudante, a la instrumentista y a la
+   circulante como lista cerrada del padrón (`personal_quirurgico`, que la app
+   arma con la hoja Medicos). En la práctica no son eso: el cirujano externo
+   llega con su propia enfermera y con sus propios ayudantes, y esa gente no
+   está —ni tiene por qué estar— dada de alta en Zorvix. Con la lista cerrada
+   no había forma de nombrarla, así que la nota salía con el renglón vacío o
+   con el nombre de alguien de casa que no estuvo en la sala.
+
+   El único que debe estar credencializado es el médico tratante, porque es
+   quien responde del acto y quien firma con cédula. El anestesiólogo también
+   se queda en el padrón, por dos razones que no son de forma: firma su
+   consentimiento y su registro con cédula, y su correo es la llave con la que
+   abre el caso para la preanestésica.
+
+   Estos cuatro pasan a texto libre con el padrón como sugerencia: el personal
+   de casa se sigue eligiendo de un clic y el externo se escribe. Tampoco se
+   bloquean aunque la agenda traiga un valor: en el quirófano el equipo cambia
+   a última hora y quien llena la nota tiene que poder corregirlo. */
+const EQUIPO_LIBRE = ['qx_ayudante1', 'qx_ayudante2', 'qx_instrumentista', 'qx_circulante'];
+function esEquipoLibre(c){ return EQUIPO_LIBRE.indexOf(String(c && c.id)) >= 0; }
+
+/* ── LAS HORAS DEL ACTO: se escriben, no se heredan ─────────────
+   El diccionario las trae colgadas de la agenda: la hora de cirugía de
+   `Casos.Hora_Inicio_Real` y la de anestesia de `Casos.Hora_Entrada_Quirofano`.
+   Ninguna pantalla de Zorvix escribe esas dos columnas, así que hoy llegan
+   vacías; el día que alguien las escribiera, el renglón quedaría bloqueado con
+   la hora de quien registró primero.
+
+   Lo correcto sería capturar la hora una sola vez y heredarla, pero eso obliga
+   a confiar en quien la teclea primero, y en el quirófano la hora real no la
+   sabe una sola persona. Mientras no haya un punto único de captura confiable,
+   las dos quedan como celdas libres: el cirujano y el anestesiólogo se ponen de
+   acuerdo y escriben la misma hora en su propia nota. */
+const HORAS_LIBRES = ['qx_hora_cirugia', 'qx_hora_anestesia'];
+function esHoraLibre(c){ return HORAS_LIBRES.indexOf(String(c && c.id)) >= 0; }
+
+/* Un campo libre es el que el diccionario declara heredado pero que en la sala
+   tiene que poder escribirse. Nunca se bloquea. */
+function esLibre(c){ return esEquipoLibre(c) || esHoraLibre(c); }
+
 function pintaCampo(c){
   const v = sinLeyenda(DOC.campos[c.id]);
   const her = heredado(c);
   const hayHer = her !== null && her !== '' && !(Array.isArray(her) && !her.length);
-  const bloq = hayHer || c.control === 'automatico';
+  const libre = esLibre(c);
+  const bloq = (hayHer || c.control === 'automatico') && !libre;
   /* Un campo bloqueado no lo escribió nadie: lo que tenga guardado sólo puede
      ser una copia vieja de lo que hoy dicen el caso, el paciente o el cálculo.
      Por eso gana el valor vivo. Antes ganaba el guardado, y con eso una cirugía
@@ -2575,13 +2617,32 @@ function pintaCampo(c){
   /* La sugerencia solo entra cuando el campo nunca se ha llenado. Si el medico
      ya escribio algo —aunque sea lo mismo— manda lo guardado: una propuesta que
      se reimpone sobre lo que alguien decidio no es una propuesta. */
-  const val = hayHer ? her
-            : (guardado ? v : (sugerido(c) || (her !== null ? her : '')));
+  /* En un campo libre lo heredado es sólo una propuesta, así que manda lo
+     guardado. Si no, la hora que el médico corrigió se perdería cada vez que
+     abre la nota y volvería a salir la de la agenda. */
+  const val = (hayHer && !libre) ? her
+            : (guardado ? v : ((libre && hayHer) ? her
+                              : (sugerido(c) || (her !== null ? her : ''))));
   const ancho = ['parrafo','tabla','serie','grafica','imagen','casillas'].indexOf(c.control) >= 0;
   const id = 'f_' + c.id;
 
   let cuerpo = '';
-  switch(c.control){
+  /* Sólo el equipo cambia de control: las horas siguen siendo reloj, nada más
+     que ya no llegan bloqueadas. */
+  const control = esEquipoLibre(c) ? 'equipo_libre' : c.control;
+
+  switch(control){
+    case 'equipo_libre': {
+      /* Lo guardado puede venir como correo de cuando el campo era lista: se
+         muestra ya convertido a nombre, que es lo que se imprime. */
+      const lid = 'dl_' + c.id;
+      const sug = ((YO && YO.padron_medicos) || []).map(m => m && m.nombre).filter(Boolean);
+      cuerpo = '<input type="text" id="'+id+'" list="'+lid+'" autocomplete="off" ' +
+               'placeholder="Nombre completo" value="'+esc(nombreDeCorreo(val))+'">' +
+               '<datalist id="'+lid+'">' +
+               sug.map(n => '<option value="'+esc(n)+'"></option>').join('') +
+               '</datalist>';
+      break; }
     case 'parrafo':
       cuerpo = '<textarea id="'+id+'"'+(bloq?' readonly class="bloqueado"':'')+'>'+esc(val)+'</textarea>'; break;
     case 'numero':
@@ -2641,12 +2702,15 @@ function pintaCampo(c){
   /* La marca de origen va como etiqueta corta, no como frase: si se escribe
      completa, envuelve el renglón y desalinea toda la rejilla. El detalle
      largo queda en el title, para quien pase el cursor. */
-  const fuente = c.constante ? ['constante','Constante del establecimiento. No se recaptura.']
+  const fuente = libre
+    ? ((c.hereda && hayHer) ? ['propuesto','Se propone del internamiento · '+c.hereda.origen+'.'+c.hereda.columna+
+                   '. Se escribe encima: aquí manda lo que usted deje.'] : null)
+    : c.constante ? ['constante','Constante del establecimiento. No se recaptura.']
     : (c.hereda ? ['heredado','Viene de AltaZorvixDB · '+c.hereda.origen+'.'+c.hereda.columna+'. No se recaptura.']
     : (c.sugiere ? ['sugerido','Se propone del internamiento · '+c.sugiere.origen+'.'+c.sugiere.columna+
                     '. Puede cambiarse: queda guardado lo que usted deje.'] : null));
 
-  return '<div class="campo'+(ancho?' ancho':'')+'" data-campo="'+esc(c.id)+'" data-control="'+esc(c.control)+'">'+
+  return '<div class="campo'+(ancho?' ancho':'')+'" data-campo="'+esc(c.id)+'" data-control="'+esc(control)+'">'+
     '<label for="'+id+'">'+esc(c.etiqueta)+(c.obligatorio?' <span class="req">*</span>':'')+
       (fuente?' <span class="heredado" title="'+esc(fuente[1])+'">'+esc(fuente[0])+'</span>':'')+'</label>'+
     cuerpo +
@@ -3146,7 +3210,9 @@ function faltantes(){
        salía en rojo como obligatorio, pidiendo algo que no existe. Si el
        documento sí está colgado de un internamiento, se sigue pidiendo. */
     if (c.hereda && c.hereda.origen === 'Casos' && !DOC.Caso_ID) return false;
-    if (heredado(c)) return false;
+    /* A los campos libres sí se les reclama: ahora se escriben a mano, así que
+       lo que traiga la agenda es una propuesta, no un dato ya resuelto. */
+    if (!esLibre(c) && heredado(c)) return false;
     const v = leeFormulario()[c.id];
     if (Array.isArray(v)) return v.length === 0;
     if (v && typeof v === 'object') return !Object.keys(v).length;
