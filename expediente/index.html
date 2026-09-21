@@ -2634,14 +2634,17 @@ function pintaCampo(c){
   switch(control){
     case 'equipo_libre': {
       /* Lo guardado puede venir como correo de cuando el campo era lista: se
-         muestra ya convertido a nombre, que es lo que se imprime. */
-      const lid = 'dl_' + c.id;
-      const sug = ((YO && YO.padron_medicos) || []).map(m => m && m.nombre).filter(Boolean);
-      cuerpo = '<input type="text" id="'+id+'" list="'+lid+'" autocomplete="off" ' +
-               'placeholder="Nombre completo" value="'+esc(nombreDeCorreo(val))+'">' +
-               '<datalist id="'+lid+'">' +
-               sug.map(n => '<option value="'+esc(n)+'"></option>').join('') +
-               '</datalist>';
+         muestra ya convertido a nombre, que es lo que se imprime.
+
+         Primero esto llevaba un <datalist> con el padrón, para poder elegir al
+         personal de casa de un clic. Se quitó: en el Chrome del consultorio la
+         lista de sugerencias se abría encima del campo y quien capturaba no
+         lograba escribir. No pude reproducirlo aquí y no voy a dejar en
+         producción una pieza que no entiendo estorbando la captura en plena
+         cirugía. Un renglón de texto liso no tiene cómo fallar, y escribir un
+         nombre cuesta menos que pelearse con un desplegable. */
+      cuerpo = '<input type="text" id="'+id+'" autocomplete="off" ' +
+               'placeholder="Nombre completo" value="'+esc(nombreDeCorreo(val))+'">';
       break; }
     case 'parrafo':
       cuerpo = '<textarea id="'+id+'"'+(bloq?' readonly class="bloqueado"':'')+'>'+esc(val)+'</textarea>'; break;
