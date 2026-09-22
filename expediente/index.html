@@ -362,6 +362,13 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
     break-after:page;page-break-after:always}
   .imp-hoja:last-child{break-after:auto;page-break-after:auto}
   .imp-hoja>img{position:absolute;inset:0;width:612pt;height:792pt}
+  /* La trazabilidad de esterilización viene apaisada. Es el único formato así,
+     y por eso se imprime SOLA: mezclar orientaciones en un mismo trabajo de
+     impresión no sale bien en el navegador —@page es una sola para todo el
+     documento—, y una hoja de CEyE tampoco tiene por qué ir pegada al juego
+     de un paciente. */
+  .imp-hoja.apaisada{width:792pt;height:612pt}
+  .imp-hoja.apaisada>img{width:792pt;height:612pt}
   .imp-dato{position:absolute;display:flex;align-items:center;white-space:nowrap;overflow:hidden;
     font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#000;line-height:1}
   /* La hoja que se deja en blanco para que el siguiente documento empiece en
@@ -497,6 +504,21 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
         <input type="date" id="agenda-fecha" style="width:auto">
       </div>
       <div id="agenda-lista"></div>
+    </div>
+
+    <!-- La hoja de CEyE es del día, no de un paciente: por eso vive aquí y no
+         en el renglón de un internamiento. -->
+    <div class="tarjeta">
+      <div class="fila">
+        <div class="crece">
+          <h2>Esterilización</h2>
+          <p class="sub">La hoja de trazabilidad es del día y del turno, no de un
+            paciente: un mismo ciclo da servicio a varias cirugías. Sale con la fecha
+            de arriba ya puesta; el turno, el equipo y el responsable los llena CEyE.
+            Se imprime <b>apaisada</b> y sola.</p>
+        </div>
+        <button type="button" class="btn" id="btn-esterilizacion">Trazabilidad de esterilización</button>
+      </div>
     </div>
   </section>
 
@@ -1306,6 +1328,9 @@ const hoyISO = () => new Date().toLocaleDateString('sv-SE');
 
 /* ══════════ AGENDA ══════════ */
 $('agenda-fecha').onchange = cargaAgenda;
+$('btn-esterilizacion').onclick = function(){
+  imprimeHojaDelDia('trazabilidad-esterilizacion', this);
+};
 async function cargaAgenda(){
   try{
     const r = await api('agendaDelDia', { fecha: $('agenda-fecha').value || hoyISO() });
@@ -1700,6 +1725,17 @@ const FORMATOS = {
     {p:4,x:421.6,y:45.0,w:52.0,k:'fecha',e:1}
   ] },
 
+  /* ── La hoja de CEyE ────────────────────────────────────────────────
+     No es del paciente: es del DÍA. Un ciclo de esterilización da servicio a
+     varias cirugías y la hoja se llena por turno, así que no entra al paquete
+     de ingreso —si entrara, se imprimiría una por cada paciente que llega— y
+     vive en la agenda, junto a la fecha. Lo único que la app sabe es qué día
+     es; el turno, el equipo y el responsable los pone CEyE. */
+  'trazabilidad-esterilizacion': {
+    titulo:'Trazabilidad de la esterilización', hojas:1, apaisado:1, campos:[
+    {p:1,x:43.4,y:138.6,w:76.0,k:'fecha'}
+  ] },
+
   'registro-cateter': { titulo:'Registro de catéter', hojas:2, campos:[
     {p:1,x:44.0,y:142.1,w:525.0,k:'nombre'},
     {p:1,x:49.4,y:167.1,w:99.0,k:'expediente'},
@@ -2075,7 +2111,8 @@ function hojaDeFormato(clave, hoja, d){
       'pt;width:' + c.w + 'pt;height:12pt;font-size:' + pt + 'pt' +
       (c.c ? ';justify-content:center' : '') + '">' + esc(d[c.k]) + '</div>';
   }).join('');
-  return '<div class="imp-hoja"><img alt="" src="' + clave + '-' + hoja + '.svg">' +
+  return '<div class="imp-hoja' + (f.apaisado ? ' apaisada' : '') + '">' +
+         '<img alt="" src="' + clave + '-' + hoja + '.svg">' +
          campos + renglonesDeTabla(f.tabla, hoja) + '</div>';
 }
 
@@ -2126,6 +2163,54 @@ async function hojaDeIdentificacion(){
       (quien ? ' por ' + esc(quien) : '') + ' el ' + cuando +
       '; la consulta quedó registrada en la bitácora.</div></div>';
   return { hoja: hoja, aviso: '' };
+}
+
+/* ── Una hoja que no es de nadie ────────────────────────────────────────
+   imprimeFormatos() arranca buscando el internamiento, porque todo lo demás
+   sale prellenado con el paciente. La hoja de CEyE no tiene paciente: lo único
+   que lleva escrito es la fecha que esté puesta en la agenda. Por eso va por
+   su propio camino en vez de inventarle un caso vacío. */
+async function imprimeHojaDelDia(clave, boton){
+  if (IMPRIMIENDO_FORMATO) return;
+  const f = FORMATOS[clave];
+  if (!f) return;
+  IMPRIMIENDO_FORMATO = true;
+  const textoBoton = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = 'Preparando…';
+  const imp = $('impresion');
+  quitaModoFormato();
+  const margenes = document.createElement('style');
+  margenes.id = 'margenes-formato';
+  try{
+    const dia = ($('agenda-fecha') && $('agenda-fecha').value) || hoyISO();
+    const d = { fecha: fechaMx(dia) };
+    let html = '';
+    for (let h = 1; h <= f.hojas; h++) html += hojaDeFormato(clave, h, d);
+    imp.classList.add('imp-formato');
+    imp.innerHTML = html;
+    await Promise.all(Array.from(imp.querySelectorAll('img')).map(img =>
+      img.decode().catch(() => { throw new Error('No se pudo cargar el formato (' +
+        img.getAttribute('src') + ').'); })));
+    /* Una hoja apaisada necesita que la página del navegador también lo sea:
+       si sólo se agranda el div, se imprime cortada por la derecha. */
+    margenes.textContent = f.apaisado ? '@page{size:792pt 612pt;margin:0}' : '@page{margin:0}';
+    document.head.appendChild(margenes);
+    window.addEventListener('afterprint', function limpia(){
+      window.removeEventListener('afterprint', limpia);
+      quitaModoFormato();
+      imp.innerHTML = '';
+    });
+    window.print();
+  }catch(e){
+    quitaModoFormato();
+    imp.innerHTML = '';
+    avisoGlobal('No se pudo imprimir: ' + e.message);
+  } finally {
+    IMPRIMIENDO_FORMATO = false;
+    boton.disabled = false;
+    boton.textContent = textoBoton;
+  }
 }
 
 async function imprimeFormatos(casoId, claves, boton){
