@@ -305,11 +305,26 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   body>*{display:none !important}
   body{background:#fff;color:#000;margin:0}
   #impresion{display:block !important;font:10.5pt/1.45 Georgia,'Times New Roman',serif;
-    color:#000;padding:26px 0 0}
+    color:#000;padding:0}
   @page{margin:14mm 14mm 16mm}
 
-  /* Se repite en cada hoja: en un expediente de papel las hojas se sueltan. */
-  .imp-corre{position:fixed;top:0;left:0;right:0;font-size:8pt;font-family:system-ui,sans-serif;
+  /* El correlativo se repite en cada hoja: en un expediente de papel las hojas
+     se sueltan y cada una tiene que decir de quién es.
+
+     Va en el <thead> de la tabla que envuelve el pliego, y NO como
+     position:fixed, que es como estaba. Un elemento fijo sí se repite en cada
+     hoja, pero no ocupa flujo: el espacio se reservaba una sola vez —con el
+     padding-top de #impresion, que aplica al bloque entero, o sea nada más
+     arriba de la hoja 1— y de la hoja 2 en adelante el correlativo caía encima
+     del texto. El <thead> es lo único que Chrome repite Y cuyo alto descuenta
+     en TODAS las hojas.
+
+     Probado con Chromium contra este mismo CSS: antes se encimaba en la hoja 2,
+     después no, y el número de hojas no cambia. */
+  .imp-pliego{width:100%;border-collapse:collapse}
+  .imp-pliego>thead>tr>td{padding:0 0 10px}
+  .imp-pliego>tbody>tr>td{padding:0;vertical-align:top}
+  .imp-corre{font-size:8pt;font-family:system-ui,sans-serif;
     color:#333;border-bottom:.5pt solid #999;padding-bottom:3px}
 
   .imp-membrete{border-bottom:1.5pt solid #000;padding-bottom:5px;margin-bottom:10px}
@@ -2559,7 +2574,9 @@ function armaImpresion(){
   const cedEsp = firma.cedula_esp;
 
   $('impresion').innerHTML =
-    '<div class="imp-corre">'+esc(ident)+'</div>' +
+    '<table class="imp-pliego"><thead><tr><td>'+
+      '<div class="imp-corre">'+esc(ident)+'</div>'+
+    '</td></tr></thead><tbody><tr><td>' +
     '<div class="imp-membrete">'+
       '<div class="n">'+esc(EST.nombre || 'Zorvix')+'</div>'+
       '<div class="d">'+esc(EST.domicilio || '')+
@@ -2585,7 +2602,8 @@ function armaImpresion(){
       (firma.correo && String(firma.correo).toLowerCase() !== String(YO.correo||'').toLowerCase()
         ? ' por cuenta de '+esc(firma.correo) : '')+
       '. El expediente es propiedad del establecimiento y se conserva cinco años '+
-      'contados desde el último acto médico (NOM-004-SSA3-2012, 5.4).</div>';
+      'contados desde el último acto médico (NOM-004-SSA3-2012, 5.4).</div>' +
+    '</td></tr></tbody></table>';
 }
 
 function nuevoDocumento(tipo){
