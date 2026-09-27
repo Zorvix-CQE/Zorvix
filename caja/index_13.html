@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zorvix · Caja</title>
+<meta name="theme-color" content="#0E1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Caja Zorvix">
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{
+  --paper:#F5F3EE; --card:#FFFFFF; --ink:#0E1116; --ink2:#2A2D33; --muted:#6F6C66; --line:#E6E1D8; --soft:#EFEBE3;
+  --accent:#8C6D46; --accent-soft:#F1E9DD; --ok:#2F6B4F; --ok-soft:#E3EFE8; --warn:#A8671A; --warn-soft:#F7ECDB;
+  --bad:#A33A3A; --bad-soft:#F6E3E1; --info:#2C5A7A; --info-soft:#E1ECF3;
+  --hero:#0E1116; --hero-ink:#F5F3EE; --hero-muted:#9C978E;
+  --r:18px; --shadow:0 1px 2px rgba(14,17,22,.04),0 8px 24px rgba(14,17,22,.06);
+  --serif:'Instrument Serif',Georgia,serif; --sans:'Manrope',system-ui,-apple-system,sans-serif;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0B0D10; --card:#15181D; --ink:#EEEAE2; --ink2:#D4D0C8; --muted:#8E8A83; --line:#252930; --soft:#1B1F25;
+  --accent:#C4A277; --accent-soft:#2A241C; --ok:#6DBB92; --ok-soft:#16261E; --warn:#E0A459; --warn-soft:#2B2116;
+  --bad:#E17C7C; --bad-soft:#2D1919; --info:#79AED3; --info-soft:#15222C; --hero:#15181D; --shadow:0 1px 2px rgba(0,0,0,.3);
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45}
+body{min-height:100dvh;padding-bottom:calc(92px + var(--safe-b))}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+.hidden{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+.serif{font-family:var(--serif);font-weight:400;letter-spacing:-.01em}
+
+/* ---------- barra superior ---------- */
+header.top{position:sticky;top:0;z-index:20;padding:calc(12px + var(--safe-t)) 16px 12px;
+  background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  display:flex;align-items:center;gap:12px;border-bottom:1px solid transparent}
+header.top.scrolled{border-bottom-color:var(--line)}
+.brand{display:flex;flex-direction:column;line-height:1}
+.brand b{font-size:11px;letter-spacing:.32em;font-weight:700}
+.brand span{font-family:var(--serif);font-size:22px;margin-top:3px}
+.top .sp{flex:1}
+.fondo-sel{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 12px;font-size:13px;max-width:44vw}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-weight:700;font-size:13px;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+
+main{padding:4px 16px 24px;max-width:640px;margin:0 auto}
+.view{animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+h2.sec{font-family:var(--serif);font-weight:400;font-size:26px;margin:22px 2px 10px}
+.sub{color:var(--muted);font-size:13px}
+
+/* ---------- hero ---------- */
+.hero{background:var(--hero);color:var(--hero-ink);border-radius:24px;padding:22px 20px 18px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(196,162,119,.22),transparent 70%)}
+.hero .lbl{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--hero-muted)}
+.hero .saldo{font-family:var(--serif);font-size:54px;line-height:1.05;margin:6px 0 2px}
+.hero .saldo small{font-size:26px;color:var(--hero-muted)}
+.hero .de{font-size:13px;color:var(--hero-muted)}
+.bar{height:6px;border-radius:9px;background:rgba(255,255,255,.1);margin:16px 0 18px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4A277,#E8D3B0);transition:width .6s ease}
+.bar.low i{background:linear-gradient(90deg,#D98A5B,#E9B08C)}
+.mini{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.mini div{border-left:1px solid rgba(255,255,255,.12);padding-left:10px}
+.mini div:first-child{border-left:0;padding-left:0}
+.mini b{display:block;font-size:15px;font-weight:600}
+.mini span{font-size:11px;color:var(--hero-muted)}
+
+.banner{display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:16px;margin-top:12px;font-size:14px}
+.banner.warn{background:var(--warn-soft);color:var(--warn)}
+.banner.info{background:var(--info-soft);color:var(--info)}
+.banner.accent{background:var(--accent-soft);color:var(--accent)}
+.banner b{font-weight:700}
+.banner .go{margin-left:auto;font-weight:700;white-space:nowrap}
+
+.cta{margin-top:14px;width:100%;display:flex;align-items:center;gap:14px;padding:18px;border-radius:20px;background:var(--card);
+  box-shadow:var(--shadow);border:1px solid var(--line);text-align:left}
+.cta .ic{width:48px;height:48px;border-radius:14px;background:var(--ink);color:var(--paper);display:grid;place-items:center;flex:none}
+.cta b{display:block;font-size:16px}
+.cta span{font-size:13px;color:var(--muted)}
+
+/* ---------- listas ---------- */
+.list{background:var(--card);border-radius:var(--r);border:1px solid var(--line);overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:14px 14px;border-top:1px solid var(--line);width:100%;text-align:left}
+.row:first-child{border-top:0}
+.dot{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none;background:var(--soft);color:var(--ink2)}
+.row .mid{flex:1;min-width:0}
+.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .amt{text-align:right;font-weight:600;white-space:nowrap}
+.row .amt.pos{color:var(--ok)}
+.pill{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:999px;text-transform:uppercase;margin-top:3px}
+.p-PENDIENTE{background:var(--warn-soft);color:var(--warn)} .p-OBSERVADO{background:var(--info-soft);color:var(--info)}
+.p-APROBADO{background:var(--ok-soft);color:var(--ok)} .p-NO_PROCEDENTE{background:var(--bad-soft);color:var(--bad)}
+.p-ANULADO{background:var(--soft);color:var(--muted);text-decoration:line-through}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);font-size:14px}
+.day{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:18px 4px 8px;font-weight:700}
+
+/* ---------- chips / filtros ---------- */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:8px 13px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:13px;font-weight:600;color:var(--ink2)}
+.chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.toolbar{display:flex;gap:8px;align-items:center;margin:6px 0 10px}
+.toolbar input[type=month]{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px 10px}
+
+.cats{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.cat{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px;margin:8px 0}
+.cat .b{grid-column:1/-1;height:5px;border-radius:9px;background:var(--soft);overflow:hidden}
+.cat .b i{display:block;height:100%;background:var(--accent);border-radius:9px}
+.tot{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.tot b{font-family:var(--serif);font-size:28px;font-weight:400}
+
+/* ---------- nav inferior ---------- */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:8px 10px calc(8px + var(--safe-b));
+  background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);align-items:end}
+nav.tabs button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--muted);padding:6px 0;position:relative}
+nav.tabs button.on{color:var(--ink)}
+nav.tabs svg{width:22px;height:22px}
+nav.tabs .fab{margin-top:-30px}
+nav.tabs .fab span.c{width:62px;height:62px;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;
+  box-shadow:0 10px 24px rgba(14,17,22,.28);border:4px solid var(--paper)}
+nav.tabs .fab svg{width:26px;height:26px}
+.badge{position:absolute;top:0;right:calc(50% - 20px);min-width:17px;height:17px;border-radius:9px;background:var(--bad);color:#fff;font-size:10px;display:grid;place-items:center;padding:0 4px}
+
+/* ---------- hojas (sheets) ---------- */
+.sheet{position:fixed;inset:0;z-index:50;background:var(--paper);overflow-y:auto;transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.8,.2,1);
+  padding:calc(10px + var(--safe-t)) 0 calc(110px + var(--safe-b))}
+.sheet.open{transform:none}
+.sheet-h{position:sticky;top:0;display:flex;align-items:center;gap:10px;padding:8px 16px 12px;background:var(--paper);z-index:2}
+.sheet-h h3{font-family:var(--serif);font-weight:400;font-size:26px;margin:0;flex:1}
+.x{width:38px;height:38px;border-radius:50%;background:var(--soft);display:grid;place-items:center}
+.sheet .in{padding:0 16px;max-width:640px;margin:0 auto}
+.sheet-foot{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + var(--safe-b));background:linear-gradient(transparent,var(--paper) 30%);z-index:3}
+.sheet-foot .in{display:flex;gap:10px;padding:0}
+
+.btn{flex:1;display:inline-flex;justify-content:center;align-items:center;gap:8px;padding:16px 18px;border-radius:16px;font-weight:700;font-size:15px;background:var(--ink);color:var(--paper)}
+.btn.sec{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn.ok{background:var(--ok);color:#fff}
+.btn.bad{background:var(--bad-soft);color:var(--bad)}
+.btn.info{background:var(--info-soft);color:var(--info)}
+.btn.sm{padding:10px 14px;font-size:13px;border-radius:12px;flex:none}
+.btn:disabled{opacity:.45}
+.link{color:var(--accent);font-weight:700;font-size:14px;padding:10px 0}
+
+/* ---------- captura ---------- */
+.shot{position:relative;border-radius:20px;overflow:hidden;background:#000;max-height:44vh;display:grid;place-items:center}
+.shot img{width:100%;max-height:44vh;object-fit:contain;display:block}
+.shot .pdf{color:#fff;padding:40px;font-weight:600}
+.scan{position:absolute;inset:0;pointer-events:none}
+.scan:before{content:"";position:absolute;left:0;right:0;height:80px;background:linear-gradient(180deg,transparent,rgba(196,162,119,.45),transparent);animation:scan 1.6s ease-in-out infinite}
+@keyframes scan{0%{top:-80px}100%{top:100%}}
+.reading{display:flex;align-items:center;gap:10px;margin:14px 2px;color:var(--muted);font-size:14px}
+.spin{width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+.amount-edit{text-align:center;margin:18px 0 6px}
+.amount-edit label{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.amount-edit .wrap{display:flex;justify-content:center;align-items:baseline;gap:4px}
+.amount-edit .wrap span{font-family:var(--serif);font-size:34px;color:var(--muted)}
+.amount-edit input{font-family:var(--serif);font-size:52px;border:0;background:transparent;text-align:left;width:4ch;min-width:2.5ch;max-width:80vw;outline:none;padding:0}
+.conf{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--ok-soft);color:var(--ok)}
+.conf.mid{background:var(--warn-soft);color:var(--warn)}
+.conf.low{background:var(--bad-soft);color:var(--bad)}
+
+.form{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:4px 16px;margin-top:14px}
+.f{display:block;padding:11px 0;border-top:1px solid var(--line)}
+.f:first-child{border-top:0}
+.f > span{display:flex;justify-content:space-between;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.f > span em{font-style:normal;text-transform:none;letter-spacing:0;color:var(--accent);font-weight:600}
+.f input,.f select,.f textarea{display:block;width:100%;border:0;background:transparent;padding:4px 0 0;font-size:16px;outline:none;font-weight:500}
+.f textarea{resize:vertical;min-height:48px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;border-top:1px solid var(--line)}
+.form > .two:first-child{border-top:0}
+.two > .f{border-top:0}
+.seg{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.seg button{padding:7px 11px;border-radius:10px;border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--ink2)}
+.seg button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.alerts{margin-top:12px;display:grid;gap:8px}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:14px;font-size:13.5px;background:var(--warn-soft);color:var(--warn)}
+.alert.grave{background:var(--bad-soft);color:var(--bad)}
+.alert:before{content:"!";width:18px;height:18px;border-radius:50%;border:1.5px solid currentColor;display:grid;place-items:center;font-size:11px;font-weight:800;flex:none;margin-top:1px}
+details.more{margin-top:12px}
+details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8px 2px;cursor:pointer}
+.items{font-size:13px;color:var(--ink2)}
+.items div{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line)}
+
+/* ---------- detalle ---------- */
+.kv{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:4px 16px;margin-top:12px}
+.kv div{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.kv div:first-child{border-top:0}
+.kv span{color:var(--muted)}
+.kv b{font-weight:600;text-align:right;word-break:break-word}
+.photo-slot{margin-top:12px;border-radius:18px;overflow:hidden;background:var(--soft);min-height:120px;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.photo-slot img{width:100%;display:block}
+.note{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--soft);font-size:13.5px;color:var(--ink2)}
+.actions{display:grid;gap:10px;margin-top:16px}
+.actions .r{display:flex;gap:10px}
+
+/* ---------- arqueo ---------- */
+.den{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.den:first-child{border-top:0}
+.den .v{width:74px;font-weight:700}
+.den .v small{display:block;font-size:10.5px;color:var(--muted);font-weight:600}
+.step{display:flex;align-items:center;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.step button{width:40px;height:40px;font-size:20px;color:var(--ink2)}
+.step input{width:48px;text-align:center;border:0;background:transparent;font-weight:700;font-size:16px;outline:none}
+.den .sum{margin-left:auto;font-weight:600}
+.arq-res{position:sticky;top:64px;z-index:3;background:var(--hero);color:var(--hero-ink);border-radius:20px;padding:16px 18px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.arq-res span{display:block;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--hero-muted)}
+.arq-res b{font-family:var(--serif);font-size:24px;font-weight:400}
+.arq-res .d-bad{color:#E9A3A3} .arq-res .d-ok{color:#9ED3B5}
+
+/* ---------- login ---------- */
+.login{min-height:100dvh;display:flex;flex-direction:column;justify-content:space-between;padding:calc(40px + var(--safe-t)) 28px calc(40px + var(--safe-b));
+  background:var(--hero);color:var(--hero-ink);position:fixed;inset:0;z-index:100}
+.login:before{content:"";position:absolute;right:-120px;top:-80px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(196,162,119,.25),transparent 70%)}
+.login .mark{font-size:12px;letter-spacing:.42em;font-weight:700}
+.login h1{font-family:var(--serif);font-weight:400;font-size:64px;line-height:.95;margin:0}
+.login h1 i{color:#C4A277}
+.login p{color:var(--hero-muted);max-width:30ch;margin:14px 0 0}
+.login .g{min-height:48px;margin-top:28px}
+.login .err{color:#E9A3A3;font-size:14px;margin-top:12px}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;left:50%;bottom:calc(100px + var(--safe-b));transform:translate(-50%,20px);opacity:0;z-index:200;
+  background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:14px;font-size:14px;font-weight:600;transition:.25s;max-width:90vw;text-align:center;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.bad{background:var(--bad);color:#fff}
+
+.skel{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--soft),var(--line),var(--soft));background-size:200% 100%;animation:sk 1.2s infinite}
+@keyframes sk{to{background-position:-200% 0}}
+
+/* ---------- impresión de relación ---------- */
+#printArea{display:none}
+@media print{
+  body{padding:0;background:#fff;color:#000}
+  body > *:not(#printArea){display:none!important}
+  #printArea{display:block;padding:24px;font-size:11px}
+  #printArea h1{font-family:var(--serif);font-weight:400;font-size:26px;margin:0}
+  #printArea table{width:100%;border-collapse:collapse;margin-top:14px}
+  #printArea th,#printArea td{border-bottom:1px solid #ccc;padding:5px 4px;text-align:left;vertical-align:top}
+  #printArea td.n,#printArea th.n{text-align:right}
+  #printArea .firmas{display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:60px;text-align:center}
+  #printArea .firmas div{border-top:1px solid #000;padding-top:6px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<section id="login" class="login">
+  <div class="mark">ZORVIX</div>
+  <div>
+    <h1>Caja<br><i>chica</i></h1>
+    <p>Fotografía el comprobante. Del resto se encarga el sistema.</p>
+    <div id="gbtn" class="g"></div>
+    <div id="loginErr" class="err"></div>
+  </div>
+  <div class="sub" style="color:var(--hero-muted)">Centro quirúrgico · Acceso sólo para personal autorizado</div>
+</section>
+
+<!-- ===================== APP ===================== -->
+<div id="app" class="hidden">
+  <header class="top" id="top">
+    <div class="brand"><b>ZORVIX</b><span id="viewTitle">Caja</span></div>
+    <div class="sp"></div>
+    <select id="fondoSel" class="fondo-sel hidden" aria-label="Fondo"></select>
+    <button class="avatar" id="avatar" aria-label="Cuenta"></button>
+  </header>
+
+  <main>
+    <!-- INICIO -->
+    <section id="v-inicio" class="view">
+      <div class="hero">
+        <div class="lbl" id="hFondoNombre">Efectivo en caja</div>
+        <div class="saldo num" id="hSaldo"><div class="skel" style="width:60%;height:44px;background:rgba(255,255,255,.08)"></div></div>
+        <div class="de" id="hDe">&nbsp;</div>
+        <div class="bar" id="hBar"><i style="width:0"></i></div>
+        <div class="mini">
+          <div><b class="num" id="hRev">—</b><span>En revisión</span></div>
+          <div><b class="num" id="hRep">—</b><span>Por reponer</span></div>
+          <div><b class="num" id="hMes">—</b><span>Este mes</span></div>
+        </div>
+      </div>
+      <div id="banners"></div>
+      <button class="cta" id="ctaFoto">
+        <span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.8"/></svg></span>
+        <span><b>Fotografiar comprobante</b><span>Ticket, nota o factura · se lee solo</span></span>
+      </button>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 class="sec">Últimos movimientos</h2>
+        <button class="link" data-go="movs">Ver todo</button>
+      </div>
+      <div class="list" id="ultimos"><div class="empty">Cargando…</div></div>
+    </section>
+
+    <!-- MOVIMIENTOS -->
+    <section id="v-movs" class="view hidden">
+      <div class="toolbar">
+        <input type="month" id="mMes">
+        <div class="sp" style="flex:1"></div>
+      </div>
+      <div class="chips" id="mFiltros">
+        <button class="chip on" data-f="">Todos</button>
+        <button class="chip" data-f="PENDIENTE">En revisión</button>
+        <button class="chip" data-f="OBSERVADO">Observados</button>
+        <button class="chip" data-f="APROBADO">Aprobados</button>
+        <button class="chip" data-f="NO_PROCEDENTE">No procede</button>
+      </div>
+      <div class="cats" id="mCats"></div>
+      <div id="mLista"></div>
+    </section>
+
+    <!-- REVISAR -->
+    <section id="v-revisar" class="view hidden">
+      <p class="sub" style="margin:8px 2px 12px">Gastos registrados por el equipo que esperan tu firma. No puedes aprobar lo que tú registraste.</p>
+      <div id="rLista"></div>
+    </section>
+
+    <!-- ARQUEO -->
+    <section id="v-arqueo" class="view hidden">
+      <div class="arq-res">
+        <div><span>Contado</span><b class="num" id="aCont">$0</b></div>
+        <div><span>Sistema</span><b class="num" id="aSis">—</b></div>
+        <div><span>Diferencia</span><b class="num" id="aDif">—</b></div>
+      </div>
+      <div class="form" id="aDen"></div>
+      <div class="form"><label class="f"><span>Notas del arqueo</span><textarea id="aNotas" placeholder="Opcional · quién estuvo presente, observaciones"></textarea></label></div>
+      <div class="actions"><button class="btn" id="aGuardar">Registrar arqueo</button></div>
+      <h2 class="sec">Arqueos anteriores</h2>
+      <div class="list" id="aHist"><div class="empty">—</div></div>
+    </section>
+
+    <!-- MÁS -->
+    <section id="v-mas" class="view hidden">
+      <div id="masRep" class="hidden">
+        <h2 class="sec">Reposición</h2>
+        <div class="list" id="repCard"></div>
+        <div class="list" id="repLista" style="margin-top:12px"></div>
+      </div>
+      <div id="masFondo" class="hidden">
+        <h2 class="sec">Fondo</h2>
+        <div class="form">
+          <label class="f"><span>Nombre</span><input id="cfNombre"></label>
+          <label class="f"><span>Monto fijo del fondo</span><input id="cfMonto" inputmode="decimal" class="num"></label>
+          <div class="two">
+            <label class="f"><span>Tope por gasto</span><input id="cfTope" inputmode="decimal" class="num"></label>
+            <label class="f"><span>Avisar reposición al</span><input id="cfUmbral" inputmode="numeric" class="num" placeholder="30 %"></label>
+          </div>
+          <label class="f"><span>Custodio · nombre</span><input id="cfCustNom"></label>
+          <label class="f"><span>Custodio · correo</span><input id="cfCustCor" type="email" autocapitalize="off"></label>
+        </div>
+        <p class="sub" style="margin:8px 2px">Cambiar el monto fijo registra un movimiento de fondeo por la diferencia (entrada o retiro de efectivo).</p>
+        <div class="actions"><button class="btn" id="cfGuardar">Guardar fondo</button></div>
+      </div>
+      <h2 class="sec">Cuenta</h2>
+      <div class="list">
+        <div class="row"><div class="mid"><div class="t" id="uNombre"></div><div class="s" id="uCorreo"></div></div><span class="pill p-APROBADO" id="uRol"></span></div>
+        <button class="row" id="btnArqueoMas"><div class="mid"><div class="t">Arqueo de caja</div><div class="s">Contar el efectivo por denominación</div></div>›</button>
+        <button class="row" id="btnSalir"><div class="mid"><div class="t" style="color:var(--bad)">Cerrar sesión</div></div></button>
+      </div>
+      <p class="sub" style="text-align:center;margin-top:18px">Zorvix · Caja v1.0</p>
+    </section>
+  </main>
+
+  <nav class="tabs" id="tabs">
+    <button data-go="inicio" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>Inicio</button>
+    <button data-go="movs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg>Movimientos</button>
+    <button class="fab" id="fab" aria-label="Fotografiar comprobante"><span class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.8"/></svg></span></button>
+    <button data-go="revisar" id="tabRevisar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.2 4.2L19 7"/></svg>Revisar<span class="badge hidden" id="badgeRev"></span></button>
+    <button data-go="mas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg>Más</button>
+  </nav>
+</div>
+
+<!-- ===================== HOJA: CAPTURA ===================== -->
+<section class="sheet" id="shCaptura" aria-modal="true">
+  <div class="sheet-h"><h3 id="capTitulo">Nuevo gasto</h3><button class="x" data-close="shCaptura" aria-label="Cerrar">✕</button></div>
+  <div class="in">
+    <div id="capElegir">
+      <button class="cta" id="capCam"><span class="ic">📷</span><span><b>Tomar foto</b><span>Cámara del celular</span></span></button>
+      <button class="cta" id="capGal"><span class="ic">🖼</span><span><b>Elegir de la galería o PDF</b><span>Fotos previas, factura en PDF</span></span></button>
+      <button class="cta" id="capSin"><span class="ic">✎</span><span><b>Gasto sin comprobante</b><span>Requiere justificación · se marca para revisión</span></span></button>
+    </div>
+    <div id="capTrabajo" class="hidden">
+      <div class="shot" id="capShot"></div>
+      <div class="reading hidden" id="capLeyendo"><span class="spin"></span><span id="capLeyendoTxt">Leyendo el comprobante…</span></div>
+      <div id="capForm" class="hidden">
+        <div class="amount-edit">
+          <label>Total pagado</label>
+          <div class="wrap"><span>$</span><input id="gTotal" inputmode="decimal" class="num" placeholder="0.00"></div>
+          <div id="gConf"></div>
+        </div>
+        <div class="alerts" id="gAlertas"></div>
+        <div class="form">
+          <label class="f"><span>Proveedor <em id="eProv"></em></span><input id="gProveedor" autocomplete="off"></label>
+          <label class="f"><span>Concepto</span><input id="gConcepto" autocomplete="off" placeholder="¿Qué se compró?"></label>
+          <div class="two">
+            <label class="f"><span>Fecha</span><input id="gFecha" type="date"></label>
+            <label class="f"><span>IVA</span><input id="gIva" inputmode="decimal" class="num" placeholder="—"></label>
+          </div>
+          <div class="f"><span>Categoría</span><div class="seg" id="gCats"></div></div>
+          <div class="f"><span>Comprobante</span><div class="seg" id="gComp"></div></div>
+          <div class="f"><span>Forma de pago</span><div class="seg" id="gPago"></div></div>
+          <label class="f"><span>Notas <em id="eNotas"></em></span><textarea id="gNotas" placeholder="Opcional"></textarea></label>
+        </div>
+        <details class="more">
+          <summary>Datos fiscales y detalle leído</summary>
+          <div class="form">
+            <label class="f"><span>RFC del emisor</span><input id="gRfc" autocapitalize="characters" autocomplete="off"></label>
+            <label class="f"><span>UUID (folio fiscal)</span><input id="gUuid" autocapitalize="characters" autocomplete="off"></label>
+            <div class="two">
+              <label class="f"><span>Subtotal</span><input id="gSub" inputmode="decimal" class="num"></label>
+              <label class="f"><span>Folio / ticket</span><input id="gFolioT" autocomplete="off"></label>
+            </div>
+          </div>
+          <div class="items" id="gItems"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+  <div class="sheet-foot hidden" id="capFoot"><div class="in"><button class="btn sec sm" id="capOtra">Otra foto</button><button class="btn" id="capGuardar">Registrar gasto</button></div></div>
+  <input type="file" id="inCam" accept="image/*" capture="environment" class="hidden">
+  <input type="file" id="inGal" accept="image/*,application/pdf" class="hidden">
+</section>
+
+<!-- ===================== HOJA: DETALLE ===================== -->
+<section class="sheet" id="shDetalle" aria-modal="true">
+  <div class="sheet-h"><h3 id="dTitulo">Movimiento</h3><button class="x" data-close="shDetalle" aria-label="Cerrar">✕</button></div>
+  <div class="in" id="dCuerpo"></div>
+</section>
+
+<!-- ===================== HOJA: REPOSICIÓN ===================== -->
+<section class="sheet" id="shRep" aria-modal="true">
+  <div class="sheet-h"><h3>Reposición</h3><button class="x" data-close="shRep" aria-label="Cerrar">✕</button></div>
+  <div class="in" id="repCuerpo"></div>
+</section>
+
+<div class="toast" id="toast"></div>
+<div id="printArea"></div>
+
+<script>
+/* ================================================================
+ *  CONFIGURACIÓN — pegar aquí la URL /exec de la implementación web
+ * ================================================================ */
+const API_URL   = 'https://script.google.com/macros/s/AKfycbzSrHK117Uwu-QQIjayIuIQDoWsOKNH1lGt4SmsTpYEOqMLTXX7bauWtHiK3ocJCBO6HQ/exec';
+const CLIENT_ID = '148311031818-4ku0lhia6qd0fgbmi379dvi7k4vp303g.apps.googleusercontent.com';
+const LS_KEY    = 'zvx_caja_sesion';
+
+const COMPROBANTES = [['TICKET','Ticket'],['FACTURA','Factura'],['NOTA','Nota'],['RECIBO','Recibo'],['SIN_COMPROBANTE','Sin comprobante']];
+const PAGOS = [['efectivo','Efectivo'],['tarjeta','Tarjeta'],['transferencia','Transferencia'],['otro','Otro']];
+const ESTADO_TXT = {PENDIENTE:'En revisión',OBSERVADO:'Observado',APROBADO:'Aprobado',NO_PROCEDENTE:'No procede',ANULADO:'Anulado'};
+const TIPO_TXT = {FONDEO:'Fondeo',GASTO:'Gasto',REPOSICION:'Reposición',REINTEGRO:'Reintegro',AJUSTE:'Ajuste de arqueo'};
+const DENOM = [1000,500,200,100,50,20,10,5,2,1,0.5];
+
+const S = { token:'', usuario:null, fondoId:'', resumen:null, vista:'inicio', filtro:'', cap:null, conteo:{} };
+
+/* ---------------- utilidades ---------------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmx = new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'});
+const money = n => n === null || n === undefined || n === '' || isNaN(n) ? '—' : fmx.format(Number(n));
+const money0 = n => n === null || n === undefined || isNaN(n) ? '—' : new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(Number(n));
+const numIn = v => { const s = String(v ?? '').replace(/[^\d.\-]/g,''); if (!s) return null; const n = Number(s); return isFinite(n) ? n : null; };
+const hoy = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+const fechaLarga = s => { if (!s) return ''; const d = new Date(String(s).slice(0,10)+'T12:00:00'); return isNaN(d) ? s : d.toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'}); };
+const iniciales = s => String(s||'?').split(/\s+/).filter(p => p && !/^(y|de|del|la|el|e)$/i.test(p)).slice(0,2).map(p=>p[0]).join('').toUpperCase();
+
+function toast(msg, bad){ const t=$('toast'); t.textContent=msg; t.className='toast show'+(bad?' bad':''); clearTimeout(t._t); t._t=setTimeout(()=>t.className='toast'+(bad?' bad':''),3200); }
+
+function lsGet(){ try { return JSON.parse(localStorage.getItem(LS_KEY)||'null'); } catch(e){ return null; } }
+function lsSet(v){ try { v ? localStorage.setItem(LS_KEY, JSON.stringify(v)) : localStorage.removeItem(LS_KEY); } catch(e){} }
+
+async function api(accion, datos){
+  if (!/^https:\/\/script\.google\.com\//.test(API_URL)) throw new Error('Falta configurar la URL del backend (API_URL)');
+  const cuerpo = Object.assign({ accion, token:S.token, fondoId:S.fondoId }, datos||{});
+  let r;
+  try {
+    r = await fetch(API_URL, { method:'POST', credentials:'omit', redirect:'follow',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(cuerpo) });
+  } catch(e){ throw new Error('Sin conexión con el servidor. Revisa tu internet.'); }
+  let j;
+  try { j = await r.json(); } catch(e){ throw new Error('Respuesta inesperada del servidor ('+r.status+')'); }
+  if (!j.ok){
+    if (j.codigo === 'SESION'){ salir(true); }
+    const e = new Error(j.error || 'Error'); e.codigo = j.codigo; throw e;
+  }
+  return j;
+}
+
+/* ---------------- sesión ---------------- */
+function initGIS(){
+  if (!window.google || !google.accounts){ return setTimeout(initGIS, 150); }
+  google.accounts.id.initialize({ client_id:CLIENT_ID, callback:onCredencial, auto_select:true, cancel_on_tap_outside:false, use_fedcm_for_prompt:true });
+  google.accounts.id.renderButton($('gbtn'), { theme:'filled_black', size:'large', shape:'pill', text:'signin_with', locale:'es', width:280 });
+}
+
+async function onCredencial(resp){
+  $('loginErr').textContent = 'Verificando…';
+  try {
+    const j = await api('sesion', { idToken: resp.credential, token:'' });
+    S.token = j.token; S.usuario = j.usuario;
+    lsSet({ token:j.token, usuario:j.usuario, t:Date.now() });
+    $('loginErr').textContent = '';
+    entrar();
+  } catch(e){ $('loginErr').textContent = e.message; }
+}
+
+function salir(vencida){
+  lsSet(null); S.token=''; S.usuario=null;
+  $('app').classList.add('hidden'); $('login').classList.remove('hidden');
+  document.querySelectorAll('.sheet.open').forEach(s=>s.classList.remove('open'));
+  if (window.google && google.accounts) google.accounts.id.disableAutoSelect();
+  if (vencida) $('loginErr').textContent = 'Tu sesión terminó. Vuelve a entrar.';
+}
+
+function entrar(){
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+  const u = S.usuario;
+  $('avatar').innerHTML = u.foto ? `<img src="${esc(u.foto)}" alt="">` : esc(iniciales(u.nombre));
+  $('uNombre').textContent = u.nombre; $('uCorreo').textContent = u.correo; $('uRol').textContent = u.rol.replace('_',' ');
+  $('tabRevisar').classList.toggle('hidden', !u.aprueba);
+  $('tabs').style.gridTemplateColumns = u.aprueba ? 'repeat(5,1fr)' : 'repeat(4,1fr)';
+  $('masRep').classList.toggle('hidden', !u.aprueba);
+  $('masFondo').classList.toggle('hidden', !u.admin);
+  ['fab','ctaFoto'].forEach(id => $(id).classList.toggle('hidden', !u.escribe));
+  $('mMes').value = hoy().slice(0,7);
+  ir('inicio');
+}
+
+/* ---------------- navegación ---------------- */
+const TITULOS = { inicio:'Caja', movs:'Movimientos', revisar:'Por revisar', arqueo:'Arqueo', mas:'Más' };
+function ir(v){
+  S.vista = v;
+  document.querySelectorAll('main .view').forEach(s => s.classList.toggle('hidden', s.id !== 'v-'+v));
+  document.querySelectorAll('#tabs button[data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === v));
+  $('viewTitle').textContent = TITULOS[v] || 'Caja';
+  window.scrollTo({top:0});
+  ({ inicio:cargarInicio, movs:cargarMovs, revisar:cargarRevisar, arqueo:cargarArqueo, mas:cargarMas })[v]?.();
+}
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]'); if (g){ ir(g.dataset.go); return; }
+  const c = e.target.closest('[data-close]'); if (c){ cerrarHoja(c.dataset.close); return; }
+  const m = e.target.closest('[data-mov]'); if (m){ abrirDetalle(m.dataset.mov); }
+});
+window.addEventListener('scroll', () => $('top').classList.toggle('scrolled', scrollY > 4), {passive:true});
+function abrirHoja(id){ $(id).classList.add('open'); $(id).scrollTop = 0; document.body.style.overflow='hidden'; }
+function cerrarHoja(id){ $(id).classList.remove('open'); if (!document.querySelector('.sheet.open')) document.body.style.overflow=''; }
+
+/* ---------------- inicio ---------------- */
+async function cargarInicio(){
+  try {
+    const r = await api('resumen');
+    S.resumen = r; S.fondoId = r.fondo.id;
+    pintarFondos(r);
+    const e = r.estado, f = r.fondo;
+    $('hFondoNombre').textContent = f.nombre;
+    const [ent, dec] = money(e.saldo).split('.');
+    $('hSaldo').innerHTML = `${esc(ent)}<small>.${esc(dec||'00')}</small>`;
+    $('hDe').textContent = f.montoFijo ? `de ${money0(f.montoFijo)} de fondo fijo · ${e.pctDisponible}% disponible` : 'Fondo sin monto fijo definido';
+    $('hBar').className = 'bar' + (e.sugerirReposicion ? ' low' : '');
+    $('hBar').firstElementChild.style.width = (f.montoFijo ? e.pctDisponible : 0) + '%';
+    $('hRev').textContent = money0(e.enRevision); $('hRep').textContent = money0(e.porReponer); $('hMes').textContent = money0(e.gastadoMes);
+    let b = '';
+    if (!f.montoFijo && r.usuario.admin) b += `<div class="banner accent"><span><b>Define el fondo</b> · monto fijo, custodio y tope por gasto</span><button class="go" data-go="mas">Configurar ›</button></div>`;
+    if (r.porRevisar) b += `<div class="banner info"><span><b>${r.porRevisar}</b> gasto${r.porRevisar>1?'s':''} esperan tu firma</span><button class="go" data-go="revisar">Revisar ›</button></div>`;
+    if (r.misObservados) b += `<div class="banner warn"><span><b>${r.misObservados}</b> gasto${r.misObservados>1?'s':''} tuyos fueron observados</span><button class="go" data-go="movs" onclick="S.filtro='OBSERVADO'">Corregir ›</button></div>`;
+    if (e.sugerirReposicion && r.usuario.aprueba) b += `<div class="banner warn"><span>Queda <b>${e.pctDisponible}%</b> del fondo · hay ${money0(e.porReponer)} aprobados por reponer</span><button class="go" data-go="mas">Reponer ›</button></div>`;
+    if (!r.geminiListo) b += `<div class="banner warn"><span>La lectura automática está apagada: falta la llave de Gemini en el servidor.</span></div>`;
+    $('banners').innerHTML = b;
+    const badge = $('badgeRev'); badge.textContent = r.porRevisar; badge.classList.toggle('hidden', !r.porRevisar);
+    $('ultimos').innerHTML = r.ultimos.length ? r.ultimos.map(filaMov).join('') : `<div class="empty">Aún no hay movimientos.<br>Toma la primera foto de un comprobante.</div>`;
+  } catch(e){ toast(e.message, true); }
+}
+
+function pintarFondos(r){
+  const sel = $('fondoSel');
+  sel.classList.toggle('hidden', r.fondos.length < 2);
+  sel.innerHTML = r.fondos.map(f => `<option value="${esc(f.id)}"${f.id===r.fondo.id?' selected':''}>${esc(f.nombre)}</option>`).join('');
+}
+$('fondoSel').addEventListener('change', e => { S.fondoId = e.target.value; ir(S.vista); });
+
+function filaMov(m){
+  const ingreso = m.efecto > 0;
+  const titulo = m.tipo === 'GASTO' ? (m.proveedor || m.concepto) : (TIPO_TXT[m.tipo] || m.tipo);
+  const sub = m.tipo === 'GASTO' ? `${esc(m.concepto)} · ${esc(m.registradoNombre.split(' ')[0])}` : esc(m.concepto);
+  const dot = m.tipo === 'GASTO' ? iniciales(m.categoria) : (ingreso ? '+' : '±');
+  const est = m.tipo === 'GASTO' || m.tipo === 'AJUSTE' ? `<span class="pill p-${m.estado}">${ESTADO_TXT[m.estado]||m.estado}</span>` : '';
+  return `<button class="row" data-mov="${esc(m.folio)}"><span class="dot">${esc(dot)}</span>
+    <span class="mid"><div class="t">${esc(titulo)}</div><div class="s">${sub}</div></span>
+    <span class="amt num ${ingreso?'pos':''}">${ingreso?'+':'−'}${money(Math.abs(m.efecto))}<br>${est}</span></button>`;
+}
+
+/* ---------------- movimientos ---------------- */
+$('mMes').addEventListener('change', cargarMovs);
+$('mFiltros').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; S.filtro = c.dataset.f; cargarMovs(); });
+async function cargarMovs(){
+  document.querySelectorAll('#mFiltros .chip').forEach(c => c.classList.toggle('on', c.dataset.f === S.filtro));
+  $('mLista').innerHTML = '<div class="list"><div class="empty">Cargando…</div></div>';
+  try {
+    const r = await api('movimientos', { mes:$('mMes').value, estado:S.filtro });
+    const cats = Object.entries(r.porCategoria).sort((a,b)=>b[1]-a[1]);
+    const max = cats.length ? cats[0][1] : 1;
+    $('mCats').innerHTML = `<div class="tot"><span class="sub">Gastos del periodo</span><b class="num">${money(r.totalGastos)}</b></div>` +
+      (cats.length ? cats.map(([c,v]) => `<div class="cat"><span>${esc(c)}</span><b class="num">${money(v)}</b><div class="b"><i style="width:${Math.max(3,v/max*100)}%"></i></div></div>`).join('') : '<div class="sub">Sin gastos en este periodo.</div>');
+    if (!r.movimientos.length){ $('mLista').innerHTML = '<div class="list"><div class="empty">Nada que mostrar con este filtro.</div></div>'; return; }
+    const grupos = {};
+    r.movimientos.forEach(m => { const k = m.tipo==='GASTO' ? m.fecha : m.registradoEn.slice(0,10); (grupos[k] = grupos[k] || []).push(m); });
+    $('mLista').innerHTML = Object.keys(grupos).sort().reverse().map(k => `<div class="day">${esc(fechaLarga(k))}</div><div class="list">${grupos[k].map(filaMov).join('')}</div>`).join('');
+  } catch(e){ toast(e.message, true); }
+}
+
+/* ---------------- revisar ---------------- */
+async function cargarRevisar(){
+  $('rLista').innerHTML = '<div class="list"><div class="empty">Cargando…</div></div>';
+  try {
+    const r = await api('porRevisar');
+    if (!r.movimientos.length){ $('rLista').innerHTML = '<div class="list"><div class="empty">Todo al día. No hay gastos por revisar.</div></div>'; $('badgeRev').classList.add('hidden'); return; }
+    $('rLista').innerHTML = r.movimientos.map(m => `
+      <div class="list" style="margin-bottom:12px">
+        ${filaMov(m)}
+        <div style="padding:0 14px 14px">
+          <div class="sub">${esc(fechaLarga(m.fecha))} · ${esc(m.categoria)} · ${esc(m.comprobante.replace('_',' ').toLowerCase())}${m.confianza!==null?` · lectura ${Math.round(m.confianza*100)}%`:''}</div>
+          ${m.alertas ? `<div class="sub" style="color:var(--warn);margin-top:4px">⚑ ${esc(m.alertas.split(',').map(a=>a.replace(/_/g,' ').toLowerCase()).join(' · '))}</div>` : ''}
+          ${m.editados ? `<div class="sub" style="margin-top:4px">✎ ${esc(m.editados)}</div>` : ''}
+          ${m.estado==='OBSERVADO' ? `<div class="sub" style="color:var(--info);margin-top:4px">Observado: ${esc(m.motivo)} — esperando corrección</div>` : ''}
+          <div class="r" style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn sec sm" data-mov="${esc(m.folio)}" style="flex:1">Ver comprobante</button>
+            ${m.puedoRevisar ? `<button class="btn ok sm" style="flex:1" onclick="revisar('${esc(m.folio)}','APROBADO')">Aprobar</button>` : `<span class="sub" style="align-self:center">Lo registraste tú</span>`}
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e){ toast(e.message, true); }
+}
+
+async function revisar(folio, decision){
+  let motivo = '';
+  if (decision !== 'APROBADO'){
+    motivo = prompt(decision === 'OBSERVADO' ? '¿Qué debe corregir quien lo registró?' : '¿Por qué no procede? (el monto quedará por reintegrar)');
+    if (!motivo) return;
+  }
+  try {
+    await api('revisar', { folio, decision, motivo });
+    toast(decision === 'APROBADO' ? 'Aprobado ✓' : decision === 'OBSERVADO' ? 'Devuelto para corrección' : 'Marcado como no procedente');
+    cerrarHoja('shDetalle');
+    if (S.vista === 'revisar') cargarRevisar(); else ir(S.vista);
+  } catch(e){ toast(e.message, true); }
+}
+
+/* ---------------- detalle ---------------- */
+async function abrirDetalle(folio){
+  $('dTitulo').textContent = folio;
+  $('dCuerpo').innerHTML = '<div class="empty">Cargando…</div>';
+  abrirHoja('shDetalle');
+  try {
+    const m = (await api('detalle', { folio })).movimiento;
+    if (!m){ $('dCuerpo').innerHTML = '<div class="empty">No encontrado.</div>'; return; }
+    const u = S.usuario;
+    const puedeRevisar = u.aprueba && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO') && (m.tipo==='GASTO'||m.tipo==='AJUSTE') && (!m.esMio || u.rol==='ceo');
+    const puedeCorregir = m.tipo==='GASTO' && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO') && (m.esMio || u.aprueba);
+    const puedeAnular = m.tipo==='GASTO' && m.estado!=='ANULADO' && !m.reposicion && ((m.esMio && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO')) || u.aprueba);
+    const puedeReintegro = u.aprueba && m.estado==='NO_PROCEDENTE' && !m.reintegro;
+    const kv = [
+      ['Tipo', TIPO_TXT[m.tipo]], ['Estado', `<span class="pill p-${m.estado}">${ESTADO_TXT[m.estado]||m.estado}</span>`],
+      ['Total', `<span class="num">${money(m.total)}</span>`], m.iva!==null?['IVA', money(m.iva)]:null,
+      ['Fecha', esc(fechaLarga(m.fecha))], m.proveedor && m.proveedor!=='—'?['Proveedor', esc(m.proveedor)]:null,
+      ['Concepto', esc(m.concepto)], m.categoria?['Categoría', esc(m.categoria)]:null,
+      m.tipo==='GASTO'?['Comprobante', esc(m.comprobante.replace('_',' ').toLowerCase())]:null,
+      m.formaPago?['Pago', esc(m.formaPago)]:null, m.rfc?['RFC', esc(m.rfc)]:null, m.uuid?['UUID', `<span style="font-size:12px">${esc(m.uuid)}</span>`]:null,
+      m.folioTicket?['Folio ticket', esc(m.folioTicket)]:null,
+      ['Registró', esc(m.registradoNombre)+'<br><span class="sub">'+esc(m.registradoEn)+'</span>'],
+      m.revisadoPor?['Revisó', esc(m.revisadoPor)+'<br><span class="sub">'+esc(m.revisadoEn)+'</span>']:null,
+      m.reposicion?['Reposición', esc(m.reposicion)]:null, m.reintegro?['Reintegro', esc(m.reintegro)]:null,
+      m.relacionado?['Relacionado', esc(m.relacionado)]:null,
+      m.confianza!==null?['Lectura automática', Math.round(m.confianza*100)+'%']:null
+    ].filter(Boolean);
+    $('dCuerpo').innerHTML = `
+      ${m.tieneFoto ? `<div class="photo-slot" id="dFoto"><span class="reading"><span class="spin"></span>Cargando comprobante…</span></div>` : ''}
+      <div class="kv">${kv.map(([k,v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+      ${m.motivo ? `<div class="note"><b>Revisión:</b> ${esc(m.motivo)}</div>` : ''}
+      ${m.editados ? `<div class="note"><b>Cambios sobre la lectura:</b> ${esc(m.editados)}</div>` : ''}
+      ${m.alertas ? `<div class="note"><b>Alertas:</b> ${esc(m.alertas.replace(/_/g,' ').toLowerCase().replace(/,/g,' · '))}</div>` : ''}
+      ${m.notas ? `<div class="note"><b>Notas:</b> ${esc(m.notas)}</div>` : ''}
+      <div class="actions">
+        ${puedeRevisar ? `<button class="btn ok" onclick="revisar('${esc(m.folio)}','APROBADO')">Aprobar</button>
+          <div class="r"><button class="btn info" onclick="revisar('${esc(m.folio)}','OBSERVADO')">Observar</button><button class="btn bad" onclick="revisar('${esc(m.folio)}','NO_PROCEDENTE')">No procede</button></div>` : ''}
+        ${puedeCorregir ? `<button class="btn sec" id="dCorregir">Corregir datos</button>` : ''}
+        ${puedeReintegro ? `<button class="btn sec" onclick="reintegro('${esc(m.folio)}',${m.total})">Registrar reintegro de ${money(m.total)}</button>` : ''}
+        ${puedeAnular ? `<button class="link" style="color:var(--bad)" onclick="anular('${esc(m.folio)}')">Anular (capturado por error)</button>` : ''}
+      </div>`;
+    if (puedeCorregir) $('dCorregir').onclick = () => { cerrarHoja('shDetalle'); abrirCorreccion(m); };
+    if (m.tieneFoto){
+      try {
+        const f = await api('foto', { folio:m.folio });
+        const slot = $('dFoto'); if (!slot) return;
+        if (f.mime === 'application/pdf'){
+          const url = URL.createObjectURL(b64aBlob(f.b64, f.mime));
+          slot.innerHTML = `<a class="btn sec" style="margin:30px" href="${url}" target="_blank" rel="noopener">Abrir PDF del comprobante</a>`;
+        } else slot.innerHTML = `<img src="data:${esc(f.mime)};base64,${f.b64}" alt="Comprobante">`;
+      } catch(e){ const s=$('dFoto'); if (s) s.textContent = 'No se pudo cargar la foto: '+e.message; }
+    }
+  } catch(e){ $('dCuerpo').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+function b64aBlob(b64, mime){ const bin = atob(b64); const a = new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return new Blob([a],{type:mime}); }
+
+async function anular(folio){
+  const motivo = prompt('Motivo de la anulación (p. ej. "capturado dos veces")'); if (!motivo) return;
+  try { await api('anular', { folio, motivo }); toast('Anulado'); cerrarHoja('shDetalle'); ir(S.vista); } catch(e){ toast(e.message, true); }
+}
+async function reintegro(folio, monto){
+  if (!confirm(`¿Confirmas que se recibieron ${money(monto)} en efectivo de regreso a la caja?`)) return;
+  try { const r = await api('registrarReintegro', { folio }); toast('Reintegro '+r.folio+' registrado'); cerrarHoja('shDetalle'); ir(S.vista); } catch(e){ toast(e.message, true); }
+}
+
+/* ================================================================
+ *  CAPTURA DE GASTO
+ * ================================================================ */
+function nuevaCaptura(directoCamara){
+  S.cap = { fotoId:'', lectura:null, sugerido:null, modelo:'', folio:'', sin:false, datos:{} };
+  $('capTitulo').textContent = 'Nuevo gasto';
+  $('capElegir').classList.remove('hidden'); $('capTrabajo').classList.add('hidden'); $('capFoot').classList.add('hidden');
+  abrirHoja('shCaptura');
+  if (directoCamara) $('inCam').click();
+}
+$('fab').onclick = () => nuevaCaptura(true);
+$('ctaFoto').onclick = () => nuevaCaptura(true);
+$('capCam').onclick = () => $('inCam').click();
+$('capGal').onclick = () => $('inGal').click();
+$('capOtra').onclick = () => { if (S.cap.folio) return; $('inCam').click(); };
+$('capSin').onclick = () => { S.cap.sin = true; mostrarFormulario({ comprobante:'SIN_COMPROBANTE', fecha:hoy(), formaPago:'efectivo' }, []); };
+['inCam','inGal'].forEach(id => $(id).addEventListener('change', async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (file) await procesarArchivo(file);
+}));
+
+async function procesarArchivo(file){
+  S.cap.sin = false;
+  $('capElegir').classList.add('hidden'); $('capTrabajo').classList.remove('hidden');
+  $('capForm').classList.add('hidden'); $('capFoot').classList.add('hidden');
+  $('capLeyendo').classList.remove('hidden'); $('capLeyendoTxt').textContent = 'Preparando la imagen…';
+  const shot = $('capShot');
+  try {
+    let b64, mime, qr = '';
+    if (file.type === 'application/pdf'){
+      if (file.size > 9.5e6) throw new Error('El PDF pesa más de 9 MB');
+      mime = 'application/pdf'; b64 = await aBase64(file);
+      shot.innerHTML = `<div class="pdf">PDF · ${esc(file.name)}</div><div class="scan"></div>`;
+    } else {
+      const r = await comprimir(file);
+      b64 = r.b64; mime = 'image/jpeg'; qr = r.qr;
+      shot.innerHTML = `<img src="data:image/jpeg;base64,${b64}" alt="Comprobante"><div class="scan"></div>`;
+    }
+    $('capLeyendoTxt').textContent = qr ? 'Código QR fiscal detectado · leyendo…' : 'Leyendo el comprobante…';
+    const r = await api('leerRecibo', { imagen:b64, mime, qr });
+    S.cap.fotoId = r.fotoId; S.cap.lectura = r.lectura; S.cap.sugerido = r.sugerido; S.cap.modelo = r.modelo;
+    shot.querySelector('.scan')?.remove();
+    $('capLeyendo').classList.add('hidden');
+    if (r.errorLectura) toast('No se pudo leer solo; captura los datos a mano', true);
+    mostrarFormulario(r.sugerido, r.alertas);
+  } catch(e){
+    $('capLeyendo').classList.add('hidden'); shot.querySelector('.scan')?.remove();
+    toast(e.message, true);
+    if (!S.cap.fotoId){ $('capElegir').classList.remove('hidden'); $('capTrabajo').classList.add('hidden'); }
+  }
+}
+
+function aBase64(blob){
+  return new Promise((ok, ko) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = ko; fr.readAsDataURL(blob); });
+}
+
+async function comprimir(file){
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation:'from-image' }); }
+  catch(e){
+    bmp = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error('No se pudo abrir la imagen')); i.src = URL.createObjectURL(file); });
+  }
+  const w = bmp.width, h = bmp.height;
+  let qr = '';
+  if ('BarcodeDetector' in window){
+    try { const det = new BarcodeDetector({ formats:['qr_code'] }); const cod = await det.detect(bmp); const sat = cod.find(c => /[?&]id=/i.test(c.rawValue)); if (sat) qr = sat.rawValue; } catch(e){}
+  }
+  const k = Math.min(1, 1600 / w, 3400 / h);          // tickets largos conservan resolución a lo alto
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const ctx = c.getContext('2d'); ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.85));
+  return { b64: await aBase64(blob), qr };
+}
+
+function segmentado(cont, opciones, valor, onSel){
+  $(cont).innerHTML = opciones.map(([v,t]) => `<button type="button" data-v="${esc(v)}" class="${v===valor?'on':''}">${esc(t)}</button>`).join('');
+  $(cont).onclick = e => { const b = e.target.closest('button'); if (!b) return; $(cont).querySelectorAll('button').forEach(x=>x.classList.toggle('on', x===b)); onSel(b.dataset.v); };
+}
+
+function mostrarFormulario(s, alertas){
+  s = s || {};
+  const d = S.cap.datos = {
+    categoria: s.categoria || '', comprobante: s.comprobante || 'TICKET',
+    formaPago: s.formaPago && s.formaPago !== 'desconocido' ? s.formaPago : 'efectivo'
+  };
+  $('capElegir').classList.add('hidden'); $('capTrabajo').classList.remove('hidden');
+  if (S.cap.sin) $('capShot').innerHTML = '<div class="pdf" style="color:#fff">Gasto sin comprobante</div>';
+  $('gTotal').value = s.total ?? '';
+  $('gProveedor').value = s.proveedor || ''; $('gConcepto').value = s.concepto || '';
+  $('gFecha').value = s.fecha || hoy(); $('gFecha').max = hoy();
+  $('gIva').value = s.iva ?? ''; $('gSub').value = s.subtotal ?? '';
+  $('gRfc').value = s.rfc || ''; $('gUuid').value = s.uuid || ''; $('gFolioT').value = s.folioTicket || '';
+  $('gNotas').value = s.notas || '';
+  $('eNotas').textContent = d.comprobante === 'SIN_COMPROBANTE' ? 'obligatorio: ¿por qué no hay comprobante?' : '';
+  const conf = s.confianza;
+  $('gConf').innerHTML = conf === null || conf === undefined ? '' :
+    `<span class="conf ${conf>=.85?'':conf>=.6?'mid':'low'}">Lectura ${Math.round(conf*100)}% · ${conf>=.85?'confiable':conf>=.6?'revisa el total':'verifica todo'}</span>`;
+  $('eProv').textContent = s.rfc ? s.rfc : '';
+  const cats = (S.resumen?.categorias || []).map(c => [c.nombre, c.nombre]);
+  segmentado('gCats', cats, d.categoria, v => d.categoria = v);
+  segmentado('gComp', COMPROBANTES, d.comprobante, v => { d.comprobante = v; $('eNotas').textContent = v==='SIN_COMPROBANTE' ? 'obligatorio: ¿por qué no hay comprobante?' : ''; });
+  segmentado('gPago', PAGOS, d.formaPago, v => d.formaPago = v);
+  $('gAlertas').innerHTML = (alertas||[]).map(a => `<div class="alert ${a.grave?'grave':''}">${esc(a.texto)}</div>`).join('');
+  $('gItems').innerHTML = (s.conceptos||[]).length ? s.conceptos.map(c => `<div><span>${c.cantidad?esc(c.cantidad)+' × ':''}${esc(c.descripcion)}</span><span class="num">${money(c.importe)}</span></div>`).join('') + (s.observaciones?`<p class="sub">${esc(s.observaciones)}</p>`:'') : '';
+  $('capForm').classList.remove('hidden'); $('capFoot').classList.remove('hidden');
+  $('capOtra').classList.toggle('hidden', !!S.cap.folio || S.cap.sin);
+  actualizarBotonGuardar();
+  if (!s.total) setTimeout(() => $('gTotal').focus(), 350);
+}
+$('gTotal').addEventListener('input', actualizarBotonGuardar);
+function actualizarBotonGuardar(){
+  const i = $('gTotal'); i.style.width = Math.max(2.5, (i.value || i.placeholder).length * 0.62 + 0.6) + 'em';
+  const t = numIn(i.value);
+  $('capGuardar').textContent = (S.cap?.folio ? 'Guardar corrección' : 'Registrar gasto') + (t ? ' · ' + money(t) : '');
+}
+
+$('capGuardar').onclick = async () => {
+  const d = S.cap.datos;
+  const datos = {
+    total: numIn($('gTotal').value), proveedor: $('gProveedor').value.trim(), concepto: $('gConcepto').value.trim(),
+    fecha: $('gFecha').value, iva: numIn($('gIva').value), subtotal: numIn($('gSub').value),
+    rfc: $('gRfc').value.trim().toUpperCase(), uuid: $('gUuid').value.trim().toUpperCase(), folioTicket: $('gFolioT').value.trim(),
+    notas: $('gNotas').value.trim(), categoria: d.categoria, comprobante: d.comprobante, formaPago: d.formaPago
+  };
+  if (!datos.total || datos.total <= 0) return toast('Escribe el total', true);
+  if (!datos.proveedor) return toast('Falta el proveedor', true);
+  if (!datos.concepto) return toast('Falta el concepto', true);
+  if (!datos.categoria) return toast('Elige una categoría', true);
+  if (datos.comprobante === 'SIN_COMPROBANTE' && datos.notas.length < 10) return toast('Explica en notas por qué no hay comprobante', true);
+  const btn = $('capGuardar'); btn.disabled = true;
+  try {
+    if (S.cap.folio){
+      await api('corregirGasto', { folio:S.cap.folio, datos });
+      toast('Corrección enviada a revisión');
+    } else {
+      const r = await api('registrarGasto', { fotoId:S.cap.fotoId, datos, sugerido:S.cap.sugerido, lectura:S.cap.lectura, modelo:S.cap.modelo });
+      toast(`${r.folio} registrado · pasa a revisión`);
+    }
+    cerrarHoja('shCaptura'); ir(S.vista === 'revisar' ? 'revisar' : S.vista);
+  } catch(e){ toast(e.message, true); }
+  finally { btn.disabled = false; }
+};
+
+function abrirCorreccion(m){
+  S.cap = { fotoId:'', lectura:null, sugerido:null, modelo:'', folio:m.folio, sin:m.comprobante==='SIN_COMPROBANTE', datos:{} };
+  $('capTitulo').textContent = 'Corregir ' + m.folio;
+  $('capShot').innerHTML = `<div class="pdf" style="color:#fff">${esc(m.folio)}${m.motivo?' · '+esc(m.motivo):''}</div>`;
+  abrirHoja('shCaptura');
+  mostrarFormulario({ total:m.total, proveedor:m.proveedor, concepto:m.concepto, fecha:m.fecha, iva:m.iva, subtotal:m.subtotal,
+    rfc:m.rfc, uuid:m.uuid, folioTicket:m.folioTicket, notas:m.notas, categoria:m.categoria, comprobante:m.comprobante, formaPago:m.formaPago }, []);
+}
+
+/* ================================================================
+ *  ARQUEO
+ * ================================================================ */
+function pintarDenominaciones(){
+  $('aDen').innerHTML = DENOM.map(d => `
+    <div class="den"><div class="v num">${d>=1?'$'+d:'50¢'}<small>${d>=20?'billete':'moneda'}</small></div>
+      <div class="step"><button type="button" data-d="${d}" data-k="-1">−</button><input inputmode="numeric" data-d="${d}" value="${S.conteo[d]||''}" placeholder="0"><button type="button" data-d="${d}" data-k="1">+</button></div>
+      <div class="sum num" id="s${String(d).replace('.','_')}">${S.conteo[d]?money(S.conteo[d]*d):''}</div></div>`).join('');
+}
+$('aDen').addEventListener('click', e => {
+  const b = e.target.closest('button[data-k]'); if (!b) return;
+  const d = Number(b.dataset.d); S.conteo[d] = Math.max(0, (S.conteo[d]||0) + Number(b.dataset.k));
+  b.parentElement.querySelector('input').value = S.conteo[d] || ''; recalcularArqueo();
+});
+$('aDen').addEventListener('input', e => { const i = e.target; if (!i.dataset.d) return; S.conteo[Number(i.dataset.d)] = Math.max(0, parseInt(i.value)||0); recalcularArqueo(); });
+function recalcularArqueo(){
+  let t = 0;
+  DENOM.forEach(d => { const n = S.conteo[d]||0; t += n*d; const s = $('s'+String(d).replace('.','_')); if (s) s.textContent = n ? money(n*d) : ''; });
+  $('aCont').textContent = money0(t);
+  const sis = S.resumen?.estado?.saldo;
+  if (sis === undefined){ $('aDif').textContent = '—'; return; }
+  const dif = Math.round((t - sis)*100)/100;
+  $('aDif').textContent = (dif>0?'+':'') + money(dif);
+  $('aDif').className = 'num ' + (Math.abs(dif) < .01 ? 'd-ok' : 'd-bad');
+}
+async function cargarArqueo(){
+  pintarDenominaciones();
+  try {
+    if (!S.resumen) S.resumen = await api('resumen');
+    $('aSis').textContent = money0(S.resumen.estado.saldo);
+    recalcularArqueo();
+    const r = await api('arqueos');
+    $('aHist').innerHTML = r.arqueos.length ? r.arqueos.map(a => `
+      <div class="row"><span class="dot">${Math.abs(a.diferencia)<.01?'✓':'!'}</span><span class="mid"><div class="t">${esc(a.folio)} · ${esc(a.por)}</div><div class="s">${esc(a.fecha)} · contado ${money(a.contado)} · sistema ${money(a.sistema)}</div></span>
+      <span class="amt num" style="color:${Math.abs(a.diferencia)<.01?'var(--ok)':'var(--bad)'}">${a.diferencia>0?'+':''}${money(a.diferencia)}</span></div>`).join('') : '<div class="empty">Sin arqueos todavía.</div>';
+  } catch(e){ toast(e.message, true); }
+}
+$('aGuardar').onclick = async () => {
+  const total = DENOM.reduce((s,d) => s + (S.conteo[d]||0)*d, 0);
+  if (!confirm(`Registrar arqueo con ${money(total)} contados?\nSi hay diferencia se generará un ajuste para revisión.`)) return;
+  const btn = $('aGuardar'); btn.disabled = true;
+  try {
+    const conteo = {}; DENOM.forEach(d => { if (S.conteo[d]) conteo[String(d)] = S.conteo[d]; });
+    const r = await api('arqueo', { conteo, notas:$('aNotas').value });
+    toast(Math.abs(r.diferencia) < .01 ? `${r.folio} · caja cuadrada ✓` : `${r.folio} · diferencia ${money(r.diferencia)} (ajuste ${r.ajuste})`, Math.abs(r.diferencia) >= .01);
+    S.conteo = {}; $('aNotas').value = ''; S.resumen = await api('resumen'); cargarArqueo();
+  } catch(e){ toast(e.message, true); }
+  finally { btn.disabled = false; }
+};
+$('btnArqueoMas').onclick = () => ir('arqueo');
+
+/* ================================================================
+ *  MÁS · REPOSICIÓN Y FONDO
+ * ================================================================ */
+async function cargarMas(){
+  const u = S.usuario;
+  if (u.admin && S.resumen){
+    const f = S.resumen.fondo;
+    $('cfNombre').value = f.nombre; $('cfMonto').value = f.montoFijo || ''; $('cfTope').value = f.tope ?? '';
+    $('cfUmbral').value = f.umbral ?? 30; $('cfCustNom').value = f.custodioNombre; $('cfCustCor').value = f.custodioCorreo;
+  }
+  if (!u.aprueba) return;
+  $('repCard').innerHTML = '<div class="empty">Cargando…</div>';
+  try {
+    const [p, l] = await Promise.all([api('prepararReposicion'), api('reposiciones')]);
+    $('repCard').innerHTML = `
+      <div class="row"><div class="mid"><div class="t">Aprobado por reponer</div><div class="s">${p.movimientos.length} comprobante${p.movimientos.length===1?'':'s'}${p.pendientesDeRevision?` · ${p.pendientesDeRevision} aún en revisión (${money0(p.montoPendienteRevision)})`:''}</div></div>
+        <span class="amt num serif" style="font-size:24px">${money(p.monto)}</span></div>
+      <div style="padding:0 14px 14px"><button class="btn" id="btnSolicitar" ${p.monto>0?'':'disabled'}>Generar solicitud de reposición</button></div>`;
+    $('btnSolicitar').onclick = async () => {
+      if (!confirm(`Generar reposición por ${money(p.monto)} con ${p.movimientos.length} comprobantes?`)) return;
+      try { const r = await api('solicitarReposicion', {}); toast(`${r.folio} solicitada`); verRelacion(r.folio); cargarMas(); } catch(e){ toast(e.message, true); }
+    };
+    $('repLista').innerHTML = l.reposiciones.length ? l.reposiciones.map(r => `
+      <button class="row" onclick="verRelacion('${esc(r.folio)}')"><span class="dot">${r.estado==='ENTREGADA'?'✓':'…'}</span>
+        <span class="mid"><div class="t">${esc(r.folio)}</div><div class="s">${esc(r.solicitadaEn.slice(0,10))} · ${r.n} comprobantes${r.recibidaPor?' · recibió '+esc(r.recibidaPor):''}</div></span>
+        <span class="amt num">${money(r.monto)}<br><span class="pill ${r.estado==='ENTREGADA'?'p-APROBADO':'p-PENDIENTE'}">${r.estado==='ENTREGADA'?'Entregada':'Por entregar'}</span></span></button>`).join('') : '<div class="empty">Sin reposiciones todavía.</div>';
+  } catch(e){ toast(e.message, true); }
+}
+
+async function verRelacion(folio){
+  $('repCuerpo').innerHTML = '<div class="empty">Cargando…</div>';
+  abrirHoja('shRep');
+  try {
+    const r = await api('detalleReposicion', { folio });
+    const rp = r.reposicion;
+    const porCat = {}; r.movimientos.forEach(m => porCat[m.categoria] = (porCat[m.categoria]||0) - m.efecto);
+    $('repCuerpo').innerHTML = `
+      <div class="hero" style="margin-bottom:12px"><div class="lbl">${esc(rp.folio)} · ${esc(r.fondo.nombre)}</div><div class="saldo num">${esc(money(rp.monto))}</div>
+        <div class="de">${rp.n} comprobantes · solicitada ${esc(rp.solicitadaEn)}${rp.estado==='ENTREGADA'?' · entregada '+esc(rp.entregadaEn):''}</div></div>
+      <div class="cats">${Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([c,v]) => `<div class="cat"><span>${esc(c)}</span><b class="num">${money(v)}</b></div>`).join('')}</div>
+      <div class="list">${r.movimientos.map(filaMov).join('')}</div>
+      <div class="actions">
+        ${rp.estado==='SOLICITADA' ? `<button class="btn ok" id="btnEntregar">Registrar entrega del efectivo</button>` : ''}
+        <button class="btn sec" id="btnImprimir">Imprimir relación</button>
+      </div>`;
+    $('btnImprimir').onclick = () => imprimirRelacion(r);
+    if ($('btnEntregar')) $('btnEntregar').onclick = async () => {
+      const quien = prompt('¿Quién recibe el efectivo en caja?', r.fondo.custodioNombre || ''); if (quien === null) return;
+      try { await api('entregarReposicion', { folio:rp.folio, recibidaPor:quien }); toast('Fondo repuesto ✓'); cerrarHoja('shRep'); S.resumen = null; cargarMas(); }
+      catch(e){ toast(e.message, true); }
+    };
+  } catch(e){ $('repCuerpo').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+function imprimirRelacion(r){
+  const rp = r.reposicion;
+  $('printArea').innerHTML = `
+    <div style="font-size:10px;letter-spacing:.3em;font-weight:700">ZORVIX</div>
+    <h1>Relación de gastos · ${esc(rp.folio)}</h1>
+    <div>${esc(r.fondo.nombre)} · Solicitada ${esc(rp.solicitadaEn)} por ${esc(rp.solicitadaPor)} · ${rp.n} comprobantes</div>
+    <table><thead><tr><th>Folio</th><th>Fecha</th><th>Proveedor</th><th>Concepto</th><th>Categoría</th><th>Comp.</th><th>Registró</th><th>Aprobó</th><th class="n">Importe</th></tr></thead>
+    <tbody>${r.movimientos.map(m => `<tr><td>${esc(m.folio)}</td><td>${esc(m.fecha)}</td><td>${esc(m.proveedor)}</td><td>${esc(m.concepto)}</td><td>${esc(m.categoria)}</td><td>${esc(m.comprobante)}${m.uuid?'<br><small>'+esc(m.uuid)+'</small>':''}</td><td>${esc(m.registradoNombre)}</td><td>${esc(m.revisadoPor)}</td><td class="n">${money(-m.efecto)}</td></tr>`).join('')}
+    <tr><td colspan="8" style="text-align:right;font-weight:700">Total a reponer</td><td class="n" style="font-weight:700">${money(rp.monto)}</td></tr></tbody></table>
+    <div class="firmas"><div>Custodio del fondo</div><div>Revisó</div><div>Autorizó y entregó</div></div>`;
+  window.print();
+}
+
+$('cfGuardar').onclick = async () => {
+  const fondo = { id:S.resumen?.fondo?.id, nombre:$('cfNombre').value.trim(), montoFijo:numIn($('cfMonto').value),
+    tope:numIn($('cfTope').value), umbral:numIn($('cfUmbral').value), custodioNombre:$('cfCustNom').value.trim(), custodioCorreo:$('cfCustCor').value.trim() };
+  if (fondo.montoFijo === null) return toast('Escribe el monto fijo', true);
+  const ant = S.resumen?.fondo?.montoFijo || 0;
+  if (fondo.montoFijo !== ant && !confirm(`El monto fijo pasa de ${money(ant)} a ${money(fondo.montoFijo)}.\nSe registrará un ${fondo.montoFijo>ant?'ingreso':'retiro'} de ${money(Math.abs(fondo.montoFijo-ant))} en efectivo. ¿Continuar?`)) return;
+  try { await api('configurarFondo', { fondo }); toast('Fondo guardado'); S.resumen = await api('resumen'); cargarMas(); } catch(e){ toast(e.message, true); }
+};
+
+$('btnSalir').onclick = () => salir(false);
+$('avatar').onclick = () => ir('mas');
+
+/* ---------------- arranque ---------------- */
+(function arrancar(){
+  initGIS();
+  const s = lsGet();
+  if (s && s.token && s.usuario && Date.now() - (s.t||0) < 11.5*3600e3){ S.token = s.token; S.usuario = s.usuario; entrar(); }
+})();
+</script>
+</body>
+</html>
