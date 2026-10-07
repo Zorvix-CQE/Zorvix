@@ -698,6 +698,54 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
           </div>
         </div>
 
+        <!-- Cotización del caso.
+
+             Lo que se opera no siempre es lo que se programó: el paciente llega
+             a una blefaroplastia y antes de entrar decide también un implante de
+             mentón. Aquí se agrega, el caso se recalcula completo —el más caro
+             siempre al 100%— y se ve la diferencia a cobrar. El ajuste de precio
+             vive aquí mismo, cerrado por rol y con motivo obligatorio: el precio
+             del quirófano es ingreso de Zorvix, no del cirujano que lo renta. -->
+        <div id="c-cotiza-caja" class="oculto">
+          <h3 class="grupo">Cotización</h3>
+          <div id="c-cotiza"></div>
+          <div class="fila">
+            <button class="btn sec oculto" id="c-recotizar" type="button">Agregar o cambiar procedimientos</button>
+            <button class="btn sec oculto" id="c-ajustar" type="button">Ajustar el precio</button>
+          </div>
+
+          <div id="c-recotiza-caja" class="oculto">
+            <div class="fila" style="margin:0 0 12px">
+              <input id="c-filtro-proc" placeholder="Filtrar procedimientos" style="flex:1;min-width:220px">
+              <label style="display:flex;align-items:center;gap:8px;white-space:nowrap">Noches
+                <input type="number" id="c-noches" min="0" max="14" step="1" style="width:84px"></label>
+            </div>
+            <div id="c-procs" class="tabla-scroll" style="max-height:230px;overflow:auto"></div>
+            <div id="c-previa"></div>
+            <div class="fila">
+              <button class="btn" id="c-recotiza-ok" type="button">Guardar la nueva cotización</button>
+              <button class="btn sec" id="c-recotiza-no" type="button">Cancelar</button>
+              <span id="c-recotiza-msg"></span>
+            </div>
+          </div>
+
+          <div id="c-ajuste-caja" class="oculto" style="margin-top:12px">
+            <div class="rejilla">
+              <div><label>Descuento o sobreprecio ($)</label>
+                <input type="number" id="c-ajuste-monto" step="100" placeholder="en negativo = descuento"></div>
+              <div><label>…o en porcentaje (%)</label>
+                <input type="number" id="c-ajuste-pct" step="1" placeholder="en negativo = descuento"></div>
+              <div style="grid-column:1/-1"><label>Motivo *</label>
+                <input id="c-ajuste-motivo" placeholder="Queda asentado con su nombre y la hora."></div>
+            </div>
+            <div class="fila">
+              <button class="btn" id="c-ajuste-ok" type="button">Aplicar el ajuste</button>
+              <button class="btn sec" id="c-ajuste-no" type="button">Cancelar</button>
+              <span id="c-ajuste-msg"></span>
+            </div>
+          </div>
+        </div>
+
         <div class="fila">
           <button class="btn sec" id="c-ficha" type="button">Abrir ficha del paciente</button>
           <button class="btn sec" id="c-expediente" type="button">Abrir expediente</button>
@@ -1173,6 +1221,7 @@ async function abreCaso(id){
   pintaPrequirurgica(r.caso, !!r.puedo_editar);
   $('c-msg').textContent = '';
   muestra('vista-caso');
+  cargaCotizacionDeCaso(id, !!r.puedo_editar);
 }
 
 $('c-volver').onclick = function(){ muestra('agenda'); };
@@ -1596,6 +1645,242 @@ document.addEventListener('DOMContentLoaded', function(){
     $('r-cotiza').innerHTML = '';
     delete $('r-duracion').dataset.tocado;
     pintaProcedimientos();
+  };
+});
+
+/* ── Cotización dentro del caso ────────────────────────────────
+   Dos cosas que la realidad del quirófano exige:
+
+   1. AGREGAR PROCEDIMIENTOS el mismo día. Se recalcula el caso COMPLETO,
+      no se le suma lo nuevo al 50% sobre lo viejo, porque la regla dice
+      que el 100% es siempre el más caro. Si lo agregado resulta más caro
+      que lo programado, el que sube al 100% es el nuevo. Por eso la
+      pantalla muestra los tres números: lo que estaba, lo que queda y la
+      diferencia a cobrar.
+
+   2. AJUSTAR EL PRECIO. El botón sólo aparece si el rol lo permite, y el
+      backend lo vuelve a verificar: que un botón esté escondido no es una
+      medida de seguridad. */
+
+let COT_CASO = null, COT_ELEGIDOS = [], COT_PERMISOS = null, RELOJ_PREVIA = null;
+
+async function cargaCotizacionDeCaso(casoId, puedoEditar){
+  $('c-cotiza-caja').classList.add('oculto');
+  $('c-recotiza-caja').classList.add('oculto');
+  $('c-ajuste-caja').classList.add('oculto');
+  $('c-recotiza-msg').textContent = '';
+  $('c-ajuste-msg').textContent = '';
+
+  let d;
+  try{ d = await api('procedimientosDeCaso', {casoId: casoId}); }
+  catch(e){
+    /* Un backend sin el módulo de ajustes no debe romper la pantalla del
+       caso: simplemente no se ofrece la cotización. */
+    return;
+  }
+
+  COT_CASO = d;
+  COT_ELEGIDOS = (d.procedimientos || []).slice();
+  COT_PERMISOS = d.permisos || {};
+
+  $('c-cotiza-caja').classList.remove('oculto');
+  pintaCotizacionCaso(d);
+
+  $('c-recotizar').classList.toggle('oculto',
+    !(puedoEditar && COT_PERMISOS.puedeRecotizar));
+  $('c-ajustar').classList.toggle('oculto',
+    !(puedoEditar && COT_PERMISOS.puedeAjustar && d.cotizacion));
+}
+
+function pintaCotizacionCaso(d){
+  const c = d.cotizacion;
+  if (!c){
+    $('c-cotiza').innerHTML = '<div class="aviso warn">Este caso todavía no tiene cotización. ' +
+      'Use «Agregar o cambiar procedimientos» para generarla.</div>';
+    return;
+  }
+
+  const renglones = (d.conceptos || []).map(function(x){
+    const f = Number(x.Factor);
+    return '<tr><td>' + esc(x.Nombre) + '</td>' +
+           '<td style="text-align:right">' + pesos(x.Precio_Lista) + '</td>' +
+           '<td style="text-align:right">' + (f === 1 ? '100%' : Math.round(f*100) + '%') + '</td>' +
+           '<td style="text-align:right"><b>' + pesos(x.Importe) + '</b></td></tr>';
+  }).join('');
+
+  const noches = Number(c.Subtotal_Noches) > 0
+    ? '<tr><td colspan="3">' + esc(c.Noches_Cotizadas) + ' noche(s) a ' + pesos(c.Tarifa_Noche) +
+      '</td><td style="text-align:right">' + pesos(c.Subtotal_Noches) + '</td></tr>'
+    : '';
+
+  const ajuste = Number(c.Ajuste_Monto)
+    ? '<tr><td colspan="3">' + (Number(c.Ajuste_Monto) < 0 ? 'Descuento' : 'Sobreprecio') +
+      ' · ' + esc(c.Ajuste_Motivo || '') + '</td>' +
+      '<td style="text-align:right">' + (Number(c.Ajuste_Monto) > 0 ? '+' : '−') +
+      pesos(Math.abs(Number(c.Ajuste_Monto))) + '</td></tr>'
+    : '';
+
+  const firma = Number(c.Ajuste_Monto)
+    ? '<div class="sub" style="margin-top:8px">Ajustado por ' + esc(c.Ajuste_Por || '') +
+      ' el ' + esc(String(c.Ajuste_Timestamp || '').replace('T',' ').slice(0,16)) +
+      ' · precio calculado ' + pesos(c.Subtotal_Antes_Ajuste) + '</div>'
+    : '';
+
+  $('c-cotiza').innerHTML =
+    '<div class="tabla-scroll"><table>' +
+      '<tr><th>Concepto</th><th style="text-align:right">Lista</th>' +
+      '<th style="text-align:right">Factor</th><th style="text-align:right">Importe</th></tr>' +
+      renglones + noches + ajuste +
+      '<tr><td colspan="3"><b>Total Zorvix</b></td>' +
+      '<td style="text-align:right"><b>' + pesos(c.Total) + '</b></td></tr>' +
+    '</table></div>' +
+    '<div class="sub" style="margin-top:8px">' + esc(c.Folio_Cotizacion || '') +
+      (c.Vigencia_Hasta ? ' · vigente hasta ' + esc(c.Vigencia_Hasta) : '') + '</div>' +
+    firma;
+}
+
+function pintaProcsCaso(){
+  const f = ($('c-filtro-proc').value || '').trim().toLowerCase();
+  const lista = CATALOGO.filter(function(p){
+    return !f || String(p.nombre).toLowerCase().indexOf(f) >= 0;
+  });
+  if (!lista.length){
+    $('c-procs').innerHTML = '<div class="aviso warn">Sin procedimientos que coincidan.</div>';
+    return;
+  }
+  $('c-procs').innerHTML = '<table><tr><th style="width:36px"></th><th>Procedimiento</th>' +
+    '<th style="text-align:right">Lista</th></tr>' +
+    lista.map(function(p){
+      const m = COT_ELEGIDOS.indexOf(p.id) >= 0 ? ' checked' : '';
+      return '<tr><td><input type="checkbox" class="chk-cproc" data-pid="' + esc(p.id) + '"' + m + '></td>' +
+             '<td>' + esc(p.nombre) + '</td>' +
+             '<td style="text-align:right">' + pesos(p.precio) + '</td></tr>';
+    }).join('') + '</table>';
+
+  $('c-procs').querySelectorAll('.chk-cproc').forEach(function(ch){
+    ch.onchange = function(){
+      const id = ch.dataset.pid, i = COT_ELEGIDOS.indexOf(id);
+      if (ch.checked && i < 0) COT_ELEGIDOS.push(id);
+      if (!ch.checked && i >= 0) COT_ELEGIDOS.splice(i, 1);
+      programaPrevia();
+    };
+  });
+}
+
+function programaPrevia(){
+  if (RELOJ_PREVIA) clearTimeout(RELOJ_PREVIA);
+  RELOJ_PREVIA = setTimeout(previaRecotiza, 350);
+}
+
+/* La previa no escribe nada: es para que se vea la diferencia ANTES de
+   comprometerla, no después. */
+async function previaRecotiza(){
+  if (!COT_ELEGIDOS.length){ $('c-previa').innerHTML = ''; return; }
+  const antes = COT_CASO && COT_CASO.cotizacion ? Number(COT_CASO.cotizacion.Total) || 0 : 0;
+  try{
+    const r = await api('cotizar', {
+      procedimientos: COT_ELEGIDOS,
+      noches: $('c-noches').value === '' ? null : Number($('c-noches').value)
+    });
+    const dif = r.total - antes;
+    $('c-previa').innerHTML =
+      '<div class="tabla-scroll" style="margin-top:12px"><table>' +
+        r.conceptos.map(function(x){
+          return '<tr><td>' + esc(x.nombre) + '</td>' +
+                 '<td style="text-align:right">' + pesos(x.precioLista) + '</td>' +
+                 '<td style="text-align:right">' + (x.factor === 1 ? '100%' : Math.round(x.factor*100) + '%') + '</td>' +
+                 '<td style="text-align:right"><b>' + pesos(x.importe) + '</b></td></tr>';
+        }).join('') +
+        (r.subtotalNoches > 0
+          ? '<tr><td colspan="3">' + r.noches + ' noche(s) a ' + pesos(r.tarifaNoche) +
+            '</td><td style="text-align:right">' + pesos(r.subtotalNoches) + '</td></tr>' : '') +
+        '<tr><td colspan="3">Estaba cotizado en</td><td style="text-align:right">' + pesos(antes) + '</td></tr>' +
+        '<tr><td colspan="3"><b>Queda en</b></td><td style="text-align:right"><b>' + pesos(r.total) + '</b></td></tr>' +
+        '<tr><td colspan="3"><b>' + (dif >= 0 ? 'Diferencia a cobrar' : 'A favor del paciente') + '</b></td>' +
+        '<td style="text-align:right"><b>' + (dif >= 0 ? '' : '−') + pesos(Math.abs(dif)) + '</b></td></tr>' +
+      '</table></div>' +
+      ((r.avisos || []).length
+        ? '<div class="aviso warn" style="margin-top:12px">' + r.avisos.map(esc).join('<br>') + '</div>' : '') +
+      (NO_INCLUYE ? '<div class="sub" style="margin-top:8px">' + esc(NO_INCLUYE) + '</div>' : '');
+  }catch(e){ aviso('c-previa','malo', e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  $('c-recotizar').onclick = function(){
+    $('c-ajuste-caja').classList.add('oculto');
+    const abierta = !$('c-recotiza-caja').classList.contains('oculto');
+    $('c-recotiza-caja').classList.toggle('oculto', abierta);
+    if (abierta) return;
+    $('c-noches').value = COT_CASO && COT_CASO.noches ? COT_CASO.noches : '';
+    $('c-filtro-proc').value = '';
+    pintaProcsCaso();
+    previaRecotiza();
+  };
+  $('c-filtro-proc').oninput = pintaProcsCaso;
+  $('c-noches').oninput = programaPrevia;
+  $('c-recotiza-no').onclick = function(){
+    $('c-recotiza-caja').classList.add('oculto');
+    COT_ELEGIDOS = COT_CASO ? (COT_CASO.procedimientos || []).slice() : [];
+  };
+
+  $('c-recotiza-ok').onclick = async function(){
+    if (!COT_ELEGIDOS.length){
+      aviso('c-recotiza-msg','warn','Elija al menos un procedimiento.'); return;
+    }
+    try{
+      const r = await api('recotizarCaso', {
+        casoId: COT_CASO.casoId,
+        procedimientos: COT_ELEGIDOS,
+        noches: $('c-noches').value === '' ? null : Number($('c-noches').value),
+        momento: 'Dia de cirugia'
+      });
+      $('c-recotiza-msg').innerHTML = '<span class="pastilla ok">' + esc(r.folio) + ': ' +
+        esc(pesos(r.total)) + '</span>' +
+        (r.diferencia ? ' <span class="pastilla warn">' +
+          (r.diferencia > 0 ? 'a cobrar ' : 'a favor ') + esc(pesos(Math.abs(r.diferencia))) +
+          '</span>' : '');
+      $('c-recotiza-caja').classList.add('oculto');
+      await cargaCotizacionDeCaso(COT_CASO.casoId, true);
+    }catch(e){ aviso('c-recotiza-msg','malo', e.message); }
+  };
+
+  $('c-ajustar').onclick = function(){
+    $('c-recotiza-caja').classList.add('oculto');
+    $('c-ajuste-caja').classList.toggle('oculto',
+      !$('c-ajuste-caja').classList.contains('oculto'));
+    ['c-ajuste-monto','c-ajuste-pct','c-ajuste-motivo'].forEach(i => $(i).value = '');
+    $('c-ajuste-msg').textContent = '';
+  };
+  $('c-ajuste-no').onclick = function(){ $('c-ajuste-caja').classList.add('oculto'); };
+
+  /* Monto y porcentaje son la misma decisión escrita de dos formas: llenar
+     uno limpia el otro, para que nunca se manden los dos en desacuerdo. */
+  $('c-ajuste-monto').oninput = function(){ if ($('c-ajuste-monto').value !== '') $('c-ajuste-pct').value = ''; };
+  $('c-ajuste-pct').oninput = function(){ if ($('c-ajuste-pct').value !== '') $('c-ajuste-monto').value = ''; };
+
+  $('c-ajuste-ok').onclick = async function(){
+    const monto = $('c-ajuste-monto').value, pct = $('c-ajuste-pct').value;
+    const motivo = $('c-ajuste-motivo').value.trim();
+    const minimo = (COT_PERMISOS && COT_PERMISOS.motivoMinimo) || 10;
+    if (monto === '' && pct === ''){
+      aviso('c-ajuste-msg','warn','Escriba el monto o el porcentaje.'); return;
+    }
+    if (motivo.length < minimo){
+      aviso('c-ajuste-msg','warn','El motivo necesita al menos ' + minimo + ' caracteres.'); return;
+    }
+    try{
+      const r = await api('ajustarCotizacion', {
+        cotizacionId: COT_CASO.cotizacion.Cotizacion_ID,
+        monto: monto === '' ? null : Number(monto),
+        pct: pct === '' ? null : Number(pct),
+        motivo: motivo
+      });
+      $('c-ajuste-msg').innerHTML = '<span class="pastilla ok">' +
+        esc(r.tipo === 'descuento' ? 'Descuento' : 'Sobreprecio') + ' de ' +
+        esc(pesos(Math.abs(r.ajuste))) + ' · total ' + esc(pesos(r.total)) + '</span>';
+      $('c-ajuste-caja').classList.add('oculto');
+      await cargaCotizacionDeCaso(COT_CASO.casoId, true);
+    }catch(e){ aviso('c-ajuste-msg','malo', e.message); }
   };
 });
 
