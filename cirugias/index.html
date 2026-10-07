@@ -516,6 +516,20 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
       </div>
 
       <div class="tarjeta">
+        <h2>Cotización</h2>
+        <p class="sub">Lo que cobra Zorvix por este tiempo quirúrgico. El procedimiento más caro va al 100% de lista; del segundo en adelante, 50%. La noche de cama se cobra una sola vez.</p>
+        <div class="fila" style="margin:0 0 12px">
+          <input id="r-filtro-proc" placeholder="Filtrar procedimientos" style="flex:1;min-width:220px">
+          <label style="display:flex;align-items:center;gap:8px;white-space:nowrap">Noches
+            <input type="number" id="r-noches" min="0" max="14" step="1" style="width:84px">
+          </label>
+          <button class="btn sec" id="r-limpiar-proc" type="button">Limpiar</button>
+        </div>
+        <div id="r-procs" class="tabla-scroll" style="max-height:250px;overflow:auto"></div>
+        <div id="r-cotiza"></div>
+      </div>
+
+      <div class="tarjeta">
         <h2>Paciente</h2>
         <p class="sub">Con estos cuatro datos basta para cerrar el compromiso. La ficha completa la termina Zorvix.</p>
         <div class="fila" style="margin:0 0 16px">
@@ -962,7 +976,7 @@ async function entro(resp, silencioso){
     }
     fijaCirujano();
     pintaTabs();
-    await Promise.all([cargaPaquetes(), cargaCasos(), cargaMedicos()]);
+    await Promise.all([cargaPaquetes(), cargaCasos(), cargaMedicos(), cargaCatalogoCotizador()]);
   }catch(e){
     TOKEN = null;
     olvidaSesion();
@@ -1420,15 +1434,170 @@ $('r-guardar').onclick = async function(){
      escribir su preanestésica. Por eso se dice en el acuse, no se calla. */
   try{
     const r = await api('crearCaso', datos);
+
+    /* La cotización se guarda DESPUÉS y aparte: el apartado del quirófano
+       ya quedó, y si algo falla al cotizar no se puede perder el espacio.
+       Se avisa, se vuelve a cotizar desde el caso, y ya. */
+    let folioCot = '';
+    if (ELEGIDOS.length){
+      try{
+        const c = await api('guardarCotizacion', {
+          casoId: r.casoId,
+          pacienteId: r.pacienteId,
+          procedimientos: ELEGIDOS,
+          noches: $('r-noches').value === '' ? null : Number($('r-noches').value),
+          fechaCirugia: datos.Fecha_Cirugia,
+          cirujanoEmail: datos.Cirujano_Email
+        });
+        folioCot = c.folio || '';
+      }catch(e){ folioCot = null; }
+    }
+
     $('r-msg').innerHTML = '<span class="pastilla ok">Apartado: ' + esc(r.folio) + '</span>' +
+      (folioCot ? ' <span class="pastilla ok">Cotización ' + esc(folioCot) + ': ' +
+                  esc(pesos(COTIZACION ? COTIZACION.total : 0)) + '</span>' : '') +
+      (folioCot === null ? ' <span class="pastilla warn">la cotización no se guardó, vuelva a cotizarla desde el caso</span>' : '') +
       (datos.Anestesiologo_Email ? ''
         : ' <span class="pastilla warn">falta asignar anestesiólogo</span>');
+    ELEGIDOS = []; COTIZACION = null;
+    $('r-noches').value = ''; $('r-cotiza').innerHTML = '';
+    delete $('r-duracion').dataset.tocado;
+    pintaProcedimientos();
     PACIENTE_SEL = null;
     ['p-nombre','p-nacimiento','p-telefono','p-correo','r-buscar'].forEach(i => $(i).value = '');
     $('r-elegido').innerHTML = ''; $('r-nuevo').classList.remove('oculto');
     await cargaCasos();
   }catch(e){ $('r-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>'; }
 };
+
+/* ── Cotizador ─────────────────────────────────────────────────
+   El motor vive en el backend y aquí no se calcula ni un peso: el
+   número que ve el cirujano en pantalla y el que queda escrito en la
+   hoja tienen que ser el mismo, y la única forma de garantizarlo es
+   que lo calcule un solo lado. Aquí sólo se elige y se muestra. */
+
+let CATALOGO = [], ELEGIDOS = [], COTIZACION = null, RELOJ_COTIZA = null, NO_INCLUYE = '';
+
+const pesos = (n) => '$' + (Math.round(Number(n) || 0)).toLocaleString('es-MX');
+
+async function cargaCatalogoCotizador(){
+  try{
+    const r = await api('catalogoCotizador');
+    CATALOGO = r.procedimientos || [];
+    NO_INCLUYE = r.noIncluye || '';
+  }catch(e){
+    CATALOGO = [];
+    aviso('r-cotiza','warn','No se pudo cargar el tarifario: ' + e.message);
+  }
+  pintaProcedimientos();
+}
+
+function pintaProcedimientos(){
+  const f = ($('r-filtro-proc').value || '').trim().toLowerCase();
+  const lista = CATALOGO.filter(function(p){
+    return !f || String(p.nombre).toLowerCase().indexOf(f) >= 0;
+  });
+  if (!lista.length){
+    $('r-procs').innerHTML = '<div class="aviso warn">Sin procedimientos que coincidan.</div>';
+    return;
+  }
+  $('r-procs').innerHTML = '<table><tr><th style="width:36px"></th><th>Procedimiento</th><th style="text-align:right">Lista</th></tr>' +
+    lista.map(function(p){
+      const marcado = ELEGIDOS.indexOf(p.id) >= 0 ? ' checked' : '';
+      return '<tr><td><input type="checkbox" class="chk-proc" data-pid="' + esc(p.id) + '"' + marcado + '></td>' +
+             '<td>' + esc(p.nombre) + '</td>' +
+             '<td style="text-align:right">' + pesos(p.precio) + '</td></tr>';
+    }).join('') + '</table>';
+
+  $('r-procs').querySelectorAll('.chk-proc').forEach(function(c){
+    c.onchange = function(){
+      const id = c.dataset.pid;
+      const i = ELEGIDOS.indexOf(id);
+      if (c.checked && i < 0) ELEGIDOS.push(id);
+      if (!c.checked && i >= 0) ELEGIDOS.splice(i, 1);
+      programaCotizacion();
+    };
+  });
+}
+
+/* Se cotiza con un respiro: el cirujano suele marcar tres casillas
+   seguidas y no tiene caso ir al servidor en cada una. */
+function programaCotizacion(){
+  if (RELOJ_COTIZA) clearTimeout(RELOJ_COTIZA);
+  RELOJ_COTIZA = setTimeout(recotiza, 350);
+}
+
+async function recotiza(){
+  if (!ELEGIDOS.length){
+    COTIZACION = null;
+    $('r-cotiza').innerHTML = '';
+    return;
+  }
+  const noches = $('r-noches').value;
+  try{
+    const r = await api('cotizar', {
+      procedimientos: ELEGIDOS,
+      noches: noches === '' ? null : Number(noches)
+    });
+    COTIZACION = r;
+    pintaCotizacion(r);
+    /* El tarifario sabe cuánto dura y dónde cabe: si lo tiene capturado,
+       se propone, pero nunca se pisa lo que el cirujano ya escribió. */
+    if (r.minutos && !$('r-duracion').dataset.tocado) $('r-duracion').value = r.minutos;
+    if (r.noches !== undefined && $('r-noches').value === '') $('r-noches').value = r.noches;
+  }catch(e){
+    COTIZACION = null;
+    aviso('r-cotiza','malo', e.message);
+  }
+}
+
+function pintaCotizacion(r){
+  const renglones = (r.conceptos || []).map(function(c){
+    return '<tr><td>' + esc(c.nombre) + '</td>' +
+           '<td style="text-align:right">' + pesos(c.precioLista) + '</td>' +
+           '<td style="text-align:right">' + (c.factor === 1 ? '100%' : Math.round(c.factor * 100) + '%') + '</td>' +
+           '<td style="text-align:right"><b>' + pesos(c.importe) + '</b></td></tr>';
+  }).join('');
+
+  let concesion = '';
+  if (r.concesion > 0){
+    concesion = '<tr><td colspan="3">Precio cerrado de lista (la regla daba ' + pesos(r.subtotalRegla) + ')</td>' +
+                '<td style="text-align:right">−' + pesos(r.concesion) + '</td></tr>';
+  }
+
+  const noches = r.subtotalNoches > 0
+    ? '<tr><td colspan="3">' + r.noches + ' noche(s) de hospitalización a ' + pesos(r.tarifaNoche) + '</td>' +
+      '<td style="text-align:right">' + pesos(r.subtotalNoches) + '</td></tr>'
+    : '';
+
+  const avisos = (r.avisos || []).length
+    ? '<div class="aviso warn" style="margin-top:12px">' + r.avisos.map(esc).join('<br>') + '</div>'
+    : '';
+
+  $('r-cotiza').innerHTML =
+    '<div class="tabla-scroll" style="margin-top:16px"><table>' +
+      '<tr><th>Concepto</th><th style="text-align:right">Lista</th><th style="text-align:right">Factor</th><th style="text-align:right">Importe</th></tr>' +
+      renglones + concesion + noches +
+      '<tr><td colspan="3"><b>Total Zorvix</b></td><td style="text-align:right"><b>' + pesos(r.total) + '</b></td></tr>' +
+    '</table></div>' +
+    (r.quirofanoSugerido ? '<div class="sub" style="margin-top:8px">Quirófano sugerido: ' + esc(r.quirofanoSugerido) +
+      (r.minutos ? ' · ' + r.minutos + ' min incluidos' : '') + '</div>' : '') +
+    (NO_INCLUYE ? '<div class="sub" style="margin-top:8px">' + esc(NO_INCLUYE) + '</div>' : '') +
+    avisos;
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  $('r-filtro-proc').oninput = pintaProcedimientos;
+  $('r-noches').oninput = programaCotizacion;
+  $('r-duracion').addEventListener('input', function(){ $('r-duracion').dataset.tocado = '1'; });
+  $('r-limpiar-proc').onclick = function(){
+    ELEGIDOS = []; COTIZACION = null;
+    $('r-noches').value = ''; $('r-filtro-proc').value = '';
+    $('r-cotiza').innerHTML = '';
+    delete $('r-duracion').dataset.tocado;
+    pintaProcedimientos();
+  };
+});
 
 /* ── Pendientes ───────────────────────────────────────────── */
 async function cargaPendientes(){
