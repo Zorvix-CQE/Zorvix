@@ -632,6 +632,32 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
         <p class="sub" id="c-sub"></p>
         <div id="c-detalle"></div>
 
+        <!-- Cambiar al anestesiologo del caso.
+
+             El anestesiologo no es un dato informativo: es la llave con la que
+             el expediente decide quien puede abrir el caso. Los turnos se
+             mueven seguido y hasta hoy eso obligaba a editar la base a mano;
+             el dia que el correo se escribio mal, el caso quedo en manos de
+             otra persona. Aqui se elige del padron, nunca se teclea. -->
+        <div id="c-anest" class="oculto" style="margin-top:12px">
+          <div class="fila">
+            <button class="btn sec" id="c-anest-abrir" type="button">Cambiar anestesiólogo</button>
+            <span id="c-anest-msg"></span>
+          </div>
+          <div id="c-anest-caja" class="oculto" style="margin-top:8px">
+            <div class="rejilla">
+              <div style="grid-column:1/-1">
+                <label for="c-anest-sel">Anestesiólogo del caso</label>
+                <select id="c-anest-sel"><option value="">— por definir —</option></select>
+              </div>
+            </div>
+            <div class="fila">
+              <button class="btn" id="c-anest-ok" type="button">Guardar el cambio</button>
+              <button class="btn sec" id="c-anest-no" type="button">Mejor no</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Valoración prequirúrgica.
 
              Estas columnas existían en la hoja Casos desde el principio y el
@@ -1201,7 +1227,8 @@ async function abreCaso(id){
     ['Procedimiento', r.caso.Procedimiento_Principal], ['Fecha', r.caso.Fecha_Cirugia],
     ['Hora', (r.caso.Hora_Inicio||'') + ' – ' + (r.caso.Hora_Fin||'')],
     ['Quirófano', r.caso.Quirofano], ['Cama', r.caso.Cama_Asignada],
-    ['Cirujano', r.caso.Cirujano_Email], ['Anestesiólogo', r.caso.Anestesiologo_Email],
+    ['Cirujano', quienEs(r.caso.Cirujano_Nombre, r.caso.Cirujano_Email)],
+    ['Anestesiólogo', quienEs(r.caso.Anestesiologo_Nombre, r.caso.Anestesiologo_Email)],
     ['Tipo de anestesia', r.caso.Tipo_Anestesia], ['Paquete', r.caso.Paquete_ID]
   ];
   $('c-detalle').innerHTML = '<div class="tabla-scroll"><table>' + campos.map(function(f){
@@ -1219,6 +1246,7 @@ async function abreCaso(id){
   $('c-cancelar-motivo').value = '';
   $('c-ficha').classList.toggle('oculto', !r.paciente);
   pintaPrequirurgica(r.caso, !!r.puedo_editar);
+  pintaAnestesiologo(r.caso, !!r.puedo_editar);
   $('c-msg').textContent = '';
   muestra('vista-caso');
   cargaCotizacionDeCaso(id, !!r.puedo_editar);
@@ -1260,6 +1288,96 @@ $('c-cancelar-ok').onclick = async function(){
   }catch(e){ $('c-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>'; }
   finally { boton.disabled = false; }
 };
+/* ── Quien es, en la tabla del caso ───────────────────────
+   Va el nombre Y el correo. El nombre solo no sirve para esto: dos renglones
+   del padron pueden traer el mismo nombre mal escrito, y el correo es lo que
+   de verdad decide quien entra. El correo solo tampoco: nadie lee correos.
+   Juntos, un caso asignado a quien no era se ve de un vistazo. */
+function quienEs(nombre, correo){
+  const n = String(nombre || '').trim();
+  const c = String(correo || '').trim();
+  if (!n && !c) return '';
+  if (!n) return c;
+  if (!c) return n;
+  return n + ' \u00b7 ' + c;
+}
+
+/* ── Cambiar al anestesiologo del caso ────────────────────
+
+   El backend ya sabia recibir el cambio: `actualizarCaso` hace pasar
+   Anestesiologo_Email por la misma aduana que el alta —lo valida contra el
+   padron y escribe el nombre el mismo—. Lo que no existia era por donde
+   pedirselo, y por eso se terminaba editando la hoja a mano.
+
+   No se ofrece si el padron no cargo: mas vale no enseñar un boton que al
+   abrirse sale vacio. */
+function pintaAnestesiologo(caso, puedoEditar){
+  const caja  = $('c-anest');
+  const lista = (MEDICOS && MEDICOS.anestesiologos) || [];
+  caja.classList.toggle('oculto', !(puedoEditar && lista.length));
+  $('c-anest-caja').classList.add('oculto');
+  $('c-anest-msg').textContent = '';
+  if (caja.classList.contains('oculto')) return;
+
+  const actual = String(caso.Anestesiologo_Email || '').toLowerCase().trim();
+  $('c-anest-abrir').textContent = actual ? 'Cambiar anestesi\u00f3logo'
+                                          : 'Asignar anestesi\u00f3logo';
+  $('c-anest-sel').innerHTML = '<option value="">\u2014 sin anestesi\u00f3logo \u2014</option>' +
+    lista.map(function(m){
+      /* Mismo criterio que en el alta: quien tiene papeles pendientes SI
+         aparece y SI se puede elegir —reasignar no exige credenciales,
+         confirmar si—. Solo se bloquea a quien ni siquiera podria entrar. */
+      const nota = !m.disponible ? '  [' + (m.motivo || 'sin acceso') + ']'
+                 : (m.credenciales_ok === false ? '  \u00b7 papeles pendientes' : '');
+      const texto = m.nombre + (m.especialidad ? ' \u00b7 ' + m.especialidad : '') + nota;
+      return '<option value="' + esc(m.correo) + '"' +
+             (m.disponible ? '' : ' disabled') +
+             (String(m.correo).toLowerCase() === actual ? ' selected' : '') +
+             '>' + esc(texto) + '</option>';
+    }).join('');
+}
+
+$('c-anest-abrir').onclick = function(){
+  $('c-anest-caja').classList.remove('oculto');
+  $('c-anest-sel').focus();
+};
+$('c-anest-no').onclick = function(){
+  $('c-anest-caja').classList.add('oculto');
+  $('c-anest-msg').textContent = '';
+};
+
+$('c-anest-ok').onclick = async function(){
+  if (!CASO_SEL) return;
+  const correo = String($('c-anest-sel').value || '').trim().toLowerCase();
+  const antes  = String(CASO_SEL.Anestesiologo_Email || '').trim().toLowerCase();
+  if (correo === antes){
+    $('c-anest-msg').innerHTML = '<span class="pastilla">No hubo cambio</span>';
+    return;
+  }
+  /* Solo viaja el correo. El nombre lo escribe el backend desde el padron:
+     si se mandara desde aqui, el dia que el padron se corrija la hoja Casos
+     se quedaria con el nombre viejo. Al dejarlo vacio se borra, que es lo
+     correcto cuando el caso se queda sin nadie. */
+  const cambios = {Anestesiologo_Email: correo};
+  if (!correo) cambios.Anestesiologo_Nombre = '';
+
+  const boton = $('c-anest-ok');
+  boton.disabled = true;
+  $('c-anest-msg').innerHTML = '<span class="pastilla">Guardando\u2026</span>';
+  try{
+    await api('actualizarCaso', {caso_id: CASO_SEL.Caso_ID, cambios: cambios});
+    await cargaCasos();
+    await abreCaso(CASO_SEL.Caso_ID);
+    /* El aviso va al final: abreCaso vuelve a pintar el bloque y lo limpia. */
+    $('c-anest-msg').innerHTML = correo
+      ? '<span class="pastilla ok">Listo. El caso ya es suyo y el anterior deja de verlo.</span>'
+      : '<span class="pastilla warn">El caso qued\u00f3 sin anestesi\u00f3logo: ' +
+        'nadie puede entrar a escribir la preanest\u00e9sica hasta que se le asigne uno.</span>';
+  }catch(e){
+    $('c-anest-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>';
+  }finally{ boton.disabled = false; }
+};
+
 $('c-ficha').onclick  = function(){ abreFicha(PACIENTE_SEL); };
 $('c-confirmar').onclick = async function(){
   try{
