@@ -496,7 +496,14 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
         <h2>Reservar tiempo quirúrgico</h2>
         <p class="sub">El espacio queda apartado en cuanto se guarda. Se libera solo si nadie lo confirma.</p>
         <div class="rejilla">
-          <div><label>Paquete</label><select id="r-paquete"></select></div>
+          <div><label>Procedimiento</label><select id="r-paquete"></select></div>
+           <!-- Zorvix no opera solo cirugia plastica. El catalogo de paquetes
+                es de precios, no de lo que cabe en el quirofano: amarrarle la
+                agenda dejaba fuera todo lo demas. Aqui se escribe. -->
+           <div id="r-otro-caja" class="oculto">
+             <label for="r-proc-otro">¿Cuál procedimiento?</label>
+             <input id="r-proc-otro" maxlength="120"
+                    placeholder="Histeroscopia diagnóstica"></div>
           <div><label>Quirófano</label><select id="r-quirofano"></select></div>
           <div><label>Fecha</label><input type="date" id="r-fecha"></div>
           <div><label>Hora de inicio</label><input type="time" id="r-hora" step="900"></div>
@@ -1517,10 +1524,15 @@ async function cargaPaquetes(){
   s.innerHTML = '<option value="">— elija el procedimiento —</option>' + PAQUETES.map(function(p){
     return '<option value="'+esc(p.Paquete_ID)+'" data-min="'+esc(p.Minutos_Quirofano_Incluidos||'')+
            '" data-q="'+esc(p.Quirofano_Elegible||'')+'">'+esc(p.Nombre||p.Paquete_ID)+'</option>';
-  }).join('');
+  }).join('') +
+    /* Va al final, no al principio: lo de todos los dias es el paquete. */
+    '<option value="__otro__">\u2014 otro procedimiento: lo escribo yo \u2014</option>';
   s.onchange = function(){
     const o = s.selectedOptions[0];
     if (o && o.dataset.min) $('r-duracion').value = o.dataset.min;
+    /* Sin paquete no hay minutos que heredar: la duracion se teclea, y por eso
+       el campo se deja como este para que quien captura la vea y la corrija. */
+    muestraOtroProcedimiento(s.value === '__otro__');
   };
   try{
     const d = await api('disponibilidad', {dias: 30});
@@ -1530,6 +1542,32 @@ async function cargaPaquetes(){
                (q.minutos_max ? ' (hasta '+esc(q.minutos_max)+' min)' : '')+'</option>';
       }).join('');
   }catch(e){ /* el backend ya avisó */ }
+}
+
+/* El campo abierto no sustituye al cat\u00e1logo, lo complementa: un paquete
+   trae precio, minutos y qui\u00e1rofano elegible, y eso no se quiere perder en
+   lo que s\u00ed est\u00e1 tabulado. El texto libre es para lo que no lo est\u00e1. */
+function muestraOtroProcedimiento(on){
+  const caja = $('r-otro-caja');
+  if (!caja) return;
+  caja.classList.toggle('oculto', !on);
+  if (on) $('r-proc-otro').focus(); else $('r-proc-otro').value = '';
+}
+
+/* Lo que se va a escribir en la hoja Casos. Con paquete, el nombre del
+   paquete; sin \u00e9l, lo que se tecle\u00f3. Nunca los dos. */
+function procedimientoElegido(){
+  const s = $('r-paquete');
+  if (s.value === '__otro__'){
+    return { paquete: '', texto: String($('r-proc-otro').value || '').trim(), abierto: true };
+  }
+  /* Sin nada elegido, el textContent de la opcion es el letrero «elija el
+     procedimiento»: hasta hoy ese letrero se guardaba como si fuera el nombre
+     de la cirugia y de ahi pasaba a la hoja frontal. No es un procedimiento. */
+  if (!s.value) return { paquete: '', texto: '', abierto: false };
+  return { paquete: s.value,
+           texto: String((s.selectedOptions[0] || {}).textContent || '').trim(),
+           abierto: false };
 }
 
 $('r-ver').onclick = async function(){
@@ -1570,14 +1608,15 @@ $('r-buscar-btn').onclick = async function(){
 };
 
 $('r-guardar').onclick = async function(){
+  const PROC = procedimientoElegido();
   const datos = {
     Quirofano: $('r-quirofano').value,
     Fecha_Cirugia: $('r-fecha').value,
     Hora_Inicio: $('r-hora').value,
     Duracion_Estimada_Min: $('r-duracion').value,
     Tiempo_Bloqueado_Min: $('r-duracion').value,
-    Paquete_ID: $('r-paquete').value,
-    Procedimiento_Principal: ($('r-paquete').selectedOptions[0]||{}).textContent || '',
+    Paquete_ID: PROC.paquete,
+    Procedimiento_Principal: PROC.texto,
     Tipo_Anestesia: $('r-anestesia').value,
     Cirujano_Email: $('r-cirujano').value.trim().toLowerCase(),
     Anestesiologo_Email: $('r-anestesiologo').value.trim().toLowerCase()
@@ -1592,6 +1631,16 @@ $('r-guardar').onclick = async function(){
   }
   if (!datos.Quirofano || !datos.Fecha_Cirugia || !datos.Hora_Inicio){
     aviso('r-msg','warn','Faltan quirófano, fecha u hora.'); return;
+  }
+  /* Un caso sin procedimiento escrito sale despu\u00e9s en blanco en la hoja
+     frontal, en la nota preoperatoria y en la lista de verificaci\u00f3n. Se
+     detiene aqu\u00ed, que es donde cuesta diez segundos arreglarlo. */
+  if (!datos.Procedimiento_Principal){
+    aviso('r-msg','warn', PROC.abierto
+      ? 'Escriba cu\u00e1l es el procedimiento.'
+      : 'Falta el procedimiento: el\u00edjalo de la lista o use \u00abotro procedimiento\u00bb.');
+    if (PROC.abierto) $('r-proc-otro').focus();
+    return;
   }
   if (!datos.Cirujano_Email){
     aviso('r-msg','warn','Falta el cirujano: es quien va a poder abrir el caso.'); return;
@@ -1632,6 +1681,8 @@ $('r-guardar').onclick = async function(){
     pintaProcedimientos();
     PACIENTE_SEL = null;
     ['p-nombre','p-nacimiento','p-telefono','p-correo','r-buscar'].forEach(i => $(i).value = '');
+    $('r-paquete').value = '';
+    muestraOtroProcedimiento(false);
     $('r-elegido').innerHTML = ''; $('r-nuevo').classList.remove('oculto');
     await cargaCasos();
   }catch(e){ $('r-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>'; }
