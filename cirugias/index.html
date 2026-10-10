@@ -504,6 +504,10 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
              <label for="r-proc-otro">¿Cuál procedimiento?</label>
              <input id="r-proc-otro" maxlength="120"
                     placeholder="Histeroscopia diagnóstica"></div>
+           <div id="r-precio-caja" class="oculto">
+             <label for="r-proc-precio">Precio del procedimiento</label>
+             <input type="number" id="r-proc-precio" min="0" step="100"
+                    inputmode="numeric" placeholder="18500"></div>
           <div><label>Quirófano</label><select id="r-quirofano"></select></div>
           <div><label>Fecha</label><input type="date" id="r-fecha"></div>
           <div><label>Hora de inicio</label><input type="time" id="r-hora" step="900"></div>
@@ -1551,7 +1555,21 @@ function muestraOtroProcedimiento(on){
   const caja = $('r-otro-caja');
   if (!caja) return;
   caja.classList.toggle('oculto', !on);
-  if (on) $('r-proc-otro').focus(); else $('r-proc-otro').value = '';
+  $('r-precio-caja').classList.toggle('oculto', !on);
+  if (on){ $('r-proc-otro').focus(); }
+  else { $('r-proc-otro').value = ''; $('r-proc-precio').value = ''; }
+  programaCotizacion();
+}
+
+/* El rengl\u00f3n de precio a mano que viaja al backend, o null si no hay.
+   Van juntos a prop\u00f3sito: un procedimiento escrito sin precio no se cotiza
+   —no se le inventa cero— y un precio sin procedimiento no significa nada. */
+function manualDeCotizacion(){
+  if ($('r-paquete').value !== '__otro__') return null;
+  const nombre = String($('r-proc-otro').value || '').trim();
+  const precio = Number($('r-proc-precio').value);
+  if (!nombre || !(precio > 0)) return null;
+  return { nombre: nombre, precio: precio };
 }
 
 /* Lo que se va a escribir en la hoja Casos. Con paquete, el nombre del
@@ -1655,12 +1673,14 @@ $('r-guardar').onclick = async function(){
        ya quedó, y si algo falla al cotizar no se puede perder el espacio.
        Se avisa, se vuelve a cotizar desde el caso, y ya. */
     let folioCot = '';
-    if (ELEGIDOS.length){
+    const manualCot = manualDeCotizacion();
+    if (ELEGIDOS.length || manualCot){
       try{
         const c = await api('guardarCotizacion', {
           casoId: r.casoId,
           pacienteId: r.pacienteId,
           procedimientos: ELEGIDOS,
+          manual: manualCot,
           noches: $('r-noches').value === '' ? null : Number($('r-noches').value),
           fechaCirugia: datos.Fecha_Cirugia,
           cirujanoEmail: datos.Cirujano_Email
@@ -1746,7 +1766,8 @@ function programaCotizacion(){
 }
 
 async function recotiza(){
-  if (!ELEGIDOS.length){
+  const manual = manualDeCotizacion();
+  if (!ELEGIDOS.length && !manual){
     COTIZACION = null;
     $('r-cotiza').innerHTML = '';
     return;
@@ -1755,6 +1776,7 @@ async function recotiza(){
   try{
     const r = await api('cotizar', {
       procedimientos: ELEGIDOS,
+      manual: manual,
       noches: noches === '' ? null : Number(noches)
     });
     COTIZACION = r;
@@ -1807,10 +1829,13 @@ function pintaCotizacion(r){
 document.addEventListener('DOMContentLoaded', function(){
   $('r-filtro-proc').oninput = pintaProcedimientos;
   $('r-noches').oninput = programaCotizacion;
+  $('r-proc-otro').oninput = programaCotizacion;
+  $('r-proc-precio').oninput = programaCotizacion;
   $('r-duracion').addEventListener('input', function(){ $('r-duracion').dataset.tocado = '1'; });
   $('r-limpiar-proc').onclick = function(){
     ELEGIDOS = []; COTIZACION = null;
     $('r-noches').value = ''; $('r-filtro-proc').value = '';
+    $('r-proc-precio').value = '';
     $('r-cotiza').innerHTML = '';
     delete $('r-duracion').dataset.tocado;
     pintaProcedimientos();
