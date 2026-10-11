@@ -535,6 +535,37 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
         <button type="button" class="btn" id="btn-esterilizacion">Trazabilidad de esterilización</button>
       </div>
     </div>
+
+    <!-- Papelería en blanco. El día que un médico llega sin credencializar, o
+         que el sistema no esté disponible, el expediente se hace a mano: la
+         NOM-004 pide que exista y sea legible, no que sea electrónico. Lo que
+         faltaba era tener las hojas. Son los MISMOS formatos que imprime la
+         app, sin datos encima, así que una hoja llenada a mano y una llenada
+         por el sistema son el mismo documento y no dos parecidos. -->
+    <div class="tarjeta">
+      <div class="fila">
+        <div class="crece">
+          <h2>Papelería en blanco</h2>
+          <p class="sub">Para llenar a mano cuando no se puede imprimir desde el
+            expediente. Sale sin ningún dato: ni paciente, ni médico, ni folio.
+            Anote el folio del caso en la hoja frontal para poder casarla después
+            con el expediente electrónico.</p>
+        </div>
+      </div>
+      <div class="fila" style="flex-wrap:wrap;gap:8px;margin-top:4px">
+        <button type="button" class="btn primario"
+                data-blanco="paquete"
+                title="Hoja frontal, consentimientos, verificación preoperatoria, listas de verificación y las hojas de enfermería y anestesia, todas en blanco">Paquete de ingreso</button>
+        <button type="button" class="btn" data-blanco="ci-quirurgico,ci-anestesia,ci-marcaje">Consentimientos</button>
+        <button type="button" class="btn" data-blanco="hoja-frontal">Hoja frontal</button>
+        <button type="button" class="btn" data-blanco="registro-enfermeria">Registro de enfermería</button>
+        <button type="button" class="btn" data-blanco="registro-anestesia">Registro de anestesia</button>
+        <button type="button" class="btn" data-blanco="verificacion-preop">Verificación preoperatoria</button>
+        <button type="button" class="btn" data-blanco="lista-verificacion">Lista de verificación</button>
+        <button type="button" class="btn" data-blanco="hoja-enfermeria">Hoja quirúrgica de enfermería</button>
+        <button type="button" class="btn" data-blanco="registro-cateter">Registro de catéter</button>
+      </div>
+    </div>
   </section>
 
   <!-- ══════════ BUSCAR ══════════ -->
@@ -1346,6 +1377,15 @@ $('agenda-fecha').onchange = cargaAgenda;
 $('btn-esterilizacion').onclick = function(){
   imprimeHojaDelDia('trazabilidad-esterilizacion', this);
 };
+document.querySelectorAll('[data-blanco]').forEach(function(b){
+  b.onclick = function(){
+    /* La identificaci\u00f3n sale del Drive del paciente: en blanco no existe. */
+    const claves = b.dataset.blanco === 'paquete'
+      ? PAQUETE_INGRESO.filter(function(k){ return k !== 'identificacion'; })
+      : b.dataset.blanco.split(',');
+    imprimeEnBlanco(claves, b);
+  };
+});
 async function cargaAgenda(){
   try{
     const r = await api('agendaDelDia', { fecha: $('agenda-fecha').value || hoyISO() });
@@ -2210,6 +2250,67 @@ async function imprimeHojaDelDia(clave, boton){
     /* Una hoja apaisada necesita que la página del navegador también lo sea:
        si sólo se agranda el div, se imprime cortada por la derecha. */
     margenes.textContent = f.apaisado ? '@page{size:792pt 612pt;margin:0}' : '@page{margin:0}';
+    document.head.appendChild(margenes);
+    window.addEventListener('afterprint', function limpia(){
+      window.removeEventListener('afterprint', limpia);
+      quitaModoFormato();
+      imp.innerHTML = '';
+    });
+    window.print();
+  }catch(e){
+    quitaModoFormato();
+    imp.innerHTML = '';
+    avisoGlobal('No se pudo imprimir: ' + e.message);
+  } finally {
+    IMPRIMIENDO_FORMATO = false;
+    boton.disabled = false;
+    boton.textContent = textoBoton;
+  }
+}
+
+/* ── Imprimir los formatos SIN datos ───────────────────────────
+
+   Es el mismo camino que `imprimeFormatos`, con una sola diferencia: no hay
+   caso del cual sacar los datos. `hojaDeFormato` ya sólo pinta los campos que
+   traen valor —filtra por `d[c.k]`— así que con un objeto vacío salen las
+   hojas limpias. Importa que sea el mismo camino y no un PDF aparte: el día
+   que un formato cambie, cambia en los dos lados solo.
+
+   No se ofrece la trazabilidad de esterilización: es apaisada y el navegador
+   no mezcla tamaños de página en una misma impresión. Tiene su propio botón
+   arriba, que ya la imprime sola. */
+async function imprimeEnBlanco(claves, boton){
+  if (IMPRIMIENDO_FORMATO) return;
+  IMPRIMIENDO_FORMATO = true;
+  const textoBoton = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = 'Preparando\u2026';
+  const imp = $('impresion');
+  quitaModoFormato();
+  const margenes = document.createElement('style');
+  margenes.id = 'margenes-formato';
+  try{
+    const d = {};
+    const par = dobleCara();
+    let html = '';
+    for (let i = 0; i < claves.length; i++) {
+      const f = FORMATOS[claves[i]];
+      if (!f) continue;
+      for (let h = 1; h <= f.hojas; h++) html += hojaDeFormato(claves[i], h, d);
+      /* Mismo criterio que con datos: se completa sólo si hay otro documento
+         atrás, para que cada uno empiece en hoja propia al imprimir por los
+         dos lados. Al final sería una hoja suelta al fondo del folder. */
+      if (par && f.hojas % 2 === 1 && i < claves.length - 1) html += hojaEnBlanco();
+    }
+    if (!html) throw new Error('No hay formatos que imprimir.');
+    imp.classList.add('imp-formato');
+    imp.innerHTML = html;
+
+    await Promise.all(Array.from(imp.querySelectorAll('img')).map(img =>
+      img.decode().catch(() => { throw new Error('No se pudo cargar el formato (' +
+        img.getAttribute('src') + ').'); })));
+
+    margenes.textContent = '@page{margin:0}';
     document.head.appendChild(margenes);
     window.addEventListener('afterprint', function limpia(){
       window.removeEventListener('afterprint', limpia);
