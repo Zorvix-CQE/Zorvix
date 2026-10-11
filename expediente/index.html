@@ -550,6 +550,10 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
             expediente. Sale sin ningún dato: ni paciente, ni médico, ni folio.
             Anote el folio del caso en la hoja frontal para poder casarla después
             con el expediente electrónico.</p>
+          <label class="sub" style="display:flex;gap:8px;align-items:center;margin:6px 0 0">
+            <input type="checkbox" id="chk-blanco-doble" checked style="width:auto;margin:0">
+            Imprimir a doble cara: cada documento empieza en el frente de una hoja
+          </label>
         </div>
       </div>
       <div class="fila" style="flex-wrap:wrap;gap:8px;margin-top:4px">
@@ -2110,7 +2114,11 @@ function datosDeFormato(caso){
    más, el último renglón lo dice en vez de callárselo. */
 function renglonesDeTabla(tabla, hoja){
   if (!tabla || tabla.p !== hoja) return '';
-  const casos = (EXP.casos || []).slice()
+  /* `EXP` puede no existir: la papelería en blanco se imprime desde la agenda,
+     sin paciente abierto. Sin esta guarda, el juego en blanco truena con
+     «Cannot read properties of null». Sin casos no hay renglones que pintar,
+     que es justo lo que una hoja en blanco necesita. */
+  const casos = ((EXP && EXP.casos) || []).slice()
     .sort((a,b) => String(b.Fecha_Cirugia).localeCompare(String(a.Fecha_Cirugia)));
   let html = '';
   tabla.filas.forEach((y, i) => {
@@ -2291,7 +2299,10 @@ async function imprimeEnBlanco(claves, boton){
   margenes.id = 'margenes-formato';
   try{
     const d = {};
-    const par = dobleCara();
+    /* Casilla propia: la de la vista del paciente no existe en la agenda, y
+       ahí `dobleCara()` contestaría siempre que sí. */
+    const chk = $('chk-blanco-doble');
+    const par = chk ? chk.checked : true;
     let html = '';
     for (let i = 0; i < claves.length; i++) {
       const f = FORMATOS[claves[i]];
