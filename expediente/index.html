@@ -3043,9 +3043,22 @@ function esEquipoLibre(c){ return EQUIPO_LIBRE.indexOf(String(c && c.id)) >= 0; 
 const HORAS_LIBRES = ['qx_hora_cirugia', 'qx_hora_anestesia'];
 function esHoraLibre(c){ return HORAS_LIBRES.indexOf(String(c && c.id)) >= 0; }
 
+/* ── LA FECHA DEL DOCUMENTO: se propone, no se impone ───────────
+   Salía bloqueada con el día en que se abría la pantalla, y de ahí pasaba a la
+   hoja impresa. Eso rompe algo que en la clínica se hace siempre: imprimir el
+   juego de papelería la VÍSPERA, para no estar peleándose con la impresora
+   cuando la paciente ya está en la puerta. Impreso el día anterior, el
+   expediente entero quedaba fechado un día antes de la cirugía.
+
+   La fecha de un documento clínico es la del acto, no la del papel. Sigue
+   siendo la sugerencia —nueve de cada diez veces es la correcta— pero ahora se
+   puede corregir, y lo corregido manda. Mismo trato para la hora. */
+const FECHAS_LIBRES = ['doc_fecha', 'doc_hora'];
+function esFechaLibre(c){ return FECHAS_LIBRES.indexOf(String(c && c.id)) >= 0; }
+
 /* Un campo libre es el que el diccionario declara heredado pero que en la sala
    tiene que poder escribirse. Nunca se bloquea. */
-function esLibre(c){ return esEquipoLibre(c) || esHoraLibre(c); }
+function esLibre(c){ return esEquipoLibre(c) || esHoraLibre(c) || esFechaLibre(c); }
 
 function pintaCampo(c){
   const v = sinLeyenda(DOC.campos[c.id]);
@@ -3592,6 +3605,30 @@ function conecta(){
   });
   const nac = $('f_pac_nacimiento'), ed = $('f_pac_edad');
   if (nac && ed) { const c = () => ed.value = edad(nac.value); nac.oninput = c; if (!ed.value) c(); }
+
+  /* La fecha del documento ya se puede corregir, y hay dos campos que se
+     calculan A PARTIR de ella: la edad del paciente el día del acto y el
+     «ciudad y fecha» que firma el paciente en los consentimientos.
+
+     Si no siguieran a la fecha corregida, el documento saldría impreso
+     diciéndose dos fechas a sí mismo: arriba la de la cirugía y abajo, en la
+     línea de la firma, la del día en que se imprimió. En un consentimiento
+     informado eso no es un detalle de formato — es la fecha en que consta que
+     la paciente aceptó. */
+  const fFecha = $('f_doc_fecha');
+  if (fFecha){
+    const sigueALaFecha = function(){
+      const iso = fFecha.value || DOC.Fecha || hoyISO();
+      const fCiudad = $('f_ci_ciudad_fecha');
+      if (fCiudad) fCiudad.value = ciudadYFecha(iso);
+      const fEdad = $('f_pac_edad');
+      if (fEdad && !nac) {
+        fEdad.value = edadAl(EXP.paciente && EXP.paciente.Fecha_Nacimiento, iso);
+      }
+    };
+    fFecha.addEventListener('input', sigueALaFecha);
+  }
+
   redibuja();
 }
 function redibuja(){ document.querySelectorAll('.gfx > div[id$="_svg"]').forEach(d => dibujaGrafica(d.id.replace(/_svg$/,''))); }
