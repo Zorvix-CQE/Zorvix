@@ -1297,10 +1297,14 @@ async function cargaCasos(){
   c.innerHTML = CASOS.map(function(x){
     const est = String(x.Estatus_Agenda||'');
     const clase = est === 'Confirmado' ? 'ok' : (est === 'Preaparto' ? 'warn' : '');
+    /* El renglón grande es el NOMBRE. El folio es para la máquina y el
+       procedimiento se repite entre pacientes: ninguno de los dos sirve para
+       que alguien reconozca de quién es el caso de un vistazo. */
     return '<div class="caso" data-id="'+esc(x.Caso_ID)+'">' +
       '<div class="top"><span class="folio">'+esc(x.Folio_Caso)+'</span>' +
       '<span class="pastilla '+clase+'">'+esc(etiquetaAgenda(est))+'</span></div>' +
-      '<div class="nom">'+esc(x.Procedimiento_Principal || 'Procedimiento por definir')+'</div>' +
+      '<div class="nom">'+esc(x.paciente || 'Paciente sin ficha')+'</div>' +
+      '<div class="meta">'+esc(x.Procedimiento_Principal || 'Procedimiento por definir')+'</div>' +
       '<div class="meta">'+esc(x.Fecha_Cirugia||'sin fecha')+' · '+esc(x.Hora_Inicio||'')+
         ' · '+esc(x.Quirofano||'')+'</div></div>';
   }).join('');
