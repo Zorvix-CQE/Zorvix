@@ -78,8 +78,7 @@ td{padding:11px 0;border-bottom:1px solid var(--linea);vertical-align:top}
 .num{text-align:right;white-space:nowrap}
 .total td{border-bottom:none;padding-top:16px;font-size:1.15rem;font-weight:700}
 .total .num{color:var(--morado)}
-.factor{display:inline-block;font-size:.75rem;padding:2px 8px;border-radius:999px;
-        background:var(--morado-50);color:var(--morado);font-weight:600}
+.matiz{font-size:.82rem;color:var(--tinta3);margin-top:2px}
 
 .aviso{border-radius:var(--zx-r-control);padding:12px 14px;margin:14px 0;font-size:.92rem;
        border:1px solid transparent}
@@ -107,7 +106,7 @@ td{padding:11px 0;border-bottom:1px solid var(--linea);vertical-align:top}
   .hoja{border:0;border-radius:0;padding:0;margin-top:8px;background:#fff}
   header{padding:0 0 10px}
   td,th{border-color:#ccc}
-  .factor{background:transparent;color:#000;padding:0}
+  .matiz{color:#555}
   .aviso{border:1px solid #999;background:transparent;color:#000}
   @page{margin:16mm}
 }
@@ -147,16 +146,13 @@ td{padding:11px 0;border-bottom:1px solid var(--linea);vertical-align:top}
         <thead>
           <tr>
             <th>Procedimiento</th>
-            <th class="num">Lista</th>
-            <th class="num">Aplica</th>
             <th class="num">Importe</th>
           </tr>
         </thead>
         <tbody id="conceptos"></tbody>
       </table>
 
-      <div id="avisos"></div>
-
+      <p class="pie" id="nota-paciente"></p>
       <p class="pie" id="no-incluye"></p>
       <p class="pie">
         <strong>Esta cotización corresponde únicamente a lo que cobra Zorvix.</strong>
@@ -205,13 +201,29 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio',
                'julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 /* "2026-10-13" -> "13 de octubre de 2026". Se arma a mediodía a propósito: con
-   T00:00 un huso negativo recorre la fecha al día anterior. */
+   T00:00 un huso negativo recorre la fecha al día anterior.
+
+   El segundo camino NO es adorno. Cuando la hoja de cálculo devuelve una fecha
+   como objeto y no como texto, lo que llega aquí es "Tue Oct 13 2026 …". La
+   versión anterior recortaba a diez caracteres y le imprimía al paciente
+   «Tue Oct 13». Si no viene en ISO, se intenta interpretar la fecha completa
+   antes de rendirse, y sólo se devuelve el texto crudo cuando de veras no se
+   pudo entender. */
 function fechaLarga(iso){
-  const s = String(iso || '').slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const d = new Date(s + 'T12:00:00');
-  if (isNaN(d.getTime())) return s;
-  return d.getDate() + ' de ' + MESES[d.getMonth()] + ' de ' + d.getFullYear();
+  const bruto = String(iso || '').trim();
+  if (!bruto) return '';
+  const s = bruto.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(s + 'T12:00:00');
+    if (!isNaN(d.getTime())) {
+      return d.getDate() + ' de ' + MESES[d.getMonth()] + ' de ' + d.getFullYear();
+    }
+  }
+  const d2 = new Date(bruto);
+  if (!isNaN(d2.getTime())) {
+    return d2.getDate() + ' de ' + MESES[d2.getMonth()] + ' de ' + d2.getFullYear();
+  }
+  return bruto;
 }
 
 function campo(etiqueta, valor){
@@ -225,8 +237,7 @@ function pinta(d){
     campo('Folio', d.folio) +
     campo('A nombre de', d.paciente) +
     campo('Cirujano', d.cirujano) +
-    campo('Emitida', fechaLarga(d.emitida)) +
-    campo('Precio vigente hasta', fechaLarga(d.vigenciaHasta));
+    campo('Emitida', fechaLarga(d.emitida));
 
   /* El estado va arriba y en palabras, no en un color nada más: el paciente que
      abre la liga tres meses después tiene que entender por qué el número que le
@@ -238,23 +249,31 @@ function pinta(d){
       (d.vigenciaHasta ? ' el ' + esc(fechaLarga(d.vigenciaHasta)) : '') +
       '. Pídanos una cotización nueva y con gusto se la preparamos.</div>';
 
+  /* DOS COLUMNAS, NO CUATRO. Antes salían «Lista», «Aplica 100%» e «Importe».
+     Las tres primeras son la contabilidad interna de cómo se armó el precio:
+     al paciente le dicen que hay un precio de lista y un factor que alguien le
+     movió —o no—, y lo invitan a preguntar por qué a él le tocó 100%. Lo único
+     que le corresponde ver es qué le van a cobrar por cada cosa.
+
+     El precio de lista reaparece SÓLO cuando hay descuento real, porque ahí sí
+     es información a su favor y hay que enseñársela. */
   const filas = (d.conceptos || []).map(function(c){
-    const f = Number(c.factor) || 1;
-    return '<tr><td>' + esc(c.nombre) + '</td>' +
-           '<td class="num">' + pesos(c.precioLista) + '</td>' +
-           '<td class="num"><span class="factor">' +
-             (f === 1 ? '100%' : Math.round(f * 100) + '%') + '</span></td>' +
-           '<td class="num"><b>' + pesos(c.importe) + '</b></td></tr>';
+    const lista   = Number(c.precioLista) || 0;
+    const importe = Number(c.importe) || 0;
+    const rebaja  = lista > importe
+      ? '<div class="matiz">Precio de lista ' + pesos(lista) + '</div>'
+      : '';
+    return '<tr><td>' + esc(c.nombre) + rebaja + '</td>' +
+           '<td class="num"><b>' + pesos(importe) + '</b></td></tr>';
   }).join('');
 
   const noches = Number(d.subtotalNoches) > 0
-    ? '<tr><td colspan="3">' + esc(d.noches) + ' noche(s) de hospitalización a ' +
-      pesos(d.tarifaNoche) + '</td>' +
+    ? '<tr><td>' + esc(d.noches) + ' noche(s) de hospitalización</td>' +
       '<td class="num"><b>' + pesos(d.subtotalNoches) + '</b></td></tr>'
     : '';
 
   const ajuste = Number(d.ajusteMonto)
-    ? '<tr><td colspan="3">' +
+    ? '<tr><td>' +
       (Number(d.ajusteMonto) < 0 ? 'Descuento' : 'Ajuste') +
       (d.ajusteMotivo ? ' · ' + esc(d.ajusteMotivo) : '') + '</td>' +
       '<td class="num"><b>' + (Number(d.ajusteMonto) > 0 ? '+' : '−') +
@@ -262,15 +281,20 @@ function pinta(d){
     : '';
 
   $('conceptos').innerHTML = filas + noches + ajuste +
-    '<tr class="total"><td colspan="3">Total</td>' +
+    '<tr class="total"><td>Total</td>' +
     '<td class="num">' + pesos(d.total) + '</td></tr>';
 
-  /* Los avisos del motor —por ejemplo que las noches no se pudieron cotizar—
-     se le enseñan al paciente. Si el sistema no supo calcular algo, callarlo
-     le deja creer que ese renglón ya estaba incluido. */
-  $('avisos').innerHTML = (d.avisos || []).length
-    ? '<div class="aviso alerta">' + (d.avisos || []).map(esc).join('<br>') + '</div>'
-    : '';
+  /* Aquí vivían los avisos del motor de precios, y era un error mío. La
+     intención era buena —no callarle al paciente que algo no se pudo
+     calcular— pero el texto estaba escrito para quien programa el tarifario:
+     «no está en el tarifario», «va al 100%, sin factor». Eso no informa a un
+     paciente, lo inquieta, y además enseña la cocina.
+
+     Lo que sí le toca saber —que la hospitalización no viene incluida— ahora
+     lo manda el backend ya redactado para él, en `notaPaciente`, y se imprime
+     como una nota al pie y no como una alarma de color. */
+  $('nota-paciente').textContent = d.notaPaciente || '';
+  $('nota-paciente').classList.toggle('oculto', !d.notaPaciente);
 
   $('no-incluye').textContent = d.noIncluye || '';
   $('no-incluye').classList.toggle('oculto', !d.noIncluye);
