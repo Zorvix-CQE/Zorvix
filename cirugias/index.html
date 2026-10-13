@@ -605,8 +605,15 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
             <input id="q-paciente" maxlength="120" placeholder="Nombre completo del paciente"></div>
           <div><label for="q-tel">Celular (para mandarla por WhatsApp)</label>
             <input id="q-tel" inputmode="tel" maxlength="20" placeholder="55 1234 5678"></div>
-          <div id="q-cirujano-caja"><label for="q-cirujano">Cirujano</label>
+          <!-- La primera cirugía de un invitado se cotiza ANTES de darlo de
+               alta: el precio va antes que el papeleo. Por eso el nombre se
+               puede escribir a mano. Si el correo ya está en el padrón, manda
+               el padrón y lo que se teclee aquí se ignora. -->
+          <div id="q-cirujano-caja"><label for="q-cirujano">Correo del cirujano</label>
             <input id="q-cirujano" placeholder="correo@gmail.com"></div>
+          <div><label for="q-cirujano-nombre">Nombre del cirujano</label>
+            <input id="q-cirujano-nombre" maxlength="120"
+                   placeholder="Sólo si todavía no está en el padrón"></div>
           <div><label for="q-noches">Noches de hospitalización</label>
             <input type="number" id="q-noches" min="0" max="14" step="1" placeholder="0"></div>
         </div>
@@ -2418,8 +2425,20 @@ function abreCotizar(){
   if (!CATALOGO.length) cargaCatalogoCotizador().then(pintaProcsQ);
   else pintaProcsQ();
   if (!COT_LIBRES) agregaLibre();
-  /* El cirujano sólo se pregunta cuando quien cotiza NO es el cirujano. */
-  $('q-cirujano-caja').classList.toggle('oculto', YO.rol === 'medico');
+  /* El campo de cirujano se pregunta SIEMPRE, también a los médicos.
+
+     Estuvo escondido para el rol `medico` con el argumento de que un médico
+     cotiza lo suyo. En Zorvix eso es falso: el negocio es rentarle el
+     quirófano a cirujanos invitados, y quien cotiza para el invitado suele
+     ser un médico —el dueño— desde su propia cuenta. Esconderlo lo obligaba
+     a cambiarse de cuenta para hacer su trabajo.
+
+     En blanco, la cotización sale a nombre de quien la emite si es médico, y
+     sin cirujano si no lo es. El backend valida el correo contra el padrón,
+     así que no se puede cotizar a nombre de alguien que no existe. */
+  $('q-cirujano').placeholder = YO.rol === 'medico'
+    ? 'En blanco sale a su nombre · o el correo del invitado'
+    : 'correo@gmail.com · opcional';
   cargaMisCotizaciones();
 }
 
@@ -2557,6 +2576,14 @@ function pintaResultadoQ(r, telefono){
       '<b>' + esc(r.folio) + '</b> · ' + esc(pesos(r.total)) +
       (r.vigenciaHasta ? ' · vigente hasta ' + esc(fechaLarga(r.vigenciaHasta)) : '') +
     '</div>' +
+    /* El recordatorio del alta va AQUÍ, para quien cotiza, y no en los avisos
+       de la cotización: eso último lo lee el paciente y no tiene por qué
+       enterarse del papeleo interno de su cirujano. */
+    (r.fueraDePadron
+      ? '<div class="aviso warn">' + esc(r.cirujanoNombre || 'Ese cirujano') +
+        ' todavía no está en el padrón. La cotización ya se puede mandar, pero ' +
+        'para apartarle quirófano hay que darlo de alta primero.</div>'
+      : '') +
     '<div class="fila" id="q-acciones"></div>' +
     '<div class="meta" style="margin-top:6px">La liga quedó copiada al portapapeles. ' +
       'Si emite otra cotización para esta persona, ésta deja de servir.</div>';
@@ -2635,7 +2662,8 @@ document.addEventListener('DOMContentLoaded', function(){
   $('q-limpiar').onclick = function(){
     COT_ELEGIDOS_Q = [];
     $('q-paciente').value = ''; $('q-tel').value = '';
-    $('q-cirujano').value = ''; $('q-noches').value = '';
+    $('q-cirujano').value = ''; $('q-cirujano-nombre').value = '';
+    $('q-noches').value = '';
     $('q-filtro').value = '';
     $('q-libres').innerHTML = ''; COT_LIBRES = 0; agregaLibre();
     $('q-previa').innerHTML = ''; $('q-msg').textContent = '';
@@ -2659,6 +2687,7 @@ document.addEventListener('DOMContentLoaded', function(){
       const r = await api('cotizacionLibre', {
         pacienteNombre: paciente,
         cirujanoEmail: String($('q-cirujano').value || '').trim(),
+        cirujanoNombre: String($('q-cirujano-nombre').value || '').trim(),
         procedimientos: COT_ELEGIDOS_Q,
         manuales: manuales,
         noches: $('q-noches').value === '' ? null : Number($('q-noches').value)
