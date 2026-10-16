@@ -3056,9 +3056,37 @@ function esHoraLibre(c){ return HORAS_LIBRES.indexOf(String(c && c.id)) >= 0; }
 const FECHAS_LIBRES = ['doc_fecha', 'doc_hora'];
 function esFechaLibre(c){ return FECHAS_LIBRES.indexOf(String(c && c.id)) >= 0; }
 
+/* ── EL ANESTESIÓLOGO: SU NOMBRE SE ESCRIBE, SU LLAVE NO SE TOCA ────
+   Estos tres campos imprimen el nombre del anestesiólogo: `caso_anestesiologo`
+   sale en TODOS los formatos, `pan_anestesiologos` en la preanestésica y
+   `qx_anestesiologo` en la postoperatoria. El diccionario los trae como lista
+   heredada del padrón, así que con un anestesiólogo que todavía no está dado
+   de alta los tres salían EN BLANCO y no había manera de escribirlos.
+
+   Eso pasa justo el primer día de cada anestesiólogo nuevo, que es cuando sí
+   trabaja y todavía no tiene cuenta. El caso se puede asignar, el juego se
+   puede imprimir y llenar a mano, pero el renglón de su nombre salía vacío: el
+   papel quedaba sin decir quién dio la anestesia, que es precisamente lo que un
+   expediente no puede dejar de decir.
+
+   QUÉ **NO** CAMBIA, Y ES LO IMPORTANTE
+   El control de acceso no vive aquí. Quién puede abrir un caso lo decide
+   `Casos.Anestesiologo_Email`, que se sigue eligiendo del padrón y se sigue
+   validando contra él. Esto es la celda de un documento que se imprime: deja
+   escribir a quién NOMBRA el papel, no a quién DEJA ENTRAR el sistema. Un
+   anestesiólogo que vaya a usar la plataforma —abrir su preanestésica, firmar
+   desde el sistema— sigue necesitando su alta completa.
+
+   Mismo trato que ayudante, instrumentista y circulante, y por la misma razón:
+   el padrón es la sugerencia, no la condición para poder nombrar a alguien. */
+const ANEST_LIBRE = ['caso_anestesiologo', 'pan_anestesiologos', 'qx_anestesiologo'];
+function esAnestLibre(c){ return ANEST_LIBRE.indexOf(String(c && c.id)) >= 0; }
+
 /* Un campo libre es el que el diccionario declara heredado pero que en la sala
    tiene que poder escribirse. Nunca se bloquea. */
-function esLibre(c){ return esEquipoLibre(c) || esHoraLibre(c) || esFechaLibre(c); }
+function esLibre(c){
+  return esEquipoLibre(c) || esHoraLibre(c) || esFechaLibre(c) || esAnestLibre(c);
+}
 
 function pintaCampo(c){
   const v = sinLeyenda(DOC.campos[c.id]);
@@ -3086,7 +3114,7 @@ function pintaCampo(c){
   let cuerpo = '';
   /* Sólo el equipo cambia de control: las horas siguen siendo reloj, nada más
      que ya no llegan bloqueadas. */
-  const control = esEquipoLibre(c) ? 'equipo_libre' : c.control;
+  const control = (esEquipoLibre(c) || esAnestLibre(c)) ? 'equipo_libre' : c.control;
 
   switch(control){
     case 'equipo_libre': {
