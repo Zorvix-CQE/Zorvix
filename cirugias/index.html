@@ -496,16 +496,30 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
         <h2>Reservar tiempo quirúrgico</h2>
         <p class="sub">El espacio queda apartado en cuanto se guarda. Se libera solo si nadie lo confirma.</p>
         <div class="rejilla">
-          <div><label>Procedimiento</label><select id="r-paquete"></select></div>
+          <!-- UNA SOLA LISTA, NO DOS.
+               Aquí había un desplegable de UN procedimiento, y abajo, en
+               «Cotización», una lista donde sí se podían marcar varios. El
+               resultado: se cotizaba una lipo + una mastopexia, pero el CASO
+               se quedaba con una sola, y ésa era la que acababa impresa en la
+               hoja frontal, en la preoperatoria y en la lista de
+               verificación. Una cirugía de dos tiempos quedaba asentada como
+               si hubiera sido una.
+
+               Ahora se marcan abajo, una sola vez, y esa misma selección es
+               la del caso Y la de la cotización. Aquí sólo se ve qué lleva. -->
+          <div style="grid-column:1/-1">
+            <label>Procedimientos del caso</label>
+            <div id="r-proc-elegidos"></div>
+          </div>
            <!-- Zorvix no opera solo cirugia plastica. El catalogo de paquetes
                 es de precios, no de lo que cabe en el quirofano: amarrarle la
                 agenda dejaba fuera todo lo demas. Aqui se escribe. -->
-           <div id="r-otro-caja" class="oculto">
-             <label for="r-proc-otro">¿Cuál procedimiento?</label>
+           <div id="r-otro-caja">
+             <label for="r-proc-otro">Procedimiento fuera del catálogo</label>
              <input id="r-proc-otro" maxlength="120"
                     placeholder="Histeroscopia diagnóstica"></div>
-           <div id="r-precio-caja" class="oculto">
-             <label for="r-proc-precio">Precio del procedimiento</label>
+           <div id="r-precio-caja">
+             <label for="r-proc-precio">Precio de ese procedimiento</label>
              <input type="number" id="r-proc-precio" min="0" step="100"
                     inputmode="numeric" placeholder="18500"></div>
           <div><label>Quirófano</label><select id="r-quirofano"></select></div>
@@ -527,8 +541,8 @@ html[data-tema="oscuro"] #acceso .iso{content:url("../assets/zorvix-iso-blanco.p
       </div>
 
       <div class="tarjeta">
-        <h2>Cotización</h2>
-        <p class="sub">Lo que cobra Zorvix por este tiempo quirúrgico. El procedimiento más caro va al 100% de lista; del segundo en adelante, 50%. La noche de cama se cobra una sola vez.</p>
+        <h2>Procedimientos y cotización</h2>
+        <p class="sub">Marque aquí todo lo que se va a hacer: esta lista es la del caso y la del precio. El procedimiento más caro va al 100% de lista; del segundo en adelante, 50%. La noche de cama se cobra una sola vez.</p>
         <div class="fila" style="margin:0 0 12px">
           <input id="r-filtro-proc" placeholder="Filtrar procedimientos" style="flex:1;min-width:220px">
           <label style="display:flex;align-items:center;gap:8px;white-space:nowrap">Noches
@@ -1609,20 +1623,10 @@ async function cargaPaquetes(){
     const r = await api('paquetes');
     PAQUETES = r.paquetes || [];
   }catch(e){ PAQUETES = []; }
-  const s = $('r-paquete');
-  s.innerHTML = '<option value="">— elija el procedimiento —</option>' + PAQUETES.map(function(p){
-    return '<option value="'+esc(p.Paquete_ID)+'" data-min="'+esc(p.Minutos_Quirofano_Incluidos||'')+
-           '" data-q="'+esc(p.Quirofano_Elegible||'')+'">'+esc(p.Nombre||p.Paquete_ID)+'</option>';
-  }).join('') +
-    /* Va al final, no al principio: lo de todos los dias es el paquete. */
-    '<option value="__otro__">\u2014 otro procedimiento: lo escribo yo \u2014</option>';
-  s.onchange = function(){
-    const o = s.selectedOptions[0];
-    if (o && o.dataset.min) $('r-duracion').value = o.dataset.min;
-    /* Sin paquete no hay minutos que heredar: la duracion se teclea, y por eso
-       el campo se deja como este para que quien captura la vea y la corrija. */
-    muestraOtroProcedimiento(s.value === '__otro__');
-  };
+  /* Aquí se armaba el desplegable de UN procedimiento. Ya no existe: los
+     procedimientos se marcan abajo, en la lista, y pueden ser varios.
+     `PAQUETES` se sigue cargando porque de ahí salen los minutos de
+     quirófano que la cotización propone en `recotiza()`. */
   try{
     const d = await api('disponibilidad', {dias: 30});
     $('r-quirofano').innerHTML = '<option value="">— quirófano —</option>' +
@@ -1633,44 +1637,82 @@ async function cargaPaquetes(){
   }catch(e){ /* el backend ya avisó */ }
 }
 
-/* El campo abierto no sustituye al cat\u00e1logo, lo complementa: un paquete
-   trae precio, minutos y qui\u00e1rofano elegible, y eso no se quiere perder en
-   lo que s\u00ed est\u00e1 tabulado. El texto libre es para lo que no lo est\u00e1. */
-function muestraOtroProcedimiento(on){
-  const caja = $('r-otro-caja');
-  if (!caja) return;
-  caja.classList.toggle('oculto', !on);
-  $('r-precio-caja').classList.toggle('oculto', !on);
-  if (on){ $('r-proc-otro').focus(); }
-  else { $('r-proc-otro').value = ''; $('r-proc-precio').value = ''; }
-  programaCotizacion();
-}
+/* El campo abierto no sustituye al catálogo, lo complementa: un paquete del
+   tarifario trae precio, minutos y quirófano elegible, y eso no se quiere
+   perder en lo que sí está tabulado. El texto libre es para lo que no lo
+   está, y ya no vive escondido detrás de una opción del desplegable:
+   Zorvix no opera sólo cirugía plástica. */
 
-/* El rengl\u00f3n de precio a mano que viaja al backend, o null si no hay.
-   Van juntos a prop\u00f3sito: un procedimiento escrito sin precio no se cotiza
-   —no se le inventa cero— y un precio sin procedimiento no significa nada. */
+/* El renglón de precio a mano que viaja al backend, o null si no hay.
+   Van juntos a propósito: un procedimiento escrito sin precio no se cotiza
+   —no se le inventa cero— y un precio sin procedimiento no significa nada.
+   Ya no se le pregunta al desplegable si dice «otro»: si hay texto, cuenta. */
 function manualDeCotizacion(){
-  if ($('r-paquete').value !== '__otro__') return null;
   const nombre = String($('r-proc-otro').value || '').trim();
   const precio = Number($('r-proc-precio').value);
   if (!nombre || !(precio > 0)) return null;
   return { nombre: nombre, precio: precio };
 }
 
-/* Lo que se va a escribir en la hoja Casos. Con paquete, el nombre del
-   paquete; sin \u00e9l, lo que se tecle\u00f3. Nunca los dos. */
-function procedimientoElegido(){
-  const s = $('r-paquete');
-  if (s.value === '__otro__'){
-    return { paquete: '', texto: String($('r-proc-otro').value || '').trim(), abierto: true };
+/* Lo que se va a escribir en la hoja Casos. UNA sola lista alimenta las dos
+   cosas, el caso y la cotización: si se marcan tres procedimientos, los
+   tres quedan asentados —en un renglón, separados por «+»— y de
+   ahí salen a la hoja frontal, a la preoperatoria y a la lista de
+   verificación. Una cirugía de dos tiempos ya no se asienta como una.
+
+   `Paquete_ID` nació para UN paquete y así se queda: sólo se llena
+   cuando lo marcado es exactamente un procedimiento del tarifario. No se
+   inventa un identificador compuesto que nadie del otro lado sabría leer;
+   el detalle completo vive en la cotización, que sí guarda renglón
+   por renglón. */
+function procedimientosDelCaso(){
+  const nombres = ELEGIDOS.map(function(id){
+    const p = CATALOGO.filter(function(x){ return String(x.id) === String(id); })[0];
+    return p ? String(p.nombre).trim() : String(id);
+  });
+  const libre = String($('r-proc-otro').value || '').trim();
+  if (libre) nombres.push(libre);
+
+  /* El id del tarifario y el Paquete_ID salen de la misma hoja, pero eso se
+     comprueba en vez de suponerse: si el id no aparece en Paquetes, el campo
+     se deja en blanco antes que escribir un identificador que no existe. */
+  let paquete = '';
+  if (ELEGIDOS.length === 1 && !libre){
+    const hay = PAQUETES.some(function(p){
+      return String(p.Paquete_ID) === String(ELEGIDOS[0]);
+    });
+    if (hay) paquete = ELEGIDOS[0];
   }
-  /* Sin nada elegido, el textContent de la opcion es el letrero «elija el
-     procedimiento»: hasta hoy ese letrero se guardaba como si fuera el nombre
-     de la cirugia y de ahi pasaba a la hoja frontal. No es un procedimiento. */
-  if (!s.value) return { paquete: '', texto: '', abierto: false };
-  return { paquete: s.value,
-           texto: String((s.selectedOptions[0] || {}).textContent || '').trim(),
-           abierto: false };
+  return { nombres: nombres, paquete: paquete, texto: nombres.join(' + ') };
+}
+
+/* Arriba, donde se aparta el quirófano, se ve qué lleva el caso sin
+   tener que bajar a la lista. Es lectura, no captura: se marca abajo, una
+   sola vez, y aquí se refleja. */
+function pintaProcElegidos(){
+  const caja = $('r-proc-elegidos');
+  if (!caja) return;
+  const d = procedimientosDelCaso();
+  if (!d.nombres.length){
+    caja.innerHTML = '<div class="aviso warn">Nada marcado todavía: márquelo ' +
+      'abajo, en «Procedimientos y cotización». Puede marcar varios.</div>';
+    return;
+  }
+  const libre = String($('r-proc-otro').value || '').trim();
+  const faltaPrecio = libre && !(Number($('r-proc-precio').value) > 0);
+  caja.innerHTML =
+    d.nombres.map(function(n){
+      return '<span class="pastilla ok">' + esc(n) + '</span>';
+    }).join(' ') +
+    (d.nombres.length > 1
+      ? '<div class="sub" style="margin-top:6px">Los ' + d.nombres.length +
+        ' quedan asentados en el caso, en un solo renglón.</div>'
+      : '') +
+    (faltaPrecio
+      ? '<div class="aviso warn" style="margin-top:8px">«' + esc(libre) +
+        '» va a quedar escrito en el caso, pero sin precio no entra en la ' +
+        'cotización.</div>'
+      : '');
 }
 
 $('r-ver').onclick = async function(){
@@ -1711,7 +1753,7 @@ $('r-buscar-btn').onclick = async function(){
 };
 
 $('r-guardar').onclick = async function(){
-  const PROC = procedimientoElegido();
+  const PROC = procedimientosDelCaso();
   const datos = {
     Quirofano: $('r-quirofano').value,
     Fecha_Cirugia: $('r-fecha').value,
@@ -1739,10 +1781,8 @@ $('r-guardar').onclick = async function(){
      frontal, en la nota preoperatoria y en la lista de verificaci\u00f3n. Se
      detiene aqu\u00ed, que es donde cuesta diez segundos arreglarlo. */
   if (!datos.Procedimiento_Principal){
-    aviso('r-msg','warn', PROC.abierto
-      ? 'Escriba cu\u00e1l es el procedimiento.'
-      : 'Falta el procedimiento: el\u00edjalo de la lista o use \u00abotro procedimiento\u00bb.');
-    if (PROC.abierto) $('r-proc-otro').focus();
+    aviso('r-msg','warn','Falta el procedimiento: m\u00e1rquelo abajo en la lista ' +
+      '\u2014puede marcar varios\u2014 o escr\u00edbalo si no est\u00e1 en el tarifario.');
     return;
   }
   if (!datos.Cirujano_Email){
@@ -1786,8 +1826,8 @@ $('r-guardar').onclick = async function(){
     pintaProcedimientos();
     PACIENTE_SEL = null;
     ['p-nombre','p-nacimiento','p-telefono','p-correo','r-buscar'].forEach(i => $(i).value = '');
-    $('r-paquete').value = '';
-    muestraOtroProcedimiento(false);
+    $('r-proc-otro').value = ''; $('r-proc-precio').value = '';
+    pintaProcElegidos();
     $('r-elegido').innerHTML = ''; $('r-nuevo').classList.remove('oculto');
     await cargaCasos();
   }catch(e){ $('r-msg').innerHTML = '<span class="pastilla warn">'+esc(e.message)+'</span>'; }
@@ -1816,6 +1856,7 @@ async function cargaCatalogoCotizador(){
 }
 
 function pintaProcedimientos(){
+  pintaProcElegidos();
   const f = ($('r-filtro-proc').value || '').trim().toLowerCase();
   const lista = CATALOGO.filter(function(p){
     return !f || String(p.nombre).toLowerCase().indexOf(f) >= 0;
@@ -1838,6 +1879,7 @@ function pintaProcedimientos(){
       const i = ELEGIDOS.indexOf(id);
       if (c.checked && i < 0) ELEGIDOS.push(id);
       if (!c.checked && i >= 0) ELEGIDOS.splice(i, 1);
+      pintaProcElegidos();
       programaCotizacion();
     };
   });
@@ -1914,13 +1956,13 @@ function pintaCotizacion(r){
 document.addEventListener('DOMContentLoaded', function(){
   $('r-filtro-proc').oninput = pintaProcedimientos;
   $('r-noches').oninput = programaCotizacion;
-  $('r-proc-otro').oninput = programaCotizacion;
-  $('r-proc-precio').oninput = programaCotizacion;
+  $('r-proc-otro').oninput = function(){ pintaProcElegidos(); programaCotizacion(); };
+  $('r-proc-precio').oninput = function(){ pintaProcElegidos(); programaCotizacion(); };
   $('r-duracion').addEventListener('input', function(){ $('r-duracion').dataset.tocado = '1'; });
   $('r-limpiar-proc').onclick = function(){
     ELEGIDOS = []; COTIZACION = null;
     $('r-noches').value = ''; $('r-filtro-proc').value = '';
-    $('r-proc-precio').value = '';
+    $('r-proc-otro').value = ''; $('r-proc-precio').value = '';
     $('r-cotiza').innerHTML = '';
     delete $('r-duracion').dataset.tocado;
     pintaProcedimientos();
