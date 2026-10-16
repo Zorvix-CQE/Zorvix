@@ -270,7 +270,8 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
    el cuadro se dibujo al final del documento, fuera de la vista: los botones
    de guardar «no servian» porque abrian una pregunta invisible y se quedaban
    esperando una respuesta que nadie podia dar. */
-#dictado,#confirmar{position:fixed;inset:0;background:rgba(20,18,28,.55);display:grid;padding:16px}
+#dictado,#confirmar,#traer{position:fixed;inset:0;background:rgba(20,18,28,.55);display:grid;padding:16px}
+#traer{place-items:center;z-index:200}
 #dictado{place-items:end center;z-index:200}
 /* Mas alto que el dictado A PROPOSITO. #confirmar siempre pregunta ALGO de lo
    que ya esta en pantalla, asi que nunca puede quedar debajo. Con los dos en
@@ -278,8 +279,9 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
    invisible detras: «Repartir a los campos» parecia no servir. */
 #confirmar{place-items:center;z-index:300}
 #aviso-global{z-index:400}
-#dictado .caja,#confirmar .caja{background:var(--papel);border:1px solid var(--linea);border-radius:var(--r-lg);
+#dictado .caja,#confirmar .caja,#traer .caja{background:var(--papel);border:1px solid var(--linea);border-radius:var(--r-lg);
   box-shadow:var(--sombra-3);width:min(560px,100%);padding:20px;max-height:86vh;overflow:auto}
+#traer .caja{width:min(860px,100%)}
 .punto{width:10px;height:10px;border-radius:var(--r-full);background:var(--malo-linea);display:inline-block;
   animation:late 1s infinite}
 @keyframes late{50%{opacity:.25}}
@@ -642,6 +644,7 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
       <div class="fila">
         <div class="crece"><h2 id="doc-titulo">—</h2><p class="sub" id="doc-sub"></p></div>
         <button class="btn" id="btn-dictar">Dictar</button>
+        <button class="btn oculto" id="btn-traer">Traer del consultorio</button>
         <button class="btn" id="btn-imprimir">Imprimir</button>
         <button class="btn" id="btn-volver-exp">Volver</button>
       </div>
@@ -690,6 +693,37 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   <span class="crece">Nadie ha usado esta pantalla en un rato. La sesión se cierra en
     <b id="cuenta-inactividad">60</b> s. <b>Guarde lo que lleve escrito.</b></span>
   <button type="button" id="sigo-aqui">Sigo aquí</button>
+</div>
+
+<!-- ══════════ TRAER DEL CONSULTORIO ══════════ -->
+<div id="traer" class="oculto">
+  <div class="caja">
+    <div class="fila" style="margin-bottom:12px">
+      <div class="crece"><h2 style="margin:0">Traer la historia del consultorio</h2>
+        <p class="sub" style="margin:0">En consulta.miguelsotomd.com abra la historia
+          de esta paciente, oprima «Llevar a Zorvix» y pegue aquí el código.</p></div>
+      <button class="btn" id="traer-cerrar">Cerrar</button>
+    </div>
+    <textarea id="traer-codigo" rows="4" placeholder="ZXHC1...."
+      style="width:100%;font-family:var(--zx-mono,monospace);font-size:12px"></textarea>
+    <div class="fila" style="margin-top:10px">
+      <button class="btn" id="traer-leer">Revisar qué trae</button>
+    </div>
+    <div id="traer-aviso" style="margin-top:12px"></div>
+    <div id="traer-tabla"></div>
+    <div id="traer-hallazgos-caja" class="oculto" style="margin-top:12px">
+      <label style="display:flex;gap:8px;align-items:flex-start">
+        <input type="checkbox" id="traer-hallazgos" style="margin-top:3px">
+        <span class="sub">Copiar también los hallazgos de aquel día (signos vitales,
+          exploración, diagnósticos). <b>No se recomienda:</b> son de la consulta,
+          no del ingreso de hoy, y una nota no debe nacer con hallazgos de otro día
+          listos para firmarse.</span>
+      </label>
+    </div>
+    <div class="fila" style="margin-top:14px">
+      <button class="btn primario oculto" id="traer-ok">Prellenar la historia</button>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════ DICTADO ══════════ -->
@@ -2920,6 +2954,10 @@ function pintaDocumento(){
      privacidad lo pide en una casilla propia y dice, con esas palabras, que
      dejarla en blanco significa que no autoriza. */
   $('btn-dictar').disabled = !audioAutorizado();
+  /* Traer del consultorio sólo tiene sentido en la historia clínica, y sólo
+     mientras la nota se pueda prellenar: una nota ya archivada o anulada no.  */
+  $('btn-traer').classList.toggle('oculto',
+    !/historia/i.test(String(DOC.Tipo || '')) || anulada || archivada);
   if (anulada){
     aviso('doc-aviso', 'malo',
       'Este documento está ANULADO. Sigue en el expediente y se puede leer, pero ya no ' +
@@ -4360,6 +4398,519 @@ function sacaVitales(frase, paso, modo, choques){
     }
   });
 }
+
+/* ══════════ TRAER LA HISTORIA DEL CONSULTORIO ══════════
+
+   El Dr. Soto ya levanta la historia clínica de sus pacientes en el
+   expediente de su consultorio (consulta.miguelsotomd.com). Volver a
+   capturarla aquí no sólo cuesta tiempo: dos capturas del mismo
+   interrogatorio terminan diciendo cosas distintas, y entonces el
+   expediente ya no sirve para lo que existe.
+
+   Esto NO conecta los dos sistemas. Él aprieta un botón allá, que le da un
+   código; lo pega aquí, ve exactamente qué va a entrar y en qué campo, y
+   entonces prellena. Se hizo así a propósito: él elige las dos puntas, de
+   modo que el sistema nunca puede empatar por su cuenta a dos pacientes
+   distintas, que es el error que de verdad hace daño.
+
+   Cuatro reglas que no se negocian:
+
+   1. NO SE PISA NADA. Un campo que ya tiene algo escrito se respeta y se
+      reporta como respetado. Lo traído sólo llena huecos.
+
+   2. NO SE TRAEN LOS HALLAZGOS DEL DÍA. Signos vitales, exploración
+      física, diagnósticos y plan son de la consulta de aquel día, no del
+      ingreso de hoy. Se muestran aparte y él decide. Esto ya nos pasó una
+      vez al heredar notas dentro del consultorio: una nota nacía con los
+      hallazgos de otro día listos para firmarse.
+
+   3. NO SE TRADUCE «EMBARAZO». El consultorio pregunta «¿embarazo actual?»
+      y Zorvix pregunta «¿embarazo descartado?». No son la misma pregunta
+      invertida: que hace meses no hubiera embarazo no lo descarta hoy, y
+      esa casilla se firma antes de anestesiar. Se captura aquí.
+
+   4. SÓLO SE ESCRIBE DONDE DE VERDAD CABE. No basta con que el diccionario
+      tenga un campo equivalente: hay que poder escribirlo. Un control de
+      casillas no recibe texto, una casilla de fecha no recibe «hace dos
+      años», y un campo bloqueado porque se hereda del caso no se toca. El
+      programa no lo supone leyendo el diccionario: se lo pregunta al
+      formulario que está en pantalla, que es de donde leeFormulario() va a
+      leer al guardar. Lo que no cabe se dice y se guarda en «Sin ubicar».
+
+   Queda rastro: de dónde vino, de qué fecha y cuándo se trajo, escrito en
+   el propio documento. NOM-004-SSA3-2012 5.10 y 5.11. */
+
+const TRAER_MARCA = 'ZXHC1.';
+
+/* El JSON viaja en base64 por una razón práctica: un pegado de texto plano
+   con saltos de línea se corta o se reacomoda al pasar por el portapapeles
+   y por los cuadros de texto. Esto no es cifrado y no pretende serlo: son
+   datos de la paciente y por eso el código no viaja por correo ni por una
+   dirección web, sólo del portapapeles de su máquina a esta pantalla. */
+function traerDeB64(b64){
+  const bin = atob(String(b64).replace(/-/g, '+').replace(/_/g, '/'));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+/* ── El mapeo, como tabla y no escondido en el código ──────────────────
+
+   Los dos diccionarios nacieron por separado: de los 151 campos del
+   consultorio sólo 17 identificadores coinciden con los de Zorvix. Cada
+   renglón de aquí abajo es una traducción, y las que no tienen destino se
+   dicen en voz alta en vez de perderse.
+
+   `de`    id (o ids) del consultorio
+   `a`     id de Zorvix, o null si no existe campo equivalente
+   `une`   rótulos con los que se juntan varios campos del consultorio en uno
+   `dia`   es hallazgo de aquel día: se muestra, no se escribe solo
+   `nota`  por qué, cuando hace falta explicarlo */
+const MAPA_CONSULTORIO = [
+  /* Antecedentes heredo-familiares. Zorvix separa trombosis, que es la que
+     cambia la conducta; el resto va junto. */
+  { de:['ahf_positivos','ahf_descripcion'], a:'ahf_otros',
+    une:['Positivos','Descripción'] },
+
+  /* Personales patológicos */
+  { de:'app_alergicos',       a:'app_alergicos' },
+  { de:'app_quirurgicos',     a:'app_quirurgicos' },
+  { de:'app_anestesicos',     a:'app_anestesicos' },
+  { de:'app_transfusionales', a:'app_transfusionales' },
+  { de:'app_oncologicos',     a:'app_cancer' },
+  { de:'app_dermatologicos',  a:'app_dermatologicas' },
+  { de:['app_cronicos','app_medicamentos_actuales','app_hospitalizaciones'],
+    a:'app_enf_medicamentos',
+    une:['Crónico-degenerativos','Medicamentos de uso actual','Hospitalizaciones previas'],
+    nota:'Zorvix no tiene campo propio para hospitalizaciones ni para ' +
+         'medicamentos de uso actual; los tres van juntos aquí, rotulados.' },
+
+  /* Personales no patológicos */
+  { de:'apnp_tabaquismo',   a:'apnp_tabaquismo' },
+  { de:'apnp_alcoholismo',  a:'apnp_alcoholismo' },
+  { de:'apnp_toxicomanias', a:'apnp_toxicomanias' },
+  { de:'apnp_actividad_fisica', a:null,
+    nota:'Zorvix no pregunta actividad física en la historia clínica.' },
+  { de:'apnp_dieta', a:null,
+    nota:'Zorvix no captura la dieta como texto sino en nueve casillas de ' +
+         'frecuencia semanal (agua, fruta, verduras…). No se reparte solo.' },
+
+  /* Gineco-obstétricos */
+  { de:'ago_fum',             a:'ago_fum' },
+  { de:'ago_papanicolaou',    a:'ago_papanicolaou' },
+  { de:'ago_estudio_mamario', a:'ago_mastografia' },
+  { de:'ago_menarca', a:null, nota:'Zorvix no pide menarca en la historia clínica.' },
+  { de:'ago_lactancia', a:null, nota:'Zorvix no pide lactancia.' },
+  { de:'ago_anticonceptivo', a:null, nota:'Zorvix no pide método anticonceptivo.' },
+  { de:'ago_embarazo_actual', a:null,
+    nota:'A PROPÓSITO no se trae. Allá la pregunta es «¿embarazo actual?» y ' +
+         'aquí es «¿embarazo descartado?», que no es la misma pregunta al revés: ' +
+         'se descarta antes de anestesiar, no hace meses. Se captura aquí.' },
+
+  /* Padecimiento: cuatro campos de allá en uno de aquí. Juntar no pierde
+     nada; al revés sí perdería. */
+  { de:['pa_motivo','pa_evolucion','pa_tratamientos_previos','pa_expectativa'],
+    a:'hc2_padecimiento',
+    une:['Motivo','Tiempo de evolución','Tratamientos previos','Expectativa del paciente'] },
+
+  /* Interrogatorio por aparatos: seis en uno. */
+  { de:['ap_cardiovascular','ap_respiratorio','ap_digestivo','ap_urinario',
+        'ap_nervioso','ap_piel_anexos'],
+    a:'hc2_aparatos',
+    une:['Cardiovascular','Respiratorio','Digestivo','Urinario','Nervioso','Piel y anexos'] },
+
+  /* Ficha y piel */
+  { de:'paciente_grupo_etnico', a:'hc_grupo_etnico' },
+  { de:'piel_fototipo',         a:'piel_fototipo' },
+  { de:'piel_valoracion', a:null,
+    nota:'Zorvix valora la piel en siete casillas (estado, tipo, biotipo, tacto, ' +
+         'características, alteraciones, arrugas). No se reparte solo.' },
+
+  /* Hallazgos de aquel día: se muestran, no se escriben. */
+  { de:'sv_ta',    a:'hc_sv_ta',    dia:true },
+  { de:'sv_fc',    a:'hc_sv_fc',    dia:true },
+  { de:'sv_fr',    a:'hc_sv_fr',    dia:true },
+  { de:'sv_temp',  a:'hc_sv_temp',  dia:true },
+  { de:'sv_sato2', a:'hc_sv_sato2', dia:true },
+  { de:'sv_peso',  a:'hc_sv_peso',  dia:true },
+  { de:'sv_talla', a:'hc_sv_talla', dia:true },
+  { de:'ef_habitus',       a:'hc2_habitus',       dia:true },
+  { de:'ef_cabeza_cuello', a:'hc2_cabeza_cuello', dia:true },
+  { de:'ef_torax',         a:'hc2_torax',         dia:true },
+  { de:'ef_mamas',         a:'hc2_mamas',         dia:true },
+  { de:'ef_abdomen',       a:'hc2_abdomen',       dia:true },
+  { de:'ef_genitales',     a:'hc2_genitales',     dia:true },
+  { de:'ef_extremidades',  a:'hc2_extremidades',  dia:true },
+  { de:'estudios_resultados', a:'hc2_laboratorio',  dia:true },
+  { de:'diagnosticos',        a:'hc2_diagnosticos', dia:true },
+  { de:'pronostico',          a:'hc2_pronostico',   dia:true },
+  { de:'plan_tratamiento',    a:'hc2_indicacion',   dia:true },
+  { de:'ef_regional', a:null, dia:true,
+    nota:'Zorvix explora por regiones con campos propios; no hay un campo ' +
+         '«regional dirigida» donde ponerlo.' },
+  { de:'ef_antropometria', a:null, dia:true,
+    nota:'Zorvix no tiene campo de medidas antropométricas en la historia.' }
+];
+
+/* ── ¿De verdad cabe? Se le pregunta al formulario, no al diccionario ──
+
+   El diccionario dice qué control le toca a cada campo, pero lo que decide
+   si un valor se puede escribir es el control pintado en pantalla:
+   leeFormulario() lee del DOM al guardar, así que escribir en un <div> de
+   casillas no guarda nada, y escribir «hace dos años» en un <input
+   type=date> lo deja vacío. Las dos cosas pasarían en silencio. */
+function traerAFecha(v){
+  const s = String(v || '').trim();
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (m) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+  return '';
+}
+
+function traerCabe(id, valor){
+  const c = PORID[id];
+  if (!c) return { ok:false, porque:'El campo «' + id + '» ya no está en el ' +
+                                    'diccionario de Zorvix: hay que actualizar el mapeo.' };
+  const el = $('f_' + id);
+  if (!el) return { ok:false, porque:'Ese campo no aparece en esta historia clínica.' };
+  if (el.readOnly || el.disabled)
+    return { ok:false, porque:'Zorvix lo hereda del caso y lo deja bloqueado.' };
+
+  const tag = String(el.tagName || '').toLowerCase();
+  if (tag === 'textarea') return { ok:true, valor:valor };
+  if (tag === 'select'){
+    const ops = Array.prototype.map.call(el.options, function(o){ return o.value; })
+                     .filter(Boolean);
+    const igual = ops.filter(function(o){ return traerNorm(o) === traerNorm(valor); })[0];
+    return igual ? { ok:true, valor:igual }
+                 : { ok:false, porque:'Aquí es una lista cerrada y «' + valor +
+                                      '» no es una de sus opciones.' };
+  }
+  if (tag === 'input'){
+    const tipo = String(el.type || 'text').toLowerCase();
+    if (tipo === 'date'){
+      const f = traerAFecha(valor);
+      return f ? { ok:true, valor:f }
+               : { ok:false, porque:'Aquí es una casilla de fecha y allá vino como ' +
+                                    'texto libre («' + String(valor).slice(0, 40) + '»).' };
+    }
+    if (tipo === 'number'){
+      const n = String(valor).trim().replace(',', '.');
+      return /^-?\d+(\.\d+)?$/.test(n)
+        ? { ok:true, valor:n }
+        : { ok:false, porque:'Aquí es un número y allá vino como texto.' };
+    }
+    if (tipo === 'checkbox')
+      return { ok:false, porque:'Aquí es una casilla de marcar, no un texto.' };
+    return { ok:true, valor:valor };
+  }
+  return { ok:false, porque:'Zorvix captura esto con casillas, no con un renglón ' +
+                            'de texto: hay que marcarlas a mano.' };
+}
+
+/* Gestas/partos/abortos/cesáreas: allá es un texto («2/1/0/1», «G2 P1 A0 C1»),
+   aquí son cuatro casillas. Se parte sólo cuando se entiende sin adivinar. */
+function traerPareGPAC(txt){
+  const s = String(txt || '').trim();
+  if (!s) return null;
+  const m = s.match(/^\s*G?\s*(\d+)\D+P?\s*(\d+)\D+A?\s*(\d+)\D+C?\s*(\d+)\s*$/i);
+  if (!m) return null;
+  return { ago_g:m[1], ago_p:m[2], ago_a:m[3], ago_c:m[4] };
+}
+
+function traerNorm(s){
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/* Dos nombres son el mismo aunque vengan en otro orden: aquí se guarda
+   «Ailyn Hernández Porello» y allá se arma «Hernández Porello Ailyn». */
+function traerMismoNombre(a, b){
+  const pa = traerNorm(a).split(' ').filter(Boolean).sort().join(' ');
+  const pb = traerNorm(b).split(' ').filter(Boolean).sort().join(' ');
+  return !!pa && pa === pb;
+}
+
+/* Lo que ya tiene valor en el documento abierto. Cuenta tanto lo guardado
+   como lo que esté escrito en pantalla sin guardar: pisar lo segundo sería
+   borrarle a alguien lo que acaba de teclear. */
+function traerYaTiene(id){
+  const el = $('f_' + id);
+  if (el && String(el.value || '').trim()) return true;
+  return !!String(DOC.campos[id] == null ? '' : DOC.campos[id]).trim();
+}
+
+function traerUne(payload, ids, rotulos){
+  const partes = [];
+  ids.forEach(function(id, i){
+    const v = String(payload.campos[id] == null ? '' : payload.campos[id]).trim();
+    if (!v) return;
+    partes.push(ids.length > 1 ? (rotulos[i] + ': ' + v) : v);
+  });
+  return partes.join('\n');
+}
+
+/* El rótulo humano lo manda el consultorio junto con los datos, así que el
+   día que él agregue un campo allá, aquí sale con su nombre y no con su id. */
+function traerRotulo(payload, ids, r){
+  if (r.une) return r.une.join(' + ');
+  if (r.a && PORID[r.a]) return PORID[r.a].etiqueta;
+  return (payload.etiquetas || {})[ids[0]] || ids[0];
+}
+
+/* ── La revisión: qué va a pasar con cada cosa, antes de que pase ────── */
+function traerRevisa(payload){
+  const filas = [];
+  MAPA_CONSULTORIO.forEach(function(r){
+    const ids = Array.isArray(r.de) ? r.de : [r.de];
+    const valor = traerUne(payload, ids, r.une || []);
+    if (!valor) return;                      /* vacío allá: no se reporta */
+    const nombre = traerRotulo(payload, ids, r);
+
+    if (r.dia){
+      const c = r.a ? traerCabe(r.a, valor) : { ok:false, porque:'' };
+      filas.push({ estado:'dia', nombre:nombre, valor:valor,
+                   final: c.ok ? c.valor : valor,
+                   destino: c.ok ? r.a : null,
+                   nota: r.nota || (c.ok ? '' : c.porque) });
+      return;
+    }
+    if (!r.a){
+      filas.push({ estado:'sin-campo', nombre:nombre, valor:valor, final:valor,
+                   destino:null, nota:r.nota || '' });
+      return;
+    }
+    if (traerYaTiene(r.a)){
+      filas.push({ estado:'ocupado', nombre:nombre, valor:valor, final:valor,
+                   destino:r.a, nota:'Aquí ya hay algo escrito. No se pisa.' });
+      return;
+    }
+    const cabe = traerCabe(r.a, valor);
+    if (!cabe.ok){
+      filas.push({ estado:'no-cabe', nombre:nombre, valor:valor, final:valor,
+                   destino:null, nota:cabe.porque });
+      return;
+    }
+    filas.push({ estado:'escribe', nombre:nombre, valor:valor, final:cabe.valor,
+                 destino:r.a, nota:r.nota || '' });
+  });
+
+  /* Trombosis familiar: cambia la conducta, así que tiene campo propio. */
+  const ahf = String(payload.campos.ahf_positivos || '') + ' ' +
+              String(payload.campos.ahf_descripcion || '');
+  if (/trombo/.test(traerNorm(ahf)) && !traerYaTiene('ahf_trombosis')){
+    const v = 'Sí — ver antecedentes heredo-familiares';
+    const c = traerCabe('ahf_trombosis', v);
+    filas.push({ estado: c.ok ? 'escribe' : 'no-cabe',
+                 nombre:'Historia familiar de trombosis', valor:v,
+                 final: c.ok ? c.valor : v, destino: c.ok ? 'ahf_trombosis' : null,
+                 nota:'La historia del consultorio menciona trombosis.' +
+                      (c.ok ? '' : ' ' + c.porque) });
+  }
+
+  /* Gestas / partos / abortos / cesáreas */
+  const bruto = payload.campos.ago_gpac;
+  if (bruto){
+    const gpac = traerPareGPAC(bruto);
+    if (gpac){
+      Object.keys(gpac).forEach(function(id){
+        const etq = (PORID[id] || {}).etiqueta || id;
+        if (traerYaTiene(id)){
+          filas.push({ estado:'ocupado', nombre:etq, valor:gpac[id],
+                       final:gpac[id], destino:id,
+                       nota:'Aquí ya hay algo escrito. No se pisa.' });
+          return;
+        }
+        const c = traerCabe(id, gpac[id]);
+        filas.push({ estado: c.ok ? 'escribe' : 'no-cabe', nombre:etq,
+                     valor:gpac[id], final: c.ok ? c.valor : gpac[id],
+                     destino: c.ok ? id : null,
+                     nota:'De «' + bruto + '».' + (c.ok ? '' : ' ' + c.porque) });
+      });
+    } else {
+      filas.push({ estado:'no-cabe', nombre:'Gestas / partos / abortos / cesáreas',
+                   valor:String(bruto), final:String(bruto), destino:null,
+                   nota:'No se entendió como cuatro números, y aquí son cuatro ' +
+                        'casillas. Cópielo a mano antes que adivinar.' });
+    }
+  }
+  return filas;
+}
+
+/* ── Escribir ───────────────────────────────────────────────────────── */
+function traerAplica(payload, filas, conHallazgos){
+  let n = 0;
+  const sueltos = [];
+  filas.forEach(function(f){
+    const escribible = f.destino &&
+      (f.estado === 'escribe' ||
+       (conHallazgos && f.estado === 'dia' && !traerYaTiene(f.destino)));
+    if (escribible){
+      DOC.campos[f.destino] = f.final;
+      const el = $('f_' + f.destino);
+      if (el) el.value = f.final;
+      n++;
+    } else if (f.estado === 'sin-campo' || f.estado === 'no-cabe'){
+      sueltos.push('· ' + f.nombre + ': ' + f.valor +
+                   (f.nota ? '\n    (' + f.nota + ')' : ''));
+    }
+  });
+
+  /* Lo que no cupo no se tira: cae íntegro en «Sin ubicar», que es el cajón
+     que esta pantalla ya tiene justo para eso. */
+  const cabeza = 'Prellenado desde el expediente del consultorio ' +
+    '(consulta.miguelsotomd.com), historia del ' +
+    (payload.fecha_historia || '(sin fecha)') +
+    (payload.folio ? ', folio ' + payload.folio : '') +
+    ', traída el ' + hoyISO() + '.';
+  const bloque = [cabeza].concat(
+    sueltos.length
+      ? ['', 'Lo que no tiene campo en Zorvix y hay que ver a mano:'].concat(sueltos)
+      : []).join('\n');
+  const sin = $('f__sin_ubicar');
+  if (sin) sin.value = (sin.value ? sin.value + '\n\n' : '') + bloque;
+  DOC.campos.__sin_ubicar =
+    (DOC.campos.__sin_ubicar ? DOC.campos.__sin_ubicar + '\n\n' : '') + bloque;
+
+  return { escritos:n, sueltos:sueltos.length };
+}
+
+/* ── La pantalla ────────────────────────────────────────────────────── */
+let TRAER_CARGA = null, TRAER_FILAS = [];
+
+function traerAbre(){
+  $('traer-codigo').value = '';
+  $('traer-aviso').innerHTML = '';
+  $('traer-tabla').innerHTML = '';
+  $('traer-ok').classList.add('oculto');
+  $('traer-hallazgos-caja').classList.add('oculto');
+  $('traer-hallazgos').checked = false;
+  TRAER_CARGA = null; TRAER_FILAS = [];
+  $('traer').classList.remove('oculto');
+}
+
+function traerCierra(){ $('traer').classList.add('oculto'); }
+
+const TRAER_ESTADOS = {
+  'escribe':   ['ok',   'Se escribe'],
+  'dia':       ['warn', 'Hallazgo de aquel día'],
+  'ocupado':   ['warn', 'Ya hay algo aquí'],
+  'no-cabe':   ['warn', 'No cabe aquí'],
+  'sin-campo': ['warn', 'Sin campo en Zorvix']
+};
+
+function traerPinta(){
+  const orden = Object.keys(TRAER_ESTADOS);
+  const filas = TRAER_FILAS.slice().sort(function(a, b){
+    return orden.indexOf(a.estado) - orden.indexOf(b.estado);
+  });
+  if (!filas.length){
+    $('traer-tabla').innerHTML =
+      '<div class="aviso warn">Esa historia del consultorio no trae nada que ' +
+      'se pueda pasar: sus campos vinieron vacíos.</div>';
+    $('traer-ok').classList.add('oculto');
+    return;
+  }
+  const cuenta = {};
+  filas.forEach(function(f){ cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
+
+  $('traer-tabla').innerHTML =
+    '<div class="fila" style="gap:8px;flex-wrap:wrap;margin-top:12px">' +
+      orden.filter(function(k){ return cuenta[k]; }).map(function(k){
+        return '<span class="etq ' + TRAER_ESTADOS[k][0] + '">' +
+               cuenta[k] + ' · ' + esc(TRAER_ESTADOS[k][1]) + '</span>';
+      }).join('') +
+    '</div>' +
+    '<div class="desbordado" style="max-height:44vh;overflow:auto;margin-top:10px">' +
+    '<table class="rep"><tr><th style="width:150px">Qué pasa</th><th>Dato</th>' +
+    '<th style="width:190px">Va a</th></tr>' +
+    filas.map(function(f){
+      const e = TRAER_ESTADOS[f.estado] || ['', f.estado];
+      return '<tr><td><span class="etq ' + e[0] + '">' + esc(e[1]) + '</span></td>' +
+             '<td><b>' + esc(f.nombre) + '</b>' +
+             '<div class="sub" style="white-space:pre-wrap;margin-top:2px">' +
+               esc(String(f.valor).slice(0, 400)) + '</div>' +
+             (f.nota ? '<div class="sub" style="margin-top:4px"><i>' + esc(f.nota) +
+                       '</i></div>' : '') +
+             '</td><td>' +
+             (f.destino && PORID[f.destino] ? esc(PORID[f.destino].etiqueta)
+                                            : '<i>a «Sin ubicar»</i>') +
+             '</td></tr>';
+    }).join('') + '</table></div>';
+
+  $('traer-hallazgos-caja').classList.toggle('oculto', !cuenta['dia']);
+  $('traer-ok').classList.remove('oculto');
+}
+
+function traerLee(){
+  const txt = String($('traer-codigo').value || '').trim();
+  if (!txt){ aviso('traer-aviso','warn','Pegue el código que le dio el consultorio.'); return; }
+  const i = txt.indexOf(TRAER_MARCA);
+  if (i < 0){
+    aviso('traer-aviso','malo','Eso no parece un código de historia del consultorio: ' +
+          'tiene que empezar con ' + TRAER_MARCA);
+    return;
+  }
+  let p;
+  try{
+    p = JSON.parse(traerDeB64(txt.slice(i + TRAER_MARCA.length).replace(/\s+/g, '')));
+  }catch(e){
+    aviso('traer-aviso','malo','El código viene incompleto o cortado. Vuelva a ' +
+          'copiarlo completo desde el consultorio.');
+    return;
+  }
+  if (!p || !p.campos){ aviso('traer-aviso','malo','El código no trae campos.'); return; }
+
+  /* El candado que importa: que sea la MISMA paciente. */
+  const nAqui = String(EXP.paciente.Fecha_Nacimiento || '').slice(0, 10);
+  const nAlla = String((p.paciente && p.paciente.nacimiento) || '').slice(0, 10);
+  const mismoNombre = traerMismoNombre(EXP.paciente.Nombre_Completo,
+                                       p.paciente && p.paciente.nombre);
+  const mismaFecha  = !!nAqui && nAqui === nAlla;
+
+  if (!mismoNombre && !mismaFecha){
+    aviso('traer-aviso','malo',
+      'Esa historia no es de esta paciente. Aquí está abierta «' +
+      (EXP.paciente.Nombre_Completo || '—') + '» y el código viene de «' +
+      ((p.paciente && p.paciente.nombre) || '—') + '». No se trae nada.');
+    $('traer-ok').classList.add('oculto');
+    $('traer-tabla').innerHTML = '';
+    return;
+  }
+  if (!mismoNombre || !mismaFecha){
+    aviso('traer-aviso','warn',
+      'Coincide a medias: aquí «' + (EXP.paciente.Nombre_Completo || '—') +
+      (nAqui ? ', ' + nAqui : '') + '» y allá «' +
+      ((p.paciente && p.paciente.nombre) || '—') + (nAlla ? ', ' + nAlla : '') +
+      '». Revise que sea la misma persona antes de prellenar.');
+  } else {
+    aviso('traer-aviso','ok',
+      'Historia de ' + ((p.paciente && p.paciente.nombre) || '') + ', del ' +
+      (p.fecha_historia || 'sin fecha') + '. Esto es lo que va a entrar:');
+  }
+
+  TRAER_CARGA = p;
+  TRAER_FILAS = traerRevisa(p);
+  traerPinta();
+}
+
+/* ── Cableado ───────────────────────────────────────────────────────── */
+$('btn-traer').onclick    = traerAbre;
+$('traer-cerrar').onclick = traerCierra;
+$('traer-leer').onclick   = traerLee;
+
+$('traer-ok').onclick = function(){
+  if (!TRAER_CARGA) return;
+  const r = traerAplica(TRAER_CARGA, TRAER_FILAS, $('traer-hallazgos').checked);
+  traerCierra();
+  aviso('doc-aviso', 'ok',
+    'Prellenado con la historia del consultorio: ' + r.escritos + ' campo(s) ' +
+    'escrito(s)' + (r.sueltos ? ' y ' + r.sueltos + ' que no caben aquí, guardado(s) ' +
+    'íntegros en «Sin ubicar»' : '') + '. Revísela, complete lo que Zorvix pide de ' +
+    'más (piel, dieta, Caprini, embarazo descartado) y guárdela. Nada se firmó solo.');
+};
+
 </script>
 </body>
 </html>
