@@ -519,6 +519,7 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
           <p class="sub" id="agenda-sub">Los casos del día que están en su alcance.</p>
         </div>
         <input type="date" id="agenda-fecha" style="width:auto">
+        <button class="btn" id="btn-programacion" type="button">Imprimir la programación</button>
       </div>
       <div id="agenda-lista"></div>
     </div>
@@ -4991,6 +4992,143 @@ $('traer-ok').onclick = function(){
     'íntegros en «Sin ubicar»' : '') + '. Revísela, complete lo que Zorvix pide de ' +
     'más (piel, dieta, Caprini, embarazo descartado) y guárdela. Nada se firmó solo.');
 };
+
+
+/* ══════════ LA PROGRAMACIÓN DEL DÍA ══════════
+
+   De dónde sale la exigencia, verificado contra la fuente y no supuesto:
+
+   La guía de autoverificación de COFEPRIS para establecimientos que ofrecen
+   procedimientos quirúrgicos con fines estéticos pide, en su punto 14:
+   «En caso de contar con servicio consulta externa, cuenta con registro
+   diario de los pacientes». Está condicionado a la consulta externa, y la
+   guía NO exige bitácora diaria de intervenciones quirúrgicas. Así que esta
+   hoja es obligatoria sólo si la licencia de Zorvix ampara consulta externa;
+   si no, es un documento operativo que de todos modos conviene tener.
+
+   Se imprime de cualquier fecha, no sólo de hoy: la misma casilla de fecha de
+   la agenda manda. Por eso no hay que «generar las que ya pasaron» como un
+   lote de archivos — se elige el día y se imprime, que además es más honesto:
+   la hoja se arma con lo que la base dice HOY de ese día, no con una copia
+   congelada que nadie puede volver a cotejar.
+
+   Un día sin cirugías también se imprime, diciendo que no hubo. Un registro
+   que sólo existe los días que hubo movimiento no demuestra nada de los otros.
+
+   EL ALCANCE SE DECLARA EN EL PAPEL. El servidor devuelve sólo los casos que
+   el usuario puede ver: quien no tiene alcance completo recibe únicamente los
+   suyos. Una hoja parcial presentada como registro del establecimiento sería
+   una mentira, así que cuando el alcance es parcial la hoja lo dice en el
+   título y en el pie, y no se llama registro del establecimiento. */
+
+function progFechaLarga(iso){
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio',
+                 'agosto','septiembre','octubre','noviembre','diciembre'];
+  const s = String(iso || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s + 'T12:00:00');
+  if (isNaN(d.getTime())) return s;
+  return d.getDate() + ' de ' + MESES[d.getMonth()] + ' de ' + d.getFullYear();
+}
+
+function progCuandoAhora(){
+  const a = new Date();
+  const dos = n => String(n).padStart(2, '0');
+  return a.getFullYear() + '-' + dos(a.getMonth() + 1) + '-' + dos(a.getDate()) +
+         ' ' + dos(a.getHours()) + ':' + dos(a.getMinutes());
+}
+
+function progRenglones(casos){
+  if (!casos.length){
+    return '<p class="imp-vitales" style="margin-top:10px">' +
+           'Sin procedimientos programados para esta fecha.</p>';
+  }
+  const fila = c =>
+    '<tr>' +
+      '<td>' + esc(String(c.Hora_Inicio || '').slice(0, 5) || '—') + '</td>' +
+      '<td>' + esc(c.Expediente_No || '—') + '</td>' +
+      '<td>' + esc(c.Paciente_Nombre || c.Paciente_ID || '—') + '</td>' +
+      '<td>' + esc(c.Procedimiento_Principal || '—') + '</td>' +
+      '<td>' + esc(c.Quirofano || '—') + '</td>' +
+      '<td>' + esc(c.Tipo_Anestesia || '—') + '</td>' +
+      '<td>' + esc(nombreDeCorreo(c.Cirujano_Nombre || c.Cirujano_Email || '')) + '</td>' +
+      '<td>' + esc(nombreDeCorreo(c.Anestesiologo_Nombre || c.Anestesiologo_Email || '') || '—') + '</td>' +
+      '<td>' + esc(etiquetaAgenda(c.Estatus_Agenda)) + '</td>' +
+    '</tr>';
+
+  return '<table class="imp-tabla">' +
+    '<tr><th>Hora</th><th>Expediente</th><th>Paciente</th><th>Procedimiento</th>' +
+    '<th>Quirófano</th><th>Anestesia</th><th>Cirujano</th><th>Anestesiólogo</th>' +
+    '<th>Estatus</th></tr>' +
+    casos.map(fila).join('') + '</table>';
+}
+
+async function imprimeProgramacionDelDia(boton){
+  if (IMPRIMIENDO_FORMATO) return;
+  IMPRIMIENDO_FORMATO = true;
+  const textoBoton = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = 'Preparando…';
+  quitaModoFormato();
+
+  try{
+    const dia = ($('agenda-fecha') && $('agenda-fecha').value) || hoyISO();
+    const r = await api('agendaDelDia', { fecha: dia });
+    const casos = (r.casos || []).slice().sort(function(a, b){
+      return String(a.Hora_Inicio || '').localeCompare(String(b.Hora_Inicio || ''));
+    });
+
+    const completo = !!(YO && YO.ve_todo);
+    const quien = (YO && (YO.nombre || YO.correo)) || '';
+    const titulo = completo
+      ? 'Programación quirúrgica del día'
+      : 'Programación del día — casos de ' + (quien || 'este usuario');
+
+    $('impresion').innerHTML =
+      '<table class="imp-pliego"><thead><tr><td>' +
+        '<div class="imp-corre">' + esc((EST.nombre || 'Zorvix') + ' · ' + titulo +
+          ' · ' + progFechaLarga(dia)) + '</div>' +
+      '</td></tr></thead><tbody><tr><td>' +
+      '<div class="imp-membrete">' +
+        '<div class="n">' + esc(EST.nombre || 'Zorvix') + '</div>' +
+        '<div class="d">' + esc(EST.domicilio || '') +
+          (EST.licencia_sanitaria ? ' · Licencia sanitaria ' + esc(EST.licencia_sanitaria) : '') +
+          (EST.telefono ? ' · Tel. ' + esc(EST.telefono) : '') + '</div>' +
+      '</div>' +
+      '<div class="imp-titulo">' + esc(titulo) +
+        '<span>' + esc(progFechaLarga(dia)) + ' · ' +
+        casos.length + ' paciente(s)</span></div>' +
+      progRenglones(casos) +
+      '<div class="imp-firma">' +
+        '<div class="linea"></div>' +
+        '<div class="pie"><b>' + esc(quien || '______________________________') + '</b>' +
+          '<br>Responsable del registro</div>' +
+      '</div>' +
+      '<div class="imp-nota">' +
+        (completo
+          ? 'Registro diario de pacientes del establecimiento. '
+          : 'ALCANCE PARCIAL: esta hoja sólo contiene los casos en los que ' +
+            'participa quien la imprimió, no todos los del establecimiento. ') +
+        'Impresa' + (quien ? ' por ' + esc(quien) : '') + ' el ' + progCuandoAhora() +
+        '. Se arma al momento con lo que la base de datos tiene de esa fecha. ' +
+        'El expediente es propiedad del establecimiento y se conserva cinco años ' +
+        'contados desde el último acto médico (NOM-004-SSA3-2012, 5.4).</div>' +
+      '</td></tr></tbody></table>';
+
+    window.print();
+    aviso('agenda-sub', 'ok', 'Programación del ' + progFechaLarga(dia) + ': ' +
+      casos.length + ' paciente(s).' +
+      (completo ? '' : ' OJO: sólo salieron los casos suyos, no todos los del día.'));
+  }catch(e){
+    aviso('agenda-sub', 'malo', 'No se pudo armar la programación: ' + e.message);
+  } finally {
+    IMPRIMIENDO_FORMATO = false;
+    boton.disabled = false;
+    boton.textContent = textoBoton;
+  }
+}
+
+$('btn-programacion').onclick = function(){ imprimeProgramacionDelDia(this); };
 
 </script>
 </body>
