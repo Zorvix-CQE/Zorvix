@@ -2613,7 +2613,20 @@ function edad(nac){
 
 /* ══════════ DOCUMENTO ══════════ */
 $('btn-volver-exp').onclick = () => vista('expediente');
-$('btn-imprimir').onclick = function(){ armaImpresion(); window.print(); };
+$('btn-imprimir').onclick = function(){
+  /* Lo de «Sin ubicar» no sale en papel. Si hay algo ahí, se dice antes de
+     imprimir: no para impedirlo, para que nadie firme creyendo que salió. */
+  const sinUbicar = String((DOC.campos && DOC.campos.__sin_ubicar) ||
+    ($('f__sin_ubicar') && $('f__sin_ubicar').value) || '').trim();
+  if (sinUbicar){
+    aviso('doc-aviso', 'warn',
+      'Esta nota tiene texto en «Sin ubicar», al final de la pantalla, y eso NO ' +
+      'se imprime. Si algo de ahí es clínico, cópielo al campo que le toca antes ' +
+      'de firmar la hoja.');
+  }
+  armaImpresion();
+  window.print();
+};
 
 /* ══════════ LA HOJA QUE SE IMPRIME ══════════
 
@@ -2704,13 +2717,24 @@ function armaImpresion(){
     return titulo + linea + resto.map(c => filaImp(c.etiqueta, val(c))).join('');
   }).join('');
 
-  /* Lo que el dictado no logró ubicar NO se pierde en el papel: si se quedó
-     en la nota, se imprime, señalado como lo que es. */
-  const suelto = String(DOC.campos.__sin_ubicar || $('f__sin_ubicar') && $('f__sin_ubicar').value || '').trim();
-  const bloqueSuelto = suelto
-    ? '<div class="imp-grupo">Texto dictado sin ubicar</div>' +
-      '<div class="imp-campo"><div class="v">'+esc(suelto)+'</div></div>'
-    : '';
+  /* «SIN UBICAR» NO SE IMPRIME. Corrección del 20 oct 2026.
+
+     Esto sí se imprimía, con el argumento de que así no se perdía nada.
+     El argumento era malo y se vio en cuanto se usó: ese cajon recoge lo que
+     el dictado no supo repartir y, desde que existe la importación del
+     consultorio, también las explicaciones de por qué un dato no cupo
+     —texto sobre el funcionamiento del sistema—. Eso acabó impreso en la
+     historia clínica de una paciente, debajo del diagnóstico y encima de la
+     firma del médico tratante.
+
+     Una hoja que se firma y se archiva sólo lleva lo que el médico asienta
+     en su campo. El cajon se queda en pantalla, se guarda con el documento y
+     se puede leer cuando se quiera; lo que de ahí sea clínico, el médico lo
+     mueve al campo que le toca y entonces sí sale impreso.
+
+     Para que no se pierda en silencio, al imprimir se avisa que hay texto
+     ahí. Ver el botón Imprimir. */
+  const bloqueSuelto = '';
 
   /* El pie se arma del medico tratante en este momento, no de lo que quedo
      guardado: si el caso cambio de cirujano, la hoja que se imprime hoy tiene
