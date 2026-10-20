@@ -3078,8 +3078,40 @@ function esEquipoLibre(c){ return EQUIPO_LIBRE.indexOf(String(c && c.id)) >= 0; 
    sabe una sola persona. Mientras no haya un punto único de captura confiable,
    las dos quedan como celdas libres: el cirujano y el anestesiólogo se ponen de
    acuerdo y escriben la misma hora en su propia nota. */
-const HORAS_LIBRES = ['qx_hora_cirugia', 'qx_hora_anestesia'];
+const HORAS_LIBRES = ['qx_cirugia_inicio', 'qx_cirugia_fin',
+                      'qx_anestesia_inicio', 'qx_anestesia_fin',
+                      'qx_hora_cirugia', 'qx_hora_anestesia'];
 function esHoraLibre(c){ return HORAS_LIBRES.indexOf(String(c && c.id)) >= 0; }
+
+/* ── LAS NOTAS ESCRITAS ANTES DE PARTIR LAS HORAS ─────────
+
+   Hasta el 20 de octubre de 2026 la nota postoperatoria pedía las horas en
+   dos campos que decían «inicio y término» pero eran una sola casilla de
+   reloj, así que sólo cabía una hora. Se partieron en cuatro.
+
+   Cuatro notas en borrador alcanzaron a guardar hora en los campos viejos.
+   Esos campos ya no se pintan, y sin esto el valor quedaría guardado pero
+   invisible: nadie lo vería y nadie sabría que se perdió.
+
+   Entonces el campo nuevo de INICIO, si está vacío, se pinta con lo que
+   tuviera el campo viejo. Se propone como inicio y no como término porque en
+   una sola casilla lo que se teclea primero es la hora de empezar —pero es
+   una suposición mía, no un dato: hay que verificarla al abrir la nota. En
+   cuanto se guarde, el valor queda en su campo nuevo y esto deja de actuar.
+   La versión anterior del documento conserva el campo viejo intacto
+   (NOM-004-SSA3-2012 5.11). */
+const HORA_PARTIDA = {
+  qx_cirugia_inicio:   'qx_hora_cirugia',
+  qx_anestesia_inicio: 'qx_hora_anestesia'
+};
+function rescataHoraVieja(c){
+  const propio = DOC.campos[c.id];
+  if (propio !== undefined && propio !== null && propio !== '') return propio;
+  const viejo = HORA_PARTIDA[String(c && c.id)];
+  if (!viejo) return propio;
+  const g = DOC.campos[viejo];
+  return (g === undefined || g === null || g === '') ? propio : g;
+}
 
 /* ── LA FECHA DEL DOCUMENTO: se propone, no se impone ───────────
    Salía bloqueada con el día en que se abría la pantalla, y de ahí pasaba a la
@@ -3127,7 +3159,7 @@ function esLibre(c){
 }
 
 function pintaCampo(c){
-  const v = sinLeyenda(DOC.campos[c.id]);
+  const v = sinLeyenda(rescataHoraVieja(c));
   const her = heredado(c);
   const hayHer = her !== null && her !== '' && !(Array.isArray(her) && !her.length);
   const libre = esLibre(c);
