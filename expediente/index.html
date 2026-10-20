@@ -3184,7 +3184,30 @@ function pintaCampo(c){
   let cuerpo = '';
   /* Sólo el equipo cambia de control: las horas siguen siendo reloj, nada más
      que ya no llegan bloqueadas. */
-  const control = (esEquipoLibre(c) || esAnestLibre(c)) ? 'equipo_libre' : c.control;
+  let control = (esEquipoLibre(c) || esAnestLibre(c)) ? 'equipo_libre' : c.control;
+
+  /* LA FECHA Y LA HORA DEL DOCUMENTO, QUE NUNCA SE PUDIERON ESCRIBIR.
+
+     Arriba, en FECHAS_LIBRES, se decidió en septiembre que la fecha del
+     documento se propone y no se impone, porque el juego de papelería se
+     imprime la víspera y si no, el expediente entero queda fechado un día
+     antes. La decisión quedó escrita y nunca llegó a la pantalla: los dos
+     campos están declarados `automatico` en el diccionario, y esa rama del
+     switch pintaba `readonly` SIEMPRE, por encima de `bloq`. O sea que la
+     bandera de campo libre no servía de nada para ellos.
+
+     Se veían normales —se podían enfocar y seleccionar— pero no se podía
+     teclear nada. El costo real: una nota que se escribe hoy sobre una
+     cirugía de otro día salía impresa con la fecha y la hora de hoy.
+
+     `automatico` describe de dónde SALE el valor, no que esté prohibido
+     corregirlo. Y ya que se abren, se pintan con el control que les toca por
+     naturaleza: calendario y reloj, no un renglón de texto donde cabe
+     «8:15 am» y al guardar se recorta a cinco caracteres. */
+  if (control === 'automatico' && libre){
+    if (c.id === 'doc_fecha') control = 'fecha';
+    else if (c.id === 'doc_hora') control = 'hora';
+  }
 
   switch(control){
     case 'equipo_libre': {
@@ -3250,9 +3273,11 @@ function pintaCampo(c){
     case 'adjunto_ref':
       cuerpo = pintaAdjuntoRef(c, val, bloq, id); break;
     case 'automatico': {
+      /* Honra `bloq` como todas las demás ramas. Un campo automático que
+         nadie declaró libre sigue saliendo bloqueado, igual que antes. */
       const ley = (val === '' || val === null || val === undefined) ? leyendaVacia(c) : '';
-      cuerpo = '<input type="text" id="'+id+'" class="bloqueado" readonly value="'+esc(val)+'"'+
-               (ley ? ' placeholder="'+esc(ley)+'"' : '')+'>'; break; }
+      cuerpo = '<input type="text" id="'+id+'"'+(bloq ? ' class="bloqueado" readonly' : '')+
+               ' value="'+esc(val)+'"'+(ley ? ' placeholder="'+esc(ley)+'"' : '')+'>'; break; }
     default:
       cuerpo = '<input type="text" id="'+id+'" value="'+esc(val)+'"'+(bloq?' readonly class="bloqueado"':'')+'>';
   }
