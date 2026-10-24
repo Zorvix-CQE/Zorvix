@@ -683,7 +683,7 @@ async function cargarRevisar(){
           ${m.editados ? `<div class="sub" style="margin-top:4px">✎ ${esc(m.editados)}</div>` : ''}
           ${m.estado==='OBSERVADO' ? `<div class="sub" style="color:var(--info);margin-top:4px">Observado: ${esc(m.motivo)} — esperando corrección</div>` : ''}
           <div class="r" style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn sec sm" data-mov="${esc(m.folio)}" style="flex:1">Ver comprobante</button>
+            <button class="btn sec sm" data-mov="${esc(m.folio)}" style="flex:1">Ver artículos</button>
             ${m.puedoRevisar ? `<button class="btn ok sm" style="flex:1" onclick="revisar('${esc(m.folio)}','APROBADO')">Aprobar</button>` : `<span class="sub" style="align-self:center">Lo registraste tú</span>`}
           </div>
         </div>
@@ -738,13 +738,13 @@ async function abrirDetalle(folio){
       m.confianza!==null?['Lectura automática', Math.round(m.confianza*100)+'%']:null
     ].filter(Boolean);
     $('dCuerpo').innerHTML = `
-      ${m.tieneFoto ? `<div class="photo-slot" id="dFoto"><span class="reading"><span class="spin"></span>Cargando comprobante…</span></div>` : ''}
-      <div class="kv">${kv.map(([k,v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
-      ${arts.length ? `<h2 class="sec" style="font-size:21px">Artículos <span class="sub" style="font-family:inherit">· ${arts.length}</span></h2>
+      ${arts.length ? `<h2 class="sec" style="font-size:21px;margin-top:0">Artículos <span class="sub" style="font-family:inherit">· ${arts.length}</span></h2>
         ${artsOk ? '' : `<div class="alert" style="margin-bottom:8px"><span>Los artículos suman ${money(sumaArts)} y el ticket ${money(m.total)}.${puedeCorregir ? ' Toca <b>Corregir datos</b> y luego <b>Cambiar foto</b> (de cerca, que se lean los precios).' : ''}</span></div>`}
         <div class="list">${arts.map(p => `<div class="row"><span class="mid"><div class="t">${esc(p.descripcion)}</div>
         <div class="s">${esc(p.categoria)}${p.cantidad ? ' · ' + esc(p.cantidad) + (p.precioUnitario ? ' × ' + money(p.precioUnitario) : '') : ''}${p.codigo ? ' · ' + esc(p.codigo) : ''}</div></span>
         <span class="amt num">${money(p.importe ?? p.importeCaja)}</span></div>`).join('')}</div>` : ''}
+      ${m.tieneFoto ? `<div class="photo-slot" id="dFoto"><span class="reading"><span class="spin"></span>Cargando comprobante…</span></div>` : ''}
+      <div class="kv">${kv.map(([k,v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
       ${m.motivo ? `<div class="note"><b>Revisión:</b> ${esc(m.motivo)}</div>` : ''}
       ${m.editados ? `<div class="note"><b>Cambios sobre la lectura:</b> ${esc(m.editados)}</div>` : ''}
       ${m.alertas ? `<div class="note"><b>Alertas:</b> ${esc(alertasTxt(m.alertas))}</div>` : ''}
