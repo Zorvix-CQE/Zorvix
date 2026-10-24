@@ -260,6 +260,24 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
 @keyframes sk{to{background-position:-200% 0}}
 
 /* ---------- impresión de relación ---------- */
+.rp-res{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:6px 0 12px}
+.rp-res div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.rp-res b{display:block;font-size:19px}
+.rp-res span{font-size:11.5px;color:var(--muted)}
+.tk{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 14px 12px;margin-bottom:12px}
+.tk.mal{border-color:var(--warn)}
+.tk-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.tk-h .t{font-weight:700;font-size:15px}
+.tk-h .s{font-size:12px;color:var(--muted);margin-top:2px}
+.tk-h .amt{text-align:right;font-weight:700;font-size:16px;white-space:nowrap}
+.tk-t{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px}
+.tk-t td{padding:6px 0;border-top:1px solid var(--line);vertical-align:top}
+.tk-t td.n{text-align:right;white-space:nowrap;padding-left:8px;font-variant-numeric:tabular-nums}
+.tk-t td.i{color:var(--muted);width:20px}
+.tk-t small{display:block;color:var(--muted);font-size:11px}
+.tk-f{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:12.5px}
+.tk-ok{color:var(--ok);font-weight:700}.tk-no{color:var(--warn);font-weight:700}.tk-na{color:var(--muted)}
+.tk-a{display:flex;gap:8px;margin-top:10px}
 #printArea{display:none}
 @media print{
   body{padding:0;background:#fff;color:#000}
@@ -271,6 +289,12 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
   #printArea td.n,#printArea th.n{text-align:right}
   #printArea .firmas{display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:60px;text-align:center}
   #printArea .firmas div{border-top:1px solid #000;padding-top:6px}
+  #printArea .ptk{break-inside:avoid;margin-top:16px;border:1px solid #bbb;border-radius:6px;padding:8px 10px}
+  #printArea .ptk h3{margin:0;font-size:12.5px;display:flex;justify-content:space-between;gap:10px}
+  #printArea .ptk .m{color:#555;font-size:10px;margin-top:2px}
+  #printArea .ptk table{margin-top:6px}
+  #printArea .ptk td,#printArea .ptk th{padding:3px 4px}
+  #printArea .warn{color:#A8671A;font-weight:700}
 }
 </style>
 </head>
@@ -328,6 +352,7 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
       <div class="toolbar">
         <input type="month" id="mMes">
         <div class="sp" style="flex:1"></div>
+        <button class="btn sec sm" id="btnReporteMov">Reporte</button>
         <button class="btn sec sm" id="btnAnalisis">Análisis ›</button>
       </div>
       <div class="chips" id="mFiltros">
@@ -343,6 +368,7 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
 
     <!-- REVISAR -->
     <section id="v-revisar" class="view hidden">
+      <button class="cta" id="btnReporteRev" style="margin-top:6px"><span class="ic">≣</span><span><b>Reporte ticket por ticket</b><span>Cada gasto con todos sus artículos · para validar e imprimir</span></span></button>
       <p class="sub" style="margin:8px 2px 12px">Gastos registrados por el equipo que esperan tu firma. No puedes aprobar lo que tú registraste.</p>
       <div id="rLista"></div>
     </section>
@@ -388,11 +414,12 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
       <h2 class="sec">Cuenta</h2>
       <div class="list">
         <div class="row"><div class="mid"><div class="t" id="uNombre"></div><div class="s" id="uCorreo"></div></div><span class="pill p-APROBADO" id="uRol"></span></div>
+        <button class="row" id="btnReporteMas"><div class="mid"><div class="t">Reporte ticket por ticket</div><div class="s">Artículo por artículo, para validar pagos</div></div>›</button>
         <button class="row" id="btnAnalisisMas"><div class="mid"><div class="t">Análisis de gastos</div><div class="s">Por categoría, artículo y precio</div></div>›</button>
         <button class="row" id="btnArqueoMas"><div class="mid"><div class="t">Arqueo de caja</div><div class="s">Contar el efectivo por denominación</div></div>›</button>
         <button class="row" id="btnSalir"><div class="mid"><div class="t" style="color:var(--bad)">Cerrar sesión</div></div></button>
       </div>
-      <p class="sub" style="text-align:center;margin-top:18px">Zorvix · Caja v1.3</p>
+      <p class="sub" style="text-align:center;margin-top:18px">Zorvix · Caja v1.4</p>
     </section>
   </main>
 
@@ -473,6 +500,25 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
       <button class="chip" data-p="todo">Todo</button>
     </div>
     <div id="anCuerpo"><div class="empty">Cargando…</div></div>
+  </div>
+</section>
+
+<!-- ===================== HOJA: REPORTE ===================== -->
+<section class="sheet" id="shReporte" aria-modal="true">
+  <div class="sheet-h"><h3>Reporte por ticket</h3><button class="x" data-close="shReporte" aria-label="Cerrar">✕</button></div>
+  <div class="in">
+    <div class="chips" id="rpEstado">
+      <button class="chip on" data-e="PENDIENTES">Por aprobar</button>
+      <button class="chip" data-e="APROBADO">Aprobados</button>
+      <button class="chip" data-e="TODOS">Todos</button>
+    </div>
+    <div class="chips" id="rpPeriodo">
+      <button class="chip on" data-p="todo">Todo</button>
+      <button class="chip" data-p="mes">Este mes</button>
+      <button class="chip" data-p="30">30 días</button>
+      <button class="chip" data-p="90">90 días</button>
+    </div>
+    <div id="rpCuerpo"><div class="empty">Cargando…</div></div>
   </div>
 </section>
 
@@ -581,7 +627,7 @@ function entrar(){
   $('masRep').classList.toggle('hidden', !u.aprueba);
   $('masFondo').classList.toggle('hidden', !u.admin);
   ['fab','ctaFoto'].forEach(id => $(id).classList.toggle('hidden', !u.escribe));
-  ['btnAnalisis','btnAnalisisMas'].forEach(id => $(id).classList.toggle('hidden', !(u.aprueba || u.nivel === 'lectura')));
+  ['btnAnalisis','btnAnalisisMas','btnReporteMov','btnReporteMas'].forEach(id => $(id).classList.toggle('hidden', !(u.aprueba || u.nivel === 'lectura')));
   $('mMes').value = hoy().slice(0,7);
   ir('inicio');
 }
@@ -1110,6 +1156,11 @@ function imprimirRelacion(r){
     <table><thead><tr><th>Folio</th><th>Fecha</th><th>Proveedor</th><th>Concepto</th><th>Categoría</th><th>Comp.</th><th>Registró</th><th>Aprobó</th><th class="n">Importe</th></tr></thead>
     <tbody>${r.movimientos.map(m => `<tr><td>${esc(m.folio)}</td><td>${esc(m.fecha)}</td><td>${esc(m.proveedor)}</td><td>${esc(m.concepto)}</td><td>${esc(m.categoria)}</td><td>${esc(m.comprobante)}${m.uuid?'<br><small>'+esc(m.uuid)+'</small>':''}</td><td>${esc(m.registradoNombre)}</td><td>${esc(m.revisadoPor)}</td><td class="n">${money(-m.efecto)}</td></tr>`).join('')}
     <tr><td colspan="8" style="text-align:right;font-weight:700">Total a reponer</td><td class="n" style="font-weight:700">${money(rp.monto)}</td></tr></tbody></table>
+    <h2 style="font-size:14px;margin-top:22px">Desglose por ticket</h2>
+    ${tablaTicketsPrint(r.movimientos.map(m => { const arts = (m.partidas || []).filter(p => p.origen !== 'AUTO');
+      const suma = Math.round(arts.reduce((s, p) => s + (Number(p.importe) || 0), 0) * 100) / 100;
+      const ok = !arts.length ? null : (Math.abs(suma - m.total) <= 1 || (m.subtotal && Math.abs(suma - m.subtotal) <= 1));
+      return Object.assign({}, m, { partidas: arts, cuadre: { suma, ok, diferencia: Math.round((m.total - suma) * 100) / 100 } }); }))}
     <div class="firmas"><div>Custodio del fondo</div><div>Revisó</div><div>Autorizó y entregó</div></div>`;
   window.print();
 }
@@ -1172,6 +1223,82 @@ async function cargarAnalisis(){
   } catch(e){ box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 $('btnAnalisis').onclick = abrirAnalisis;
+
+/* ================================================================
+ *  REPORTE TICKET POR TICKET
+ * ================================================================ */
+const RP = { estado:'PENDIENTES', periodo:'todo', datos:null };
+function abrirReporte(){ abrirHoja('shReporte'); cargarReporte(); }
+['btnReporteRev','btnReporteMov','btnReporteMas'].forEach(id => $(id).onclick = abrirReporte);
+$('rpEstado').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; RP.estado = c.dataset.e; cargarReporte(); });
+$('rpPeriodo').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; RP.periodo = c.dataset.p; cargarReporte(); });
+const cantTxt = p => p.cantidad ? (p.cantidad + (p.precioUnitario ? ' × ' + money(p.precioUnitario) : '')) : '';
+function cuadreTxt(t){
+  if (t.cuadre.ok === null) return t.comprobante === 'SIN_COMPROBANTE' ? ['tk-na','Sin comprobante: sin desglose'] : ['tk-na','Sin desglose de artículos'];
+  if (t.cuadre.ok) return ['tk-ok', 'Cuadra ✓'];
+  const d = t.cuadre.diferencia;
+  return ['tk-no', '⚠ ' + (d > 0 ? 'Faltan ' + money(d) : 'Sobran ' + money(-d))];
+}
+async function cargarReporte(){
+  document.querySelectorAll('#rpEstado .chip').forEach(c => c.classList.toggle('on', c.dataset.e === RP.estado));
+  document.querySelectorAll('#rpPeriodo .chip').forEach(c => c.classList.toggle('on', c.dataset.p === RP.periodo));
+  const box = $('rpCuerpo'); box.innerHTML = '<div class="empty">Cargando…</div>';
+  try {
+    const r = RP.datos = await api('reporte', Object.assign({ estado:RP.estado }, rangoPeriodo(RP.periodo)));
+    if (!r.tickets.length){ box.innerHTML = '<div class="list"><div class="empty">No hay gastos con este filtro.</div></div>'; return; }
+    box.innerHTML = `
+      <div class="rp-res">
+        <div><b class="num">${r.tickets.length}</b><span>Tickets</span></div>
+        <div><b class="num">${money(r.total)}</b><span>Total pagado</span></div>
+        <div><b class="num" style="color:${r.sinCuadrar?'var(--warn)':'inherit'}">${r.sinCuadrar}</b><span>No cuadran con sus artículos</span></div>
+        <div><b class="num">${r.sinComprobante}</b><span>Sin comprobante</span></div>
+      </div>
+      <button class="btn sec" id="rpImprimir" style="width:100%;margin-bottom:12px">Imprimir o guardar PDF</button>
+      ${r.tickets.map(t => { const [cl, tx] = cuadreTxt(t); return `
+      <div class="tk${t.cuadre.ok === false ? ' mal' : ''}">
+        <div class="tk-h"><div><div class="t">${esc(t.proveedor)}</div>
+          <div class="s">${esc(t.folio)} · ${esc(fechaLarga(t.fecha))} · ${esc(t.registradoNombre.split(' ')[0])}</div></div>
+          <div class="amt num">${money(t.total)}<br><span class="pill p-${t.estado}">${ESTADO_TXT[t.estado]||t.estado}</span></div></div>
+        ${t.partidas.length ? `<table class="tk-t">${t.partidas.map((p, i) => `<tr><td class="i">${i+1}</td>
+          <td>${esc(p.descripcion)}<small>${esc(p.categoria)}${cantTxt(p) ? ' · ' + esc(cantTxt(p)) : ''}</small></td>
+          <td class="n">${money(p.importe)}</td></tr>`).join('')}</table>` :
+          `<p class="sub" style="margin:10px 0 0">${t.comprobante === 'SIN_COMPROBANTE' ? 'Motivo: ' + esc(t.notas || '—') : esc(t.concepto)}</p>`}
+        <div class="tk-f"><span class="${cl}">${tx}</span>
+          <span class="sub">${t.partidas.length ? 'Suman ' + money(t.cuadre.suma) : ''}${t.subtotal ? ' · Subtotal ' + money(t.subtotal) : ''}${t.iva ? ' · IVA ' + money(t.iva) : ''}</span></div>
+        <div class="tk-a"><button class="btn sec sm" data-mov="${esc(t.folio)}" style="flex:1">Ver foto y detalle</button>
+          ${t.puedoRevisar ? `<button class="btn ok sm" style="flex:1" onclick="aprobarDesdeReporte('${esc(t.folio)}')">Aprobar</button>` : ''}</div>
+      </div>`; }).join('')}`;
+    $('rpImprimir').onclick = imprimirReporte;
+  } catch(e){ box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+async function aprobarDesdeReporte(folio){
+  try { await api('revisar', { folio, decision:'APROBADO', motivo:'' }); toast(folio + ' aprobado ✓'); cargarReporte(); }
+  catch(e){ toast(e.message, true); }
+}
+function tablaTicketsPrint(lista){
+  return lista.map(t => { const [cl, tx] = cuadreTxt(t); const arts = t.partidas || []; return `
+    <div class="ptk"><h3><span>${esc(t.folio)} · ${esc(t.fecha)} · ${esc(t.proveedor)}</span><span>${money(t.total)}</span></h3>
+      <div class="m">${ESTADO_TXT[t.estado]||t.estado} · ${esc(String(t.comprobante||'').replace('_',' ').toLowerCase())} · registró ${esc(t.registradoNombre)}${t.revisadoPor ? ' · revisó ' + esc(t.revisadoPor) : ''}${t.rfc ? ' · RFC ' + esc(t.rfc) : ''}</div>
+      ${arts.length ? `<table><thead><tr><th>#</th><th>Artículo</th><th>Categoría</th><th class="n">Cant. × P.U.</th><th class="n">Importe</th></tr></thead><tbody>
+        ${arts.map((p, i) => `<tr><td>${i+1}</td><td>${esc(p.descripcion)}</td><td>${esc(p.categoria)}</td><td class="n">${esc(cantTxt(p))}</td><td class="n">${money(p.importe)}</td></tr>`).join('')}
+        <tr><td colspan="4" style="text-align:right">Suman${t.subtotal ? ' (subtotal ' + money(t.subtotal) + (t.iva ? ', IVA ' + money(t.iva) : '') + ')' : ''}</td><td class="n"><b>${money(t.cuadre ? t.cuadre.suma : 0)}</b></td></tr></tbody></table>`
+        : `<div class="m">${t.comprobante === 'SIN_COMPROBANTE' ? 'Sin comprobante · motivo: ' + esc(t.notas || '—') : 'Sin desglose · ' + esc(t.concepto)}</div>`}
+      ${t.cuadre && t.cuadre.ok !== null ? `<div class="m ${cl === 'tk-no' ? 'warn' : ''}">${tx}</div>` : ''}
+    </div>`; }).join('');
+}
+function imprimirReporte(){
+  const r = RP.datos; if (!r) return;
+  const est = {PENDIENTES:'por aprobar', APROBADO:'aprobados', TODOS:'todos'}[RP.estado];
+  const per = {todo:'todo el historial', mes:'este mes', '30':'últimos 30 días', '90':'últimos 90 días'}[RP.periodo];
+  $('printArea').innerHTML = `
+    <div style="font-size:10px;letter-spacing:.3em;font-weight:700">ZORVIX</div>
+    <h1>Reporte de gastos ticket por ticket</h1>
+    <div>${esc(r.fondo.nombre)} · Gastos ${est} · ${per} · ${r.tickets.length} tickets · total ${money(r.total)}${r.sinCuadrar ? ' · <span class="warn">' + r.sinCuadrar + ' no cuadran</span>' : ''}</div>
+    <div style="color:#555">Generado ${esc(r.generado)} por ${esc(r.por)}</div>
+    ${tablaTicketsPrint(r.tickets)}
+    <div class="firmas"><div>Custodio del fondo</div><div>Revisó</div><div>Autorizó</div></div>`;
+  window.print();
+}
 $('btnAnalisisMas').onclick = abrirAnalisis;
 
 $('btnSalir').onclick = () => salir(false);
