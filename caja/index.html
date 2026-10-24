@@ -517,6 +517,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const fmx = new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'});
 const money = n => n === null || n === undefined || n === '' || isNaN(n) ? '—' : fmx.format(Number(n));
 const money0 = n => n === null || n === undefined || isNaN(n) ? '—' : new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(Number(n));
+const dec2 = v => (typeof v === 'number' && isFinite(v)) ? v.toFixed(2) : (v ?? '');
 const numIn = v => { const s = String(v ?? '').replace(/[^\d.\-]/g,''); if (!s) return null; const n = Number(s); return isFinite(n) ? n : null; };
 const hoy = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
 const fechaLarga = s => { if (!s) return ''; const d = new Date(String(s).slice(0,10)+'T12:00:00'); return isNaN(d) ? s : d.toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'}); };
@@ -869,10 +870,10 @@ function mostrarFormulario(s, alertas){
   };
   $('capElegir').classList.add('hidden'); $('capTrabajo').classList.remove('hidden');
   if (S.cap.sin) $('capShot').innerHTML = '<div class="pdf" style="color:#fff">Gasto sin comprobante</div>';
-  $('gTotal').value = s.total ?? '';
+  $('gTotal').value = dec2(s.total);
   $('gProveedor').value = s.proveedor || ''; $('gConcepto').value = s.concepto || '';
   $('gFecha').value = s.fecha || hoy(); $('gFecha').max = hoy();
-  $('gIva').value = s.iva ?? ''; $('gSub').value = s.subtotal ?? '';
+  $('gIva').value = dec2(s.iva); $('gSub').value = dec2(s.subtotal);
   $('gRfc').value = s.rfc || ''; $('gUuid').value = s.uuid || ''; $('gFolioT').value = s.folioTicket || '';
   $('gNotas').value = s.notas || '';
   $('eNotas').textContent = d.comprobante === 'SIN_COMPROBANTE' ? 'obligatorio: ¿por qué no hay comprobante?' : '';
@@ -907,7 +908,7 @@ function pintarArticulos(){
       <input class="art-d" data-k="descripcion" value="${esc(p.descripcion)}" placeholder="Artículo">
       <div class="art-r">
         <select data-k="categoria">${cats.map(c => `<option${c === p.categoria ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
-        <input data-k="importe" inputmode="decimal" class="num" value="${p.importe ?? ''}" placeholder="$">
+        <input data-k="importe" inputmode="decimal" class="num" value="${esc(dec2(p.importe))}" placeholder="$">
         <button type="button" class="art-x" data-del="${i}" aria-label="Quitar">✕</button>
       </div>
       ${p.cantidad || p.codigo ? `<small>${p.cantidad ? esc(p.cantidad) + (p.precioUnitario ? ' × ' + money(p.precioUnitario) : '') : ''}${p.codigo ? ' · ' + esc(p.codigo) : ''}</small>` : ''}
