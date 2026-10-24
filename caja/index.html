@@ -220,6 +220,24 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
 .arq-res b{font-family:var(--serif);font-size:24px;font-weight:400}
 .arq-res .d-bad{color:#E9A3A3} .arq-res .d-ok{color:#9ED3B5}
 
+/* ---------- artículos y análisis ---------- */
+.arts{display:grid;gap:10px;margin-top:8px}
+.art{border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--paper)}
+.art-d{width:100%;border:0;background:transparent;font-weight:600;font-size:15px;outline:none;padding:0}
+.art-r{display:flex;gap:8px;align-items:center;margin-top:6px}
+.art-r select{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:7px 8px;background:var(--card);font-size:13px}
+.art-r input{width:96px;text-align:right;border:1px solid var(--line);border-radius:10px;padding:7px 8px;background:var(--card);font-weight:700}
+.art-x{width:30px;height:30px;border-radius:50%;background:var(--soft);color:var(--muted);flex:none}
+.art small{display:block;color:var(--muted);font-size:11.5px;margin-top:4px}
+.f > span em.cuadre{font-weight:700}
+.cuadre.ok{color:var(--ok)!important} .cuadre.no{color:var(--warn)!important}
+.an-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:6px 0 4px}
+.an-kpis div{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.an-kpis b{display:block;font-family:var(--serif);font-size:24px;font-weight:400}
+.an-kpis span{font-size:11.5px;color:var(--muted)}
+#anCuerpo .row .s{white-space:normal}
+.up{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--bad-soft);color:var(--bad);margin-left:6px;white-space:nowrap}
+
 /* ---------- login ---------- */
 .login{min-height:100dvh;display:flex;flex-direction:column;justify-content:space-between;padding:calc(40px + var(--safe-t)) 28px calc(40px + var(--safe-b));
   background:var(--hero);color:var(--hero-ink);position:fixed;inset:0;z-index:100}
@@ -309,6 +327,7 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
       <div class="toolbar">
         <input type="month" id="mMes">
         <div class="sp" style="flex:1"></div>
+        <button class="btn sec sm" id="btnAnalisis">Análisis ›</button>
       </div>
       <div class="chips" id="mFiltros">
         <button class="chip on" data-f="">Todos</button>
@@ -352,7 +371,8 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
         <h2 class="sec">Fondo</h2>
         <div class="form">
           <label class="f"><span>Nombre</span><input id="cfNombre"></label>
-          <label class="f"><span>Monto fijo del fondo</span><input id="cfMonto" inputmode="decimal" class="num"></label>
+          <div class="f"><span>Monto fijo actual</span><div class="num" id="cfActual" style="font-size:16px;font-weight:600;padding-top:4px">—</div></div>
+          <label class="f"><span>Entrada (+) o retiro (−) de efectivo</span><input id="cfMonto" inputmode="decimal" class="num" placeholder="Ej. 5000 para agregar · -2000 para retirar"></label>
           <div class="two">
             <label class="f"><span>Tope por gasto</span><input id="cfTope" inputmode="decimal" class="num"></label>
             <label class="f"><span>Avisar reposición al</span><input id="cfUmbral" inputmode="numeric" class="num" placeholder="30 %"></label>
@@ -360,16 +380,17 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
           <label class="f"><span>Custodio · nombre</span><input id="cfCustNom"></label>
           <label class="f"><span>Custodio · correo</span><input id="cfCustCor" type="email" autocapitalize="off"></label>
         </div>
-        <p class="sub" style="margin:8px 2px">Cambiar el monto fijo registra un movimiento de fondeo por la diferencia (entrada o retiro de efectivo).</p>
+        <p class="sub" style="margin:8px 2px">Escribe solo la cantidad que entra o sale de la caja. El nuevo monto fijo se calcula solo y queda registrado como fondeo. Deja vacío si solo cambias custodio o tope.</p>
         <div class="actions"><button class="btn" id="cfGuardar">Guardar fondo</button></div>
       </div>
       <h2 class="sec">Cuenta</h2>
       <div class="list">
         <div class="row"><div class="mid"><div class="t" id="uNombre"></div><div class="s" id="uCorreo"></div></div><span class="pill p-APROBADO" id="uRol"></span></div>
+        <button class="row" id="btnAnalisisMas"><div class="mid"><div class="t">Análisis de gastos</div><div class="s">Por categoría, artículo y precio</div></div>›</button>
         <button class="row" id="btnArqueoMas"><div class="mid"><div class="t">Arqueo de caja</div><div class="s">Contar el efectivo por denominación</div></div>›</button>
         <button class="row" id="btnSalir"><div class="mid"><div class="t" style="color:var(--bad)">Cerrar sesión</div></div></button>
       </div>
-      <p class="sub" style="text-align:center;margin-top:18px">Zorvix · Caja v1.0</p>
+      <p class="sub" style="text-align:center;margin-top:18px">Zorvix · Caja v1.2</p>
     </section>
   </main>
 
@@ -408,13 +429,19 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
             <label class="f"><span>Fecha</span><input id="gFecha" type="date"></label>
             <label class="f"><span>IVA</span><input id="gIva" inputmode="decimal" class="num" placeholder="—"></label>
           </div>
-          <div class="f"><span>Categoría</span><div class="seg" id="gCats"></div></div>
+          <div class="f"><span>Categoría <em>aplica a todos los artículos</em></span><div class="seg" id="gCats"></div></div>
           <div class="f"><span>Comprobante</span><div class="seg" id="gComp"></div></div>
           <div class="f"><span>Forma de pago</span><div class="seg" id="gPago"></div></div>
           <label class="f"><span>Notas <em id="eNotas"></em></span><textarea id="gNotas" placeholder="Opcional"></textarea></label>
         </div>
+        <div class="form" id="gArtWrap">
+          <div class="f"><span>Artículos <em class="cuadre" id="gCuadre"></em></span>
+            <div class="arts" id="gArts"></div>
+            <button type="button" class="link" id="gArtAdd">+ Agregar artículo</button>
+          </div>
+        </div>
         <details class="more">
-          <summary>Datos fiscales y detalle leído</summary>
+          <summary>Datos fiscales</summary>
           <div class="form">
             <label class="f"><span>RFC del emisor</span><input id="gRfc" autocapitalize="characters" autocomplete="off"></label>
             <label class="f"><span>UUID (folio fiscal)</span><input id="gUuid" autocapitalize="characters" autocomplete="off"></label>
@@ -423,7 +450,6 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
               <label class="f"><span>Folio / ticket</span><input id="gFolioT" autocomplete="off"></label>
             </div>
           </div>
-          <div class="items" id="gItems"></div>
         </details>
       </div>
     </div>
@@ -431,6 +457,20 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
   <div class="sheet-foot hidden" id="capFoot"><div class="in"><button class="btn sec sm" id="capOtra">Otra foto</button><button class="btn" id="capGuardar">Registrar gasto</button></div></div>
   <input type="file" id="inCam" accept="image/*" capture="environment" class="hidden">
   <input type="file" id="inGal" accept="image/*,application/pdf" class="hidden">
+</section>
+
+<!-- ===================== HOJA: ANÁLISIS ===================== -->
+<section class="sheet" id="shAnalisis" aria-modal="true">
+  <div class="sheet-h"><h3>Análisis de gastos</h3><button class="x" data-close="shAnalisis" aria-label="Cerrar">✕</button></div>
+  <div class="in">
+    <div class="chips" id="anPeriodo">
+      <button class="chip on" data-p="mes">Este mes</button>
+      <button class="chip" data-p="30">30 días</button>
+      <button class="chip" data-p="90">90 días</button>
+      <button class="chip" data-p="todo">Todo</button>
+    </div>
+    <div id="anCuerpo"><div class="empty">Cargando…</div></div>
+  </div>
 </section>
 
 <!-- ===================== HOJA: DETALLE ===================== -->
@@ -533,6 +573,7 @@ function entrar(){
   $('masRep').classList.toggle('hidden', !u.aprueba);
   $('masFondo').classList.toggle('hidden', !u.admin);
   ['fab','ctaFoto'].forEach(id => $(id).classList.toggle('hidden', !u.escribe));
+  ['btnAnalisis','btnAnalisisMas'].forEach(id => $(id).classList.toggle('hidden', !(u.aprueba || u.nivel === 'lectura')));
   $('mMes').value = hoy().slice(0,7);
   ir('inicio');
 }
@@ -662,7 +703,8 @@ async function abrirDetalle(folio){
   $('dCuerpo').innerHTML = '<div class="empty">Cargando…</div>';
   abrirHoja('shDetalle');
   try {
-    const m = (await api('detalle', { folio })).movimiento;
+    const det = await api('detalle', { folio });
+    const m = det.movimiento; m.partidas = det.partidas || [];
     if (!m){ $('dCuerpo').innerHTML = '<div class="empty">No encontrado.</div>'; return; }
     const u = S.usuario;
     const puedeRevisar = u.aprueba && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO') && (m.tipo==='GASTO'||m.tipo==='AJUSTE') && (!m.esMio || u.rol==='ceo');
@@ -686,6 +728,9 @@ async function abrirDetalle(folio){
     $('dCuerpo').innerHTML = `
       ${m.tieneFoto ? `<div class="photo-slot" id="dFoto"><span class="reading"><span class="spin"></span>Cargando comprobante…</span></div>` : ''}
       <div class="kv">${kv.map(([k,v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+      ${m.partidas.length ? `<h2 class="sec" style="font-size:21px">Artículos</h2><div class="list">${m.partidas.map(p => `<div class="row"><span class="mid"><div class="t">${esc(p.descripcion)}</div>
+        <div class="s">${esc(p.categoria)}${p.cantidad ? ' · ' + esc(p.cantidad) + (p.precioUnitario ? ' × ' + money(p.precioUnitario) : '') : ''}${p.codigo ? ' · ' + esc(p.codigo) : ''}</div></span>
+        <span class="amt num">${money(p.importeCaja ?? p.importe)}</span></div>`).join('')}</div>` : ''}
       ${m.motivo ? `<div class="note"><b>Revisión:</b> ${esc(m.motivo)}</div>` : ''}
       ${m.editados ? `<div class="note"><b>Cambios sobre la lectura:</b> ${esc(m.editados)}</div>` : ''}
       ${m.alertas ? `<div class="note"><b>Alertas:</b> ${esc(m.alertas.replace(/_/g,' ').toLowerCase().replace(/,/g,' · '))}</div>` : ''}
@@ -822,17 +867,54 @@ function mostrarFormulario(s, alertas){
     `<span class="conf ${conf>=.85?'':conf>=.6?'mid':'low'}">Lectura ${Math.round(conf*100)}% · ${conf>=.85?'confiable':conf>=.6?'revisa el total':'verifica todo'}</span>`;
   $('eProv').textContent = s.rfc ? s.rfc : '';
   const cats = (S.resumen?.categorias || []).map(c => [c.nombre, c.nombre]);
-  segmentado('gCats', cats, d.categoria, v => d.categoria = v);
+  segmentado('gCats', cats, d.categoria, v => { d.categoria = v; (S.cap.partidas || []).forEach(p => p.categoria = v); pintarArticulos(); });
   segmentado('gComp', COMPROBANTES, d.comprobante, v => { d.comprobante = v; $('eNotas').textContent = v==='SIN_COMPROBANTE' ? 'obligatorio: ¿por qué no hay comprobante?' : ''; });
   segmentado('gPago', PAGOS, d.formaPago, v => d.formaPago = v);
   $('gAlertas').innerHTML = (alertas||[]).map(a => `<div class="alert ${a.grave?'grave':''}">${esc(a.texto)}</div>`).join('');
-  $('gItems').innerHTML = (s.conceptos||[]).length ? s.conceptos.map(c => `<div><span>${c.cantidad?esc(c.cantidad)+' × ':''}${esc(c.descripcion)}</span><span class="num">${money(c.importe)}</span></div>`).join('') + (s.observaciones?`<p class="sub">${esc(s.observaciones)}</p>`:'') : '';
+  S.cap.partidas = (s.conceptos || []).map(c => ({ descripcion: c.descripcion || '', codigo: c.codigo || '', cantidad: c.cantidad ?? null,
+    precioUnitario: c.precioUnitario ?? null, importe: c.importe ?? null, categoria: c.categoria || d.categoria }));
+  $('gArtWrap').classList.toggle('hidden', !!S.cap.sin);
+  pintarArticulos();
   $('capForm').classList.remove('hidden'); $('capFoot').classList.remove('hidden');
   $('capOtra').classList.toggle('hidden', !!S.cap.folio || S.cap.sin);
   actualizarBotonGuardar();
   if (!s.total) setTimeout(() => $('gTotal').focus(), 350);
 }
-$('gTotal').addEventListener('input', actualizarBotonGuardar);
+$('gTotal').addEventListener('input', () => { actualizarBotonGuardar(); actualizarCuadre(); });
+$('gSub').addEventListener('input', actualizarCuadre);
+
+function pintarArticulos(){
+  const cats = (S.resumen?.categorias || []).map(c => c.nombre);
+  const P = S.cap.partidas || [];
+  $('gArts').innerHTML = P.length ? P.map((p, i) => `
+    <div class="art" data-i="${i}">
+      <input class="art-d" data-k="descripcion" value="${esc(p.descripcion)}" placeholder="Artículo">
+      <div class="art-r">
+        <select data-k="categoria">${cats.map(c => `<option${c === p.categoria ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
+        <input data-k="importe" inputmode="decimal" class="num" value="${p.importe ?? ''}" placeholder="$">
+        <button type="button" class="art-x" data-del="${i}" aria-label="Quitar">✕</button>
+      </div>
+      ${p.cantidad || p.codigo ? `<small>${p.cantidad ? esc(p.cantidad) + (p.precioUnitario ? ' × ' + money(p.precioUnitario) : '') : ''}${p.codigo ? ' · ' + esc(p.codigo) : ''}</small>` : ''}
+    </div>`).join('') : '<p class="sub" style="margin:6px 0">No hay artículos: el gasto se guardará como un solo renglón.</p>';
+  actualizarCuadre();
+}
+function actualizarCuadre(){
+  const P = (S.cap && S.cap.partidas) || [];
+  const el = $('gCuadre');
+  if (!P.length){ el.textContent = ''; el.className = 'cuadre'; return; }
+  const suma = Math.round(P.reduce((s, p) => s + (numIn(p.importe) || 0), 0) * 100) / 100;
+  const total = numIn($('gTotal').value) || 0, sub = numIn($('gSub').value);
+  const ok = Math.abs(suma - total) <= 1 || (sub && Math.abs(suma - sub) <= 1);
+  el.textContent = ok ? `suman ${money(suma)} ✓` : `suman ${money(suma)} · faltan ${money(total - suma)}`;
+  el.className = 'cuadre ' + (ok ? 'ok' : 'no');
+}
+$('gArts').addEventListener('input', e => {
+  const box = e.target.closest('.art'), k = e.target.dataset.k; if (!box || !k) return;
+  S.cap.partidas[+box.dataset.i][k] = k === 'importe' ? numIn(e.target.value) : e.target.value;
+  if (k === 'importe') actualizarCuadre();
+});
+$('gArts').addEventListener('click', e => { const b = e.target.closest('[data-del]'); if (!b) return; S.cap.partidas.splice(+b.dataset.del, 1); pintarArticulos(); });
+$('gArtAdd').onclick = () => { (S.cap.partidas = S.cap.partidas || []).push({ descripcion:'', codigo:'', cantidad:null, precioUnitario:null, importe:null, categoria:S.cap.datos.categoria || '' }); pintarArticulos(); };
 function actualizarBotonGuardar(){
   const i = $('gTotal'); i.style.width = Math.max(2.5, (i.value || i.placeholder).length * 0.62 + 0.6) + 'em';
   const t = numIn(i.value);
@@ -852,13 +934,16 @@ $('capGuardar').onclick = async () => {
   if (!datos.concepto) return toast('Falta el concepto', true);
   if (!datos.categoria) return toast('Elige una categoría', true);
   if (datos.comprobante === 'SIN_COMPROBANTE' && datos.notas.length < 10) return toast('Explica en notas por qué no hay comprobante', true);
+  const partidas = S.cap.sin ? [] : (S.cap.partidas || []).filter(p => String(p.descripcion || '').trim() && numIn(p.importe) !== null)
+    .map(p => ({ descripcion: String(p.descripcion).trim(), codigo: p.codigo || '', cantidad: p.cantidad, precioUnitario: p.precioUnitario,
+      importe: numIn(p.importe), categoria: p.categoria || d.categoria }));
   const btn = $('capGuardar'); btn.disabled = true;
   try {
     if (S.cap.folio){
-      await api('corregirGasto', { folio:S.cap.folio, datos });
+      await api('corregirGasto', { folio:S.cap.folio, datos, partidas });
       toast('Corrección enviada a revisión');
     } else {
-      const r = await api('registrarGasto', { fotoId:S.cap.fotoId, datos, sugerido:S.cap.sugerido, lectura:S.cap.lectura, modelo:S.cap.modelo });
+      const r = await api('registrarGasto', { fotoId:S.cap.fotoId, datos, partidas, sugerido:S.cap.sugerido, lectura:S.cap.lectura, modelo:S.cap.modelo });
       toast(`${r.folio} registrado · pasa a revisión`);
     }
     cerrarHoja('shCaptura'); ir(S.vista === 'revisar' ? 'revisar' : S.vista);
@@ -872,7 +957,8 @@ function abrirCorreccion(m){
   $('capShot').innerHTML = `<div class="pdf" style="color:#fff">${esc(m.folio)}${m.motivo?' · '+esc(m.motivo):''}</div>`;
   abrirHoja('shCaptura');
   mostrarFormulario({ total:m.total, proveedor:m.proveedor, concepto:m.concepto, fecha:m.fecha, iva:m.iva, subtotal:m.subtotal,
-    rfc:m.rfc, uuid:m.uuid, folioTicket:m.folioTicket, notas:m.notas, categoria:m.categoria, comprobante:m.comprobante, formaPago:m.formaPago }, []);
+    rfc:m.rfc, uuid:m.uuid, folioTicket:m.folioTicket, notas:m.notas, categoria:m.categoria, comprobante:m.comprobante, formaPago:m.formaPago,
+    conceptos:(m.partidas || []).filter(p => p.origen !== 'AUTO') }, []);
 }
 
 /* ================================================================
@@ -933,7 +1019,7 @@ async function cargarMas(){
   const u = S.usuario;
   if (u.admin && S.resumen){
     const f = S.resumen.fondo;
-    $('cfNombre').value = f.nombre; $('cfMonto').value = f.montoFijo || ''; $('cfTope').value = f.tope ?? '';
+    $('cfNombre').value = f.nombre; $('cfActual').textContent = money(f.montoFijo || 0); $('cfMonto').value = ''; $('cfTope').value = f.tope ?? '';
     $('cfUmbral').value = f.umbral ?? 30; $('cfCustNom').value = f.custodioNombre; $('cfCustCor').value = f.custodioCorreo;
   }
   if (!u.aprueba) return;
@@ -994,13 +1080,61 @@ function imprimirRelacion(r){
 }
 
 $('cfGuardar').onclick = async () => {
-  const fondo = { id:S.resumen?.fondo?.id, nombre:$('cfNombre').value.trim(), montoFijo:numIn($('cfMonto').value),
-    tope:numIn($('cfTope').value), umbral:numIn($('cfUmbral').value), custodioNombre:$('cfCustNom').value.trim(), custodioCorreo:$('cfCustCor').value.trim() };
-  if (fondo.montoFijo === null) return toast('Escribe el monto fijo', true);
   const ant = S.resumen?.fondo?.montoFijo || 0;
-  if (fondo.montoFijo !== ant && !confirm(`El monto fijo pasa de ${money(ant)} a ${money(fondo.montoFijo)}.\nSe registrará un ${fondo.montoFijo>ant?'ingreso':'retiro'} de ${money(Math.abs(fondo.montoFijo-ant))} en efectivo. ¿Continuar?`)) return;
+  const cambio = numIn($('cfMonto').value) || 0;
+  const nuevo = Math.round((ant + cambio) * 100) / 100;
+  if (nuevo < 0) return toast('El fondo no puede quedar en negativo', true);
+  const fondo = { id:S.resumen?.fondo?.id, nombre:$('cfNombre').value.trim(), montoFijo:nuevo,
+    tope:numIn($('cfTope').value), umbral:numIn($('cfUmbral').value), custodioNombre:$('cfCustNom').value.trim(), custodioCorreo:$('cfCustCor').value.trim() };
+  if (cambio && !confirm(`${cambio > 0 ? 'Entrada' : 'Retiro'} de ${money(Math.abs(cambio))} en efectivo.\nEl fondo pasa de ${money(ant)} a ${money(nuevo)}. ¿Continuar?`)) return;
   try { await api('configurarFondo', { fondo }); toast('Fondo guardado'); S.resumen = await api('resumen'); cargarMas(); } catch(e){ toast(e.message, true); }
 };
+
+/* ================================================================
+ *  ANÁLISIS
+ * ================================================================ */
+let periodoAn = 'mes';
+function rangoPeriodo(p){
+  const h = hoy();
+  if (p === 'mes') return { desde: h.slice(0, 7) + '-01', hasta: h };
+  if (p === 'todo') return { desde: '', hasta: '' };
+  const d = new Date(h + 'T12:00:00'); d.setDate(d.getDate() - Number(p));
+  return { desde: d.toISOString().slice(0, 10), hasta: h };
+}
+function abrirAnalisis(){ abrirHoja('shAnalisis'); cargarAnalisis(); }
+$('anPeriodo').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; periodoAn = c.dataset.p; cargarAnalisis(); });
+function barras(lista){
+  const max = Math.max(1, ...lista.map(c => Math.abs(c.monto)));
+  return lista.map(c => `<div class="cat"><span>${esc(c.nombre)}</span><b class="num">${money(c.monto)}</b><div class="b"><i style="width:${Math.max(3, Math.abs(c.monto) / max * 100)}%"></i></div></div>`).join('');
+}
+async function cargarAnalisis(){
+  document.querySelectorAll('#anPeriodo .chip').forEach(c => c.classList.toggle('on', c.dataset.p === periodoAn));
+  const box = $('anCuerpo'); box.innerHTML = '<div class="empty">Cargando…</div>';
+  try {
+    const r = await api('analisis', rangoPeriodo(periodoAn));
+    if (!r.tickets){ box.innerHTML = '<div class="list"><div class="empty">Sin gastos en este periodo.</div></div>'; return; }
+    box.innerHTML = `
+      <div class="an-kpis">
+        <div><b class="num">${money0(r.total)}</b><span>Gastado en el periodo</span></div>
+        <div><b class="num">${r.tickets}</b><span>Tickets · ${r.renglones} artículos</span></div>
+        <div><b class="num">${money0(r.pendiente)}</b><span>Aún sin aprobar</span></div>
+        <div><b class="num">${r.alertasPrecio.length}</b><span>Artículos que subieron de precio</span></div>
+      </div>
+      <h2 class="sec">Por categoría</h2><div class="cats">${barras(r.porCategoria)}</div>
+      <h2 class="sec">Lo que más se compra</h2>
+      <div class="list">${r.articulos.map(a => `<div class="row"><span class="mid"><div class="t">${esc(a.nombre)}${a.variacion >= 10 && a.compras2 >= 2 ? `<span class="up">+${a.variacion}%</span>` : ''}</div>
+        <div class="s">${a.veces} ${a.veces === 1 ? 'compra' : 'compras'} · ${esc(a.categoria)} · último ${money(a.ultimoPrecio)} en ${esc(a.ultimoProveedor)}</div></span>
+        <span class="amt num">${money(a.gasto)}</span></div>`).join('')}</div>
+      ${r.alertasPrecio.length ? `<h2 class="sec">Subieron de precio</h2><div class="list">${r.alertasPrecio.map(a => `<div class="row"><span class="mid"><div class="t">${esc(a.nombre)}</div>
+        <div class="s">Más barato ${money(a.precioMin)} en ${esc(a.proveedorMin)} · último ${money(a.ultimoPrecio)} en ${esc(a.ultimoProveedor)}</div></span><span class="up">+${a.variacion}%</span></div>`).join('')}</div>` : ''}
+      <h2 class="sec">Proveedores</h2><div class="cats">${barras(r.porProveedor)}</div>
+      ${r.porMes.length > 1 ? `<h2 class="sec">Por mes</h2><div class="cats">${barras(r.porMes.map(m => ({ nombre: m.mes, monto: m.monto })).reverse())}</div>` : ''}
+      ${r.sinCuadrar.length ? `<h2 class="sec">Tickets que no cuadran</h2><p class="sub" style="margin:0 2px 8px">Sus artículos no suman el total; lo pagado se repartió en proporción. Conviene revisarlos.</p>
+        <div class="list">${r.sinCuadrar.map(s => `<button class="row" data-mov="${esc(s.folio)}"><span class="mid"><div class="t">${esc(s.proveedor)}</div><div class="s">${esc(s.folio)}</div></span><span class="amt num">${money(s.total)}</span></button>`).join('')}</div>` : ''}`;
+  } catch(e){ box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('btnAnalisis').onclick = abrirAnalisis;
+$('btnAnalisisMas').onclick = abrirAnalisis;
 
 $('btnSalir').onclick = () => salir(false);
 $('avatar').onclick = () => ir('mas');
