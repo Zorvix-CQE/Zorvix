@@ -228,6 +228,7 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
 .art-r select{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:7px 8px;background:var(--card);font-size:13px}
 .art-r input{width:96px;text-align:right;border:1px solid var(--line);border-radius:10px;padding:7px 8px;background:var(--card);font-weight:700}
 .art-x{width:30px;height:30px;border-radius:50%;background:var(--soft);color:var(--muted);flex:none}
+.art-help{font-size:12.5px;color:var(--warn);background:var(--warn-soft);border-radius:10px;padding:8px 10px;margin-top:8px;line-height:1.4}
 .art small{display:block;color:var(--muted);font-size:11.5px;margin-top:4px}
 .f > span em.cuadre{font-weight:700}
 .cuadre.ok{color:var(--ok)!important} .cuadre.no{color:var(--warn)!important}
@@ -372,7 +373,8 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
         <div class="form">
           <label class="f"><span>Nombre</span><input id="cfNombre"></label>
           <div class="f"><span>Monto fijo actual</span><div class="num" id="cfActual" style="font-size:16px;font-weight:600;padding-top:4px">—</div></div>
-          <label class="f"><span>Entrada (+) o retiro (−) de efectivo</span><input id="cfMonto" inputmode="decimal" class="num" placeholder="Ej. 5000 para agregar · -2000 para retirar"></label>
+          <div class="f"><span>¿Entra o sale efectivo de la caja?</span><div class="seg" id="cfMov"><button type="button" data-v="1" class="on">Entra dinero</button><button type="button" data-v="-1">Sale dinero</button></div></div>
+          <label class="f"><span>Cantidad</span><input id="cfMonto" inputmode="decimal" class="num" placeholder="Ej. 5000"></label>
           <div class="two">
             <label class="f"><span>Tope por gasto</span><input id="cfTope" inputmode="decimal" class="num"></label>
             <label class="f"><span>Avisar reposición al</span><input id="cfUmbral" inputmode="numeric" class="num" placeholder="30 %"></label>
@@ -380,7 +382,7 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
           <label class="f"><span>Custodio · nombre</span><input id="cfCustNom"></label>
           <label class="f"><span>Custodio · correo</span><input id="cfCustCor" type="email" autocapitalize="off"></label>
         </div>
-        <p class="sub" style="margin:8px 2px">Escribe solo la cantidad que entra o sale de la caja. El nuevo monto fijo se calcula solo y queda registrado como fondeo. Deja vacío si solo cambias custodio o tope.</p>
+        <p class="sub" style="margin:8px 2px">Aquí sólo se registra dinero <b>nuevo</b> que entra a la caja o que se saca de ella. Los gastos <b>no</b> van aquí: van con la cámara. Para reponer lo gastado usa Reposición.</p>
         <div class="actions"><button class="btn" id="cfGuardar">Guardar fondo</button></div>
       </div>
       <h2 class="sec">Cuenta</h2>
@@ -390,7 +392,7 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
         <button class="row" id="btnArqueoMas"><div class="mid"><div class="t">Arqueo de caja</div><div class="s">Contar el efectivo por denominación</div></div>›</button>
         <button class="row" id="btnSalir"><div class="mid"><div class="t" style="color:var(--bad)">Cerrar sesión</div></div></button>
       </div>
-      <p class="sub" style="text-align:center;margin-top:18px">Zorvix · Caja v1.2</p>
+      <p class="sub" style="text-align:center;margin-top:18px">Zorvix · Caja v1.3</p>
     </section>
   </main>
 
@@ -437,7 +439,8 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
         <div class="form" id="gArtWrap">
           <div class="f"><span>Artículos <em class="cuadre" id="gCuadre"></em></span>
             <div class="arts" id="gArts"></div>
-            <button type="button" class="link" id="gArtAdd">+ Agregar artículo</button>
+            <div class="art-help hidden" id="gArtHelp">Si faltan artículos, toma una foto más cerca (o en dos partes si el ticket es largo) o agrégalos a mano. Si se deja así, lo pagado se reparte en proporción.</div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap"><button type="button" class="link" id="gArtAdd">+ Agregar artículo</button><button type="button" class="link hidden" id="gReleer">↻ Volver a leer el ticket</button></div>
           </div>
         </div>
         <details class="more">
@@ -501,6 +504,10 @@ const PAGOS = [['efectivo','Efectivo'],['tarjeta','Tarjeta'],['transferencia','T
 const ESTADO_TXT = {PENDIENTE:'En revisión',OBSERVADO:'Observado',APROBADO:'Aprobado',NO_PROCEDENTE:'No procede',ANULADO:'Anulado'};
 const TIPO_TXT = {FONDEO:'Fondeo',GASTO:'Gasto',REPOSICION:'Reposición',REINTEGRO:'Reintegro',AJUSTE:'Ajuste de arqueo'};
 const DENOM = [1000,500,200,100,50,20,10,5,2,1,0.5];
+const ALERTA_TXT = {DUPLICADO_FOTO:'foto repetida',DUPLICADO_UUID:'factura repetida',POSIBLE_DUPLICADO:'posible duplicado',PAGO_NO_EFECTIVO:'no se pagó en efectivo',
+  SUPERA_TOPE:'supera el tope',FECHA_FUTURA:'fecha futura',FECHA_ANTIGUA:'fecha antigua',NO_CUADRA:'subtotal + IVA no da el total',ILEGIBLE:'foto poco legible',
+  SIN_COMPROBANTE:'sin comprobante',PARTIDAS_NO_CUADRAN:'los artículos no suman el total'};
+const alertasTxt = s => String(s||'').split(',').filter(Boolean).map(a => ALERTA_TXT[a] || a.replace(/_/g,' ').toLowerCase()).join(' · ');
 
 const S = { token:'', usuario:null, fondoId:'', resumen:null, vista:'inicio', filtro:'', cap:null, conteo:{} };
 
@@ -670,8 +677,8 @@ async function cargarRevisar(){
       <div class="list" style="margin-bottom:12px">
         ${filaMov(m)}
         <div style="padding:0 14px 14px">
-          <div class="sub">${esc(fechaLarga(m.fecha))} · ${esc(m.categoria)} · ${esc(m.comprobante.replace('_',' ').toLowerCase())}${m.confianza!==null?` · lectura ${Math.round(m.confianza*100)}%`:''}</div>
-          ${m.alertas ? `<div class="sub" style="color:var(--warn);margin-top:4px">⚑ ${esc(m.alertas.split(',').map(a=>a.replace(/_/g,' ').toLowerCase()).join(' · '))}</div>` : ''}
+          <div class="sub">${esc(fechaLarga(m.fecha))} · ${esc(m.categoria)} · ${esc(String(m.comprobante||'').replace('_',' ').toLowerCase())}${m.confianza!==null?` · lectura ${Math.round(m.confianza*100)}%`:''}</div>
+          ${m.alertas ? `<div class="sub" style="color:var(--warn);margin-top:4px">⚑ ${esc(alertasTxt(m.alertas))}</div>` : ''}
           ${m.editados ? `<div class="sub" style="margin-top:4px">✎ ${esc(m.editados)}</div>` : ''}
           ${m.estado==='OBSERVADO' ? `<div class="sub" style="color:var(--info);margin-top:4px">Observado: ${esc(m.motivo)} — esperando corrección</div>` : ''}
           <div class="r" style="display:flex;gap:8px;margin-top:10px">
@@ -704,8 +711,12 @@ async function abrirDetalle(folio){
   abrirHoja('shDetalle');
   try {
     const det = await api('detalle', { folio });
-    const m = det.movimiento; m.partidas = det.partidas || [];
+    const m = det.movimiento;
     if (!m){ $('dCuerpo').innerHTML = '<div class="empty">No encontrado.</div>'; return; }
+    m.partidas = det.partidas || [];
+    const arts = m.partidas.filter(p => p.origen !== 'AUTO');
+    const sumaArts = Math.round(arts.reduce((s,p) => s + (Number(p.importe) || 0), 0) * 100) / 100;
+    const artsOk = !arts.length || Math.abs(sumaArts - m.total) <= 1 || (m.subtotal && Math.abs(sumaArts - m.subtotal) <= 1);
     const u = S.usuario;
     const puedeRevisar = u.aprueba && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO') && (m.tipo==='GASTO'||m.tipo==='AJUSTE') && (!m.esMio || u.rol==='ceo');
     const puedeCorregir = m.tipo==='GASTO' && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO') && (m.esMio || u.aprueba);
@@ -728,12 +739,14 @@ async function abrirDetalle(folio){
     $('dCuerpo').innerHTML = `
       ${m.tieneFoto ? `<div class="photo-slot" id="dFoto"><span class="reading"><span class="spin"></span>Cargando comprobante…</span></div>` : ''}
       <div class="kv">${kv.map(([k,v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
-      ${m.partidas.length ? `<h2 class="sec" style="font-size:21px">Artículos</h2><div class="list">${m.partidas.map(p => `<div class="row"><span class="mid"><div class="t">${esc(p.descripcion)}</div>
+      ${arts.length ? `<h2 class="sec" style="font-size:21px">Artículos <span class="sub" style="font-family:inherit">· ${arts.length}</span></h2>
+        ${artsOk ? '' : `<div class="alert" style="margin-bottom:8px"><span>Los artículos suman ${money(sumaArts)} y el ticket ${money(m.total)}.${puedeCorregir ? ' Toca <b>Corregir datos</b> y luego <b>Cambiar foto</b> (de cerca, que se lean los precios).' : ''}</span></div>`}
+        <div class="list">${arts.map(p => `<div class="row"><span class="mid"><div class="t">${esc(p.descripcion)}</div>
         <div class="s">${esc(p.categoria)}${p.cantidad ? ' · ' + esc(p.cantidad) + (p.precioUnitario ? ' × ' + money(p.precioUnitario) : '') : ''}${p.codigo ? ' · ' + esc(p.codigo) : ''}</div></span>
-        <span class="amt num">${money(p.importeCaja ?? p.importe)}</span></div>`).join('')}</div>` : ''}
+        <span class="amt num">${money(p.importe ?? p.importeCaja)}</span></div>`).join('')}</div>` : ''}
       ${m.motivo ? `<div class="note"><b>Revisión:</b> ${esc(m.motivo)}</div>` : ''}
       ${m.editados ? `<div class="note"><b>Cambios sobre la lectura:</b> ${esc(m.editados)}</div>` : ''}
-      ${m.alertas ? `<div class="note"><b>Alertas:</b> ${esc(m.alertas.replace(/_/g,' ').toLowerCase().replace(/,/g,' · '))}</div>` : ''}
+      ${m.alertas ? `<div class="note"><b>Alertas:</b> ${esc(alertasTxt(m.alertas))}</div>` : ''}
       ${m.notas ? `<div class="note"><b>Notas:</b> ${esc(m.notas)}</div>` : ''}
       <div class="actions">
         ${puedeRevisar ? `<button class="btn ok" onclick="revisar('${esc(m.folio)}','APROBADO')">Aprobar</button>
@@ -781,7 +794,7 @@ $('fab').onclick = () => nuevaCaptura(true);
 $('ctaFoto').onclick = () => nuevaCaptura(true);
 $('capCam').onclick = () => $('inCam').click();
 $('capGal').onclick = () => $('inGal').click();
-$('capOtra').onclick = () => { if (S.cap.folio) return; $('inCam').click(); };
+$('capOtra').onclick = () => $('inCam').click();
 $('capSin').onclick = () => { S.cap.sin = true; mostrarFormulario({ comprobante:'SIN_COMPROBANTE', fecha:hoy(), formaPago:'efectivo' }, []); };
 ['inCam','inGal'].forEach(id => $(id).addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = '';
@@ -815,7 +828,8 @@ async function procesarArchivo(file){
   } catch(e){
     $('capLeyendo').classList.add('hidden'); shot.querySelector('.scan')?.remove();
     toast(e.message, true);
-    if (!S.cap.fotoId){ $('capElegir').classList.remove('hidden'); $('capTrabajo').classList.add('hidden'); }
+    if (S.cap.folio){ $('capForm').classList.remove('hidden'); $('capFoot').classList.remove('hidden'); }
+    else if (!S.cap.fotoId){ $('capElegir').classList.remove('hidden'); $('capTrabajo').classList.add('hidden'); }
   }
 }
 
@@ -876,7 +890,9 @@ function mostrarFormulario(s, alertas){
   $('gArtWrap').classList.toggle('hidden', !!S.cap.sin);
   pintarArticulos();
   $('capForm').classList.remove('hidden'); $('capFoot').classList.remove('hidden');
-  $('capOtra').classList.toggle('hidden', !!S.cap.folio || S.cap.sin);
+  $('capOtra').classList.toggle('hidden', !!S.cap.sin);
+  $('capOtra').textContent = S.cap.folio ? 'Cambiar foto' : 'Otra foto';
+  $('gReleer').classList.toggle('hidden', !(S.cap.folio && S.cap.tieneFoto && !S.cap.fotoId));
   actualizarBotonGuardar();
   if (!s.total) setTimeout(() => $('gTotal').focus(), 350);
 }
@@ -901,12 +917,14 @@ function pintarArticulos(){
 function actualizarCuadre(){
   const P = (S.cap && S.cap.partidas) || [];
   const el = $('gCuadre');
-  if (!P.length){ el.textContent = ''; el.className = 'cuadre'; return; }
+  if (!P.length){ el.textContent = ''; el.className = 'cuadre'; $('gArtHelp').classList.add('hidden'); return; }
   const suma = Math.round(P.reduce((s, p) => s + (numIn(p.importe) || 0), 0) * 100) / 100;
   const total = numIn($('gTotal').value) || 0, sub = numIn($('gSub').value);
   const ok = Math.abs(suma - total) <= 1 || (sub && Math.abs(suma - sub) <= 1);
-  el.textContent = ok ? `suman ${money(suma)} ✓` : `suman ${money(suma)} · faltan ${money(total - suma)}`;
+  const dif = Math.round((total - suma) * 100) / 100;
+  el.textContent = ok ? `suman ${money(suma)} ✓` : `suman ${money(suma)} · ${dif > 0 ? 'faltan ' + money(dif) : 'sobran ' + money(-dif)}`;
   el.className = 'cuadre ' + (ok ? 'ok' : 'no');
+  $('gArtHelp').classList.toggle('hidden', ok || !total);
 }
 $('gArts').addEventListener('input', e => {
   const box = e.target.closest('.art'), k = e.target.dataset.k; if (!box || !k) return;
@@ -914,6 +932,21 @@ $('gArts').addEventListener('input', e => {
   if (k === 'importe') actualizarCuadre();
 });
 $('gArts').addEventListener('click', e => { const b = e.target.closest('[data-del]'); if (!b) return; S.cap.partidas.splice(+b.dataset.del, 1); pintarArticulos(); });
+$('gReleer').onclick = async () => {
+  const b = $('gReleer'); if (b.disabled) return;
+  b.disabled = true; b.textContent = 'Leyendo el ticket otra vez…';
+  try {
+    const r = await api('releerRecibo', { folio:S.cap.folio });
+    if (!r.conceptos.length) toast('No se encontraron artículos en la foto', true);
+    else {
+      S.cap.partidas = r.conceptos.map(c => ({ descripcion:c.descripcion, codigo:c.codigo, cantidad:c.cantidad, precioUnitario:c.precioUnitario, importe:c.importe, categoria:c.categoria || S.cap.datos.categoria }));
+      if (r.subtotal && !$('gSub').value) $('gSub').value = r.subtotal;
+      pintarArticulos();
+      toast(r.cuadre.ok ? `${r.conceptos.length} artículos · ya cuadra ✓` : `${r.conceptos.length} artículos leídos · revisa los que faltan`, !r.cuadre.ok);
+    }
+  } catch(e){ toast(e.message, true); }
+  finally { b.disabled = false; b.textContent = '↻ Volver a leer el ticket'; }
+};
 $('gArtAdd').onclick = () => { (S.cap.partidas = S.cap.partidas || []).push({ descripcion:'', codigo:'', cantidad:null, precioUnitario:null, importe:null, categoria:S.cap.datos.categoria || '' }); pintarArticulos(); };
 function actualizarBotonGuardar(){
   const i = $('gTotal'); i.style.width = Math.max(2.5, (i.value || i.placeholder).length * 0.62 + 0.6) + 'em';
@@ -940,7 +973,7 @@ $('capGuardar').onclick = async () => {
   const btn = $('capGuardar'); btn.disabled = true;
   try {
     if (S.cap.folio){
-      await api('corregirGasto', { folio:S.cap.folio, datos, partidas });
+      await api('corregirGasto', { folio:S.cap.folio, datos, partidas, fotoId:S.cap.fotoId, sugerido:S.cap.sugerido, lectura:S.cap.lectura, modelo:S.cap.modelo });
       toast('Corrección enviada a revisión');
     } else {
       const r = await api('registrarGasto', { fotoId:S.cap.fotoId, datos, partidas, sugerido:S.cap.sugerido, lectura:S.cap.lectura, modelo:S.cap.modelo });
@@ -952,7 +985,7 @@ $('capGuardar').onclick = async () => {
 };
 
 function abrirCorreccion(m){
-  S.cap = { fotoId:'', lectura:null, sugerido:null, modelo:'', folio:m.folio, sin:m.comprobante==='SIN_COMPROBANTE', datos:{} };
+  S.cap = { fotoId:'', lectura:null, sugerido:null, modelo:'', folio:m.folio, sin:m.comprobante==='SIN_COMPROBANTE', tieneFoto:!!m.tieneFoto, datos:{} };
   $('capTitulo').textContent = 'Corregir ' + m.folio;
   $('capShot').innerHTML = `<div class="pdf" style="color:#fff">${esc(m.folio)}${m.motivo?' · '+esc(m.motivo):''}</div>`;
   abrirHoja('shCaptura');
@@ -1019,7 +1052,8 @@ async function cargarMas(){
   const u = S.usuario;
   if (u.admin && S.resumen){
     const f = S.resumen.fondo;
-    $('cfNombre').value = f.nombre; $('cfActual').textContent = money(f.montoFijo || 0); $('cfMonto').value = ''; $('cfTope').value = f.tope ?? '';
+    $('cfNombre').value = f.nombre; $('cfActual').textContent = money(f.montoFijo || 0); $('cfMonto').value = '';
+    S.cfSigno = 1; $('cfMov').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.v === '1')); $('cfTope').value = f.tope ?? '';
     $('cfUmbral').value = f.umbral ?? 30; $('cfCustNom').value = f.custodioNombre; $('cfCustCor').value = f.custodioCorreo;
   }
   if (!u.aprueba) return;
@@ -1079,14 +1113,17 @@ function imprimirRelacion(r){
   window.print();
 }
 
+S.cfSigno = 1;
+$('cfMov').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.cfSigno = Number(b.dataset.v);
+  $('cfMov').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
 $('cfGuardar').onclick = async () => {
   const ant = S.resumen?.fondo?.montoFijo || 0;
-  const cambio = numIn($('cfMonto').value) || 0;
+  const cambio = Math.abs(numIn($('cfMonto').value) || 0) * S.cfSigno;
   const nuevo = Math.round((ant + cambio) * 100) / 100;
   if (nuevo < 0) return toast('El fondo no puede quedar en negativo', true);
   const fondo = { id:S.resumen?.fondo?.id, nombre:$('cfNombre').value.trim(), montoFijo:nuevo,
     tope:numIn($('cfTope').value), umbral:numIn($('cfUmbral').value), custodioNombre:$('cfCustNom').value.trim(), custodioCorreo:$('cfCustCor').value.trim() };
-  if (cambio && !confirm(`${cambio > 0 ? 'Entrada' : 'Retiro'} de ${money(Math.abs(cambio))} en efectivo.\nEl fondo pasa de ${money(ant)} a ${money(nuevo)}. ¿Continuar?`)) return;
+  if (cambio && !confirm(`${cambio > 0 ? 'ENTRAN' : 'SALEN'} ${money(Math.abs(cambio))} en efectivo ${cambio > 0 ? 'a' : 'de'} la caja.\nEl fondo pasa de ${money(ant)} a ${money(nuevo)}.\n\n¿Es correcto?`)) return;
   try { await api('configurarFondo', { fondo }); toast('Fondo guardado'); S.resumen = await api('resumen'); cargarMas(); } catch(e){ toast(e.message, true); }
 };
 
