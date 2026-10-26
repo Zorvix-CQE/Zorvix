@@ -512,6 +512,7 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
   <button data-v="mios" class="sel">Mis pacientes</button>
   <button data-v="agenda">Agenda de quirófano</button>
   <button data-v="buscar">Buscar paciente</button>
+  <button data-v="labs" class="oculto" id="tab-labs">Laboratorios</button>
   <button data-v="expediente" class="oculto" id="tab-exp">Expediente</button>
   <button data-v="documento" class="oculto" id="tab-doc">Documento</button>
 </div>
@@ -618,6 +619,26 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
       </div>
       <div id="buscar-aviso"></div>
       <div id="buscar-lista"></div>
+    </div>
+  </section>
+
+  <!-- ══════════ LABORATORIOS POR ASIGNAR ══════════
+       Los resultados llegan por correo y se enganchan solos cuando el nombre
+       corresponde a UN paciente y nada más uno. Lo que no cuadra cae aquí.
+
+       Antes no caía en ningún lado: se quedaba marcado en una hoja que nadie
+       abre, y un resultado podía llevar semanas detenido sin que se notara.
+       Eso es lo que esta pantalla viene a evitar. -->
+  <section class="vista" id="vista-labs">
+    <div class="tarjeta">
+      <h2>Laboratorios por asignar</h2>
+      <p class="sub" id="labs-sub">Resultados que llegaron al correo y no se pudieron
+        enganchar solos porque el nombre no corresponde exactamente a un paciente.</p>
+      <div class="fila">
+        <button class="btn sec" id="btn-labs-recargar">Volver a consultar</button>
+      </div>
+      <div id="labs-aviso"></div>
+      <div id="labs-lista"></div>
     </div>
   </section>
 
@@ -906,7 +927,8 @@ window.ZORVIX_ULTIMO_FALLO = null;
    audio que ya está guardado (se vuelve a transcribir el mismo Audio_ID,
    no se crea otro). Guardar, subir y borrar NO se reintentan nunca. */
 const REPETIBLES = ['ping','sesion','esquema','buscarPaciente','expediente',
-                    'documento','agendaDelDia','bitacora','audioTranscribir'];
+                    'documento','agendaDelDia','bitacora','audioTranscribir',
+                    'labsPorAsignar'];
 
 const esperaMs = ms => new Promise(res => setTimeout(res, ms));
 
@@ -1327,6 +1349,11 @@ async function entro(resp, silencioso){
     $('barra').classList.remove('oculto');
     $('tabs').classList.remove('oculto');
     $('app').classList.remove('oculto');
+    /* La bandeja de laboratorios sólo para quien ve todo el centro: asignar
+       un resultado es escribir en el expediente de alguien, y hacerlo a partir
+       de un nombre que NO cuadró es el momento de más riesgo del circuito.
+       El servidor exige lo mismo; esto sólo evita enseñar una puerta cerrada. */
+    if (s.ve_todo) $('tab-labs').classList.remove('oculto');
     $('quien-txt').textContent = s.nombre;
     $('quien-rol').textContent = s.rol;
     $('quien-ini').textContent = String(s.nombre||'?').trim().charAt(0).toUpperCase();
@@ -1438,6 +1465,9 @@ function vista(v){
   document.querySelectorAll('.vista').forEach(s => s.classList.toggle('on', s.id === 'vista-'+v));
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('sel', b.dataset.v === v));
   window.scrollTo(0,0);
+  /* La bandeja se consulta al entrar, no al arrancar la aplicación: que abrir
+     el expediente de una paciente no pague el costo de leer el índice. */
+  if (v === 'labs') cargaLabs();
 }
 
 const hoyISO = () => new Date().toLocaleDateString('sv-SE');
@@ -1591,6 +1621,185 @@ async function buscar(){
       aviso('buscar-aviso','warn','Se muestran los primeros '+r.tope+'. Afine la búsqueda.');
   }catch(e){ aviso('buscar-aviso','malo', e.message); }
 }
+
+/* ══════════ LABORATORIOS POR ASIGNAR ══════════
+
+   Aquí la máquina deja de adivinar. Para enganchar solo, el servidor exige
+   coincidencia estricta —mismas letras, con o sin acentos, con o sin espacios
+   de más—. Para SUGERIR basta un apellido en común, porque de este lado hay
+   una persona mirando: una sugerencia equivocada se descarta con la vista, un
+   laboratorio en el expediente equivocado no se nota hasta que ya hizo daño.
+
+   Asignar se confirma en dos tiempos a propósito. No es burocracia: es la
+   única acción de esta pantalla que escribe en el expediente de un paciente
+   y no se deshace sola. */
+
+let LABS = [];
+
+async function cargaLabs(){
+  const L = $('labs-lista');
+  L.innerHTML = '<div class="vacio">Consultando…</div>';
+  aviso('labs-aviso', '', '');
+  try{
+    const r = await api('labsPorAsignar', {});
+    LABS = r.pendientes || [];
+    $('labs-sub').textContent = LABS.length
+      ? 'Llegaron al correo y no se engancharon solos porque el nombre no corresponde ' +
+        'exactamente a un paciente de Zorvix. ' + LABS.length + ' de los últimos ' +
+        r.dias + ' días' + (r.viejos ? ' (' + r.viejos + ' más viejos no se muestran).' : '.')
+      : 'Nada pendiente de los últimos ' + r.dias + ' días' +
+        (r.viejos ? ' (' + r.viejos + ' más viejos no se muestran).' : '.');
+    pintaLabs();
+  }catch(e){
+    L.innerHTML = '';
+    aviso('labs-aviso', 'malo', e.message);
+  }
+}
+
+function pintaLabs(){
+  const L = $('labs-lista');
+  if (!LABS.length){
+    L.innerHTML = '<div class="vacio">Ningún laboratorio esperando. Todo lo que llegó ' +
+      'está en el expediente de alguien o se descartó.</div>';
+    return;
+  }
+
+  L.innerHTML = LABS.map(function(x){
+    const sug = (x.sugeridos || []).map(function(s){
+      return '<button type="button" class="btn sec labs-asignar" data-pac="' + esc(s.id) + '">' +
+        esc(s.nombre) + (s.expediente ? ' · ' + esc(s.expediente) : '') + '</button>';
+    }).join(' ');
+    return '<div class="renglon" data-r="' + esc(String(x.renglon)) + '" ' +
+             'style="display:block">' +
+      '<div class="nom">' + esc(x.nombre_lab || '(sin nombre)') + '</div>' +
+      '<div class="det">' + esc(x.fecha) +
+        (x.folio_lab ? ' · folio ' + esc(x.folio_lab) : '') +
+        ' · ' + esc(x.estado) +
+        (x.archivo_url ? ' · <a href="' + esc(x.archivo_url) + '" target="_blank" ' +
+          'rel="noopener">ver el PDF</a>' : '') +
+      '</div>' +
+      '<div class="det" style="margin-top:8px">' +
+        (sug ? 'Se parece a: ' + sug : 'Ningún paciente de Zorvix se le parece.') +
+      '</div>' +
+      '<div class="fila" style="margin-top:8px">' +
+        '<input type="text" class="labs-q crece" placeholder="otro paciente: tres letras del nombre">' +
+        '<button type="button" class="btn sec labs-buscar">Buscar</button>' +
+        '<button type="button" class="btn sec labs-descartar">No es de este centro</button>' +
+      '</div>' +
+      '<div class="labs-res"></div>' +
+    '</div>';
+  }).join('');
+
+  /* Los botones se cablean después de pintar, nunca con onclick interpolado:
+     por ahí se cuela una comilla de un nombre y se rompe la pantalla. */
+  L.querySelectorAll('.labs-asignar').forEach(function(b){
+    b.onclick = function(){ labPideConfirmar(b); };
+  });
+  L.querySelectorAll('.labs-buscar').forEach(function(b){
+    b.onclick = function(){ labBuscaOtro(b); };
+  });
+  L.querySelectorAll('.labs-q').forEach(function(i){
+    i.onkeydown = function(e){
+      if (e.key === 'Enter') labBuscaOtro(i.parentNode.querySelector('.labs-buscar'));
+    };
+  });
+  L.querySelectorAll('.labs-descartar').forEach(function(b){
+    b.onclick = function(){ labDescarta(b); };
+  });
+}
+
+function labRenglonDe(el){
+  const caja = el.closest('[data-r]');
+  return { caja: caja, renglon: Number(caja.dataset.r) };
+}
+
+async function labBuscaOtro(boton){
+  const { caja } = labRenglonDe(boton);
+  const q = caja.querySelector('.labs-q').value.trim();
+  const res = caja.querySelector('.labs-res');
+  if (q.length < 3){ res.innerHTML = '<div class="det">Escriba al menos tres letras.</div>'; return; }
+  res.innerHTML = '<div class="det">Buscando…</div>';
+  try{
+    const r = await api('buscarPaciente', { q: q });
+    if (!r.pacientes.length){ res.innerHTML = '<div class="det">Ningún paciente con ese texto.</div>'; return; }
+    res.innerHTML = '<div class="det" style="margin-top:6px">' +
+      r.pacientes.map(function(p){
+        return '<button type="button" class="btn sec labs-asignar" data-pac="' +
+          esc(p.Paciente_ID) + '">' + esc(p.Nombre_Completo) +
+          (p.Expediente_No ? ' · ' + esc(p.Expediente_No) : '') + '</button>';
+      }).join(' ') + '</div>';
+    res.querySelectorAll('.labs-asignar').forEach(function(b){
+      b.onclick = function(){ labPideConfirmar(b); };
+    });
+  }catch(e){ res.innerHTML = '<div class="det">' + esc(e.message) + '</div>'; }
+}
+
+/* Dos tiempos. El primer clic sólo cambia el botón; el segundo escribe. */
+function labPideConfirmar(boton){
+  if (boton.dataset.confirmando === '1'){ labAsigna(boton); return; }
+  const nombre = boton.textContent;
+  boton.dataset.confirmando = '1';
+  boton.classList.add('primario');
+  boton.textContent = 'Confirmar: va al expediente de ' + nombre;
+  setTimeout(function(){
+    if (boton.dataset.confirmando !== '1') return;
+    boton.dataset.confirmando = '';
+    boton.classList.remove('primario');
+    boton.textContent = nombre;
+  }, 8000);
+}
+
+async function labAsigna(boton){
+  const { caja, renglon } = labRenglonDe(boton);
+  boton.disabled = true;
+  boton.textContent = 'Asignando…';
+  try{
+    const r = await api('labAsignar', { renglon: renglon, paciente_id: boton.dataset.pac });
+    LABS = LABS.filter(function(x){ return x.renglon !== renglon; });
+    caja.remove();
+    aviso('labs-aviso', 'ok', 'Quedó en el expediente de ' + r.paciente +
+      ' (' + r.expediente + ') como ' + r.adjunto + '.');
+    if (!LABS.length) pintaLabs();
+  }catch(e){
+    boton.disabled = false;
+    boton.dataset.confirmando = '';
+    boton.classList.remove('primario');
+    aviso('labs-aviso', 'malo', e.message);
+    pintaLabs();
+  }
+}
+
+async function labDescarta(boton){
+  const { caja, renglon } = labRenglonDe(boton);
+  if (boton.dataset.confirmando !== '1'){
+    boton.dataset.confirmando = '1';
+    boton.textContent = 'Confirmar que no es de aquí';
+    setTimeout(function(){
+      if (boton.dataset.confirmando !== '1') return;
+      boton.dataset.confirmando = '';
+      boton.textContent = 'No es de este centro';
+    }, 8000);
+    return;
+  }
+  boton.disabled = true;
+  boton.textContent = 'Descartando…';
+  try{
+    await api('labDescartar', { renglon: renglon });
+    LABS = LABS.filter(function(x){ return x.renglon !== renglon; });
+    caja.remove();
+    /* No se borra el renglón del índice: queda marcado con quién lo descartó
+       y cuándo. Lo que el laboratorio mandó, mandado está. */
+    aviso('labs-aviso', 'ok', 'Fuera de la lista. El registro de que llegó se queda.');
+    if (!LABS.length) pintaLabs();
+  }catch(e){
+    boton.disabled = false;
+    boton.dataset.confirmando = '';
+    boton.textContent = 'No es de este centro';
+    aviso('labs-aviso', 'malo', e.message);
+  }
+}
+
+$('btn-labs-recargar').onclick = cargaLabs;
 
 /* ══════════ EXPEDIENTE ══════════ */
 $('btn-volver-agenda').onclick = () => vista('agenda');
