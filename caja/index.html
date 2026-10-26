@@ -1004,7 +1004,8 @@ function montoCaja(){
 function actualizarPersonal(){
   const m = montoCaja(), el = $('gPersonal');
   el.classList.toggle('hidden', !m.personal);
-  if (m.personal) el.innerHTML = `Ticket ${money(m.total)} · personal ${money(m.personal)} · <b>a caja ${money(m.caja)}</b>`;
+  if (m.personal) el.innerHTML = `Ticket ${money(m.total)} · personal ${money(m.personal)} · <b>a caja ${money(m.caja)}</b>
+    <div style="margin-top:4px;font-size:12px;color:var(--warn)">Si pagaste todo con efectivo de la caja, regresa <b>${money(m.personal)}</b> a la caja.</div>`;
   actualizarBotonGuardar();
 }
 $('gArts').addEventListener('input', e => {
@@ -1067,8 +1068,10 @@ $('capGuardar').onclick = async () => {
       await api('corregirGasto', { folio:S.cap.folio, datos, partidas, fotoId:S.cap.fotoId, sugerido:S.cap.sugerido, lectura:S.cap.lectura, modelo:S.cap.modelo });
       toast('Corrección enviada a revisión');
     } else {
+      const per = montoCaja().personal;
       const r = await api('registrarGasto', { fotoId:S.cap.fotoId, datos, partidas, sugerido:S.cap.sugerido, lectura:S.cap.lectura, modelo:S.cap.modelo });
-      toast(`${r.folio} registrado · pasa a revisión`);
+      if (per) alert(`${r.folio} registrado.\n\nLa caja paga sólo lo de la clínica. Si pagaste todo con efectivo de la caja, regresa ${money(per)} a la caja.`);
+      else toast(`${r.folio} registrado · pasa a revisión`);
     }
     cerrarHoja('shCaptura'); ir(S.vista === 'revisar' ? 'revisar' : S.vista);
   } catch(e){ toast(e.message, true); }
