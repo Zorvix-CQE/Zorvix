@@ -228,6 +228,15 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
 .art-r select{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:7px 8px;background:var(--card);font-size:13px}
 .art-r input{width:96px;text-align:right;border:1px solid var(--line);border-radius:10px;padding:7px 8px;background:var(--card);font-weight:700}
 .art-x{width:30px;height:30px;border-radius:50%;background:var(--soft);color:var(--muted);flex:none}
+.art-p{flex:none;height:30px;padding:0 10px;border-radius:999px;border:1px solid var(--ok);background:var(--ok-soft);color:var(--ok);font-size:12px;font-weight:700}
+.art.per{background:var(--soft);border-style:dashed}
+.art.per .art-d,.art.per input.num{color:var(--muted);text-decoration:line-through}
+.art.per .art-p{border-color:var(--muted);background:var(--card);color:var(--ink2)}
+.per-sum{margin-top:8px;font-size:13px;color:var(--ink2);background:var(--soft);border-radius:12px;padding:8px 12px;text-align:center}
+.per-sum b{color:var(--ink)}
+.tag-per{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:1px}
+.row.per .t,.row.per .amt,.tk-t tr.per td{color:var(--muted)}
+.tk-t tr.per td:nth-child(2){text-decoration:line-through}
 .art-help{font-size:12.5px;color:var(--warn);background:var(--warn-soft);border-radius:10px;padding:8px 10px;margin-top:8px;line-height:1.4}
 .art small{display:block;color:var(--muted);font-size:11.5px;margin-top:4px}
 .f > span em.cuadre{font-weight:700}
@@ -419,7 +428,7 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
         <button class="row" id="btnArqueoMas"><div class="mid"><div class="t">Arqueo de caja</div><div class="s">Contar el efectivo por denominación</div></div>›</button>
         <button class="row" id="btnSalir"><div class="mid"><div class="t" style="color:var(--bad)">Cerrar sesión</div></div></button>
       </div>
-      <p class="sub" style="text-align:center;margin-top:18px">Zorvix · Caja v1.4</p>
+      <p class="sub" style="text-align:center;margin-top:18px">Zorvix · Caja v1.6</p>
     </section>
   </main>
 
@@ -446,9 +455,10 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
       <div class="reading hidden" id="capLeyendo"><span class="spin"></span><span id="capLeyendoTxt">Leyendo el comprobante…</span></div>
       <div id="capForm" class="hidden">
         <div class="amount-edit">
-          <label>Total pagado</label>
+          <label>Total del ticket</label>
           <div class="wrap"><span>$</span><input id="gTotal" inputmode="decimal" class="num" placeholder="0.00"></div>
           <div id="gConf"></div>
+          <div class="per-sum hidden" id="gPersonal"></div>
         </div>
         <div class="alerts" id="gAlertas"></div>
         <div class="form">
@@ -465,6 +475,7 @@ details.more summary{font-size:13px;color:var(--muted);font-weight:600;padding:8
         </div>
         <div class="form" id="gArtWrap">
           <div class="f"><span>Artículos <em class="cuadre" id="gCuadre"></em></span>
+            <p class="sub" style="margin:2px 0 8px">¿Compraste cosas personales en el mismo ticket? Toca <b>Caja</b> en cada una para marcarla como <b>Personal</b>: la caja sólo paga lo de la clínica.</p>
             <div class="arts" id="gArts"></div>
             <div class="art-help hidden" id="gArtHelp">Si faltan artículos, toma una foto más cerca (o en dos partes si el ticket es largo) o agrégalos a mano. Si se deja así, lo pagado se reparte en proporción.</div>
             <div style="display:flex;gap:16px;flex-wrap:wrap"><button type="button" class="link" id="gArtAdd">+ Agregar artículo</button><button type="button" class="link hidden" id="gReleer">↻ Volver a leer el ticket</button></div>
@@ -552,7 +563,7 @@ const TIPO_TXT = {FONDEO:'Fondeo',GASTO:'Gasto',REPOSICION:'Reposición',REINTEG
 const DENOM = [1000,500,200,100,50,20,10,5,2,1,0.5];
 const ALERTA_TXT = {DUPLICADO_FOTO:'foto repetida',DUPLICADO_UUID:'factura repetida',POSIBLE_DUPLICADO:'posible duplicado',PAGO_NO_EFECTIVO:'no se pagó en efectivo',
   SUPERA_TOPE:'supera el tope',FECHA_FUTURA:'fecha futura',FECHA_ANTIGUA:'fecha antigua',NO_CUADRA:'subtotal + IVA no da el total',ILEGIBLE:'foto poco legible',
-  SIN_COMPROBANTE:'sin comprobante',PARTIDAS_NO_CUADRAN:'los artículos no suman el total'};
+  SIN_COMPROBANTE:'sin comprobante',PARTIDAS_NO_CUADRAN:'los artículos no suman el total',INCLUYE_PERSONAL:'incluye compras personales'};
 const alertasTxt = s => String(s||'').split(',').filter(Boolean).map(a => ALERTA_TXT[a] || a.replace(/_/g,' ').toLowerCase()).join(' · ');
 
 const S = { token:'', usuario:null, fondoId:'', resumen:null, vista:'inicio', filtro:'', cap:null, conteo:{} };
@@ -763,7 +774,8 @@ async function abrirDetalle(folio){
     m.partidas = det.partidas || [];
     const arts = m.partidas.filter(p => p.origen !== 'AUTO');
     const sumaArts = Math.round(arts.reduce((s,p) => s + (Number(p.importe) || 0), 0) * 100) / 100;
-    const artsOk = !arts.length || Math.abs(sumaArts - m.total) <= 1 || (m.subtotal && Math.abs(sumaArts - m.subtotal) <= 1);
+    const tTicket = m.totalTicket || m.total;
+    const artsOk = !arts.length || Math.abs(sumaArts - tTicket) <= 1 || (m.subtotal && Math.abs(sumaArts - m.subtotal) <= 1);
     const u = S.usuario;
     const puedeRevisar = u.aprueba && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO') && (m.tipo==='GASTO'||m.tipo==='AJUSTE') && (!m.esMio || u.rol==='ceo');
     const puedeCorregir = m.tipo==='GASTO' && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO') && (m.esMio || u.aprueba);
@@ -771,7 +783,10 @@ async function abrirDetalle(folio){
     const puedeReintegro = u.aprueba && m.estado==='NO_PROCEDENTE' && !m.reintegro;
     const kv = [
       ['Tipo', TIPO_TXT[m.tipo]], ['Estado', `<span class="pill p-${m.estado}">${ESTADO_TXT[m.estado]||m.estado}</span>`],
-      ['Total', `<span class="num">${money(m.total)}</span>`], m.iva!==null?['IVA', money(m.iva)]:null,
+      [m.personal ? 'Paga la caja' : 'Total', `<span class="num">${money(m.total)}</span>`],
+      m.personal ? ['Ticket completo', `<span class="num">${money(tTicket)}</span>`] : null,
+      m.personal ? ['Personal (no sale de caja)', `<span class="num">${money(m.personal)}</span>`] : null,
+      m.iva!==null?['IVA', money(m.iva)]:null,
       ['Fecha', esc(fechaLarga(m.fecha))], m.proveedor && m.proveedor!=='—'?['Proveedor', esc(m.proveedor)]:null,
       ['Concepto', esc(m.concepto)], m.categoria?['Categoría', esc(m.categoria)]:null,
       m.tipo==='GASTO'?['Comprobante', esc(m.comprobante.replace('_',' ').toLowerCase())]:null,
@@ -785,8 +800,8 @@ async function abrirDetalle(folio){
     ].filter(Boolean);
     $('dCuerpo').innerHTML = `
       ${arts.length ? `<h2 class="sec" style="font-size:21px;margin-top:0">Artículos <span class="sub" style="font-family:inherit">· ${arts.length}</span></h2>
-        ${artsOk ? '' : `<div class="alert" style="margin-bottom:8px"><span>Los artículos suman ${money(sumaArts)} y el ticket ${money(m.total)}.${puedeCorregir ? ' Toca <b>Corregir datos</b> y luego <b>Cambiar foto</b> (de cerca, que se lean los precios).' : ''}</span></div>`}
-        <div class="list">${arts.map(p => `<div class="row"><span class="mid"><div class="t">${esc(p.descripcion)}</div>
+        ${artsOk ? '' : `<div class="alert" style="margin-bottom:8px"><span>Los artículos suman ${money(sumaArts)} y el ticket ${money(tTicket)}.${puedeCorregir ? ' Toca <b>Corregir datos</b> y luego <b>Cambiar foto</b> (de cerca, que se lean los precios).' : ''}</span></div>`}
+        <div class="list">${arts.map(p => `<div class="row${p.paga === 'PERSONAL' ? ' per' : ''}"><span class="mid"><div class="t">${esc(p.descripcion)}${p.paga === 'PERSONAL' ? '<span class="tag-per">personal</span>' : ''}</div>
         <div class="s">${esc(p.categoria)}${p.cantidad ? ' · ' + esc(p.cantidad) + (p.precioUnitario ? ' × ' + money(p.precioUnitario) : '') : ''}${p.codigo ? ' · ' + esc(p.codigo) : ''}</div></span>
         <span class="amt num">${money(p.importe ?? p.importeCaja)}</span></div>`).join('')}</div>` : ''}
       ${m.tieneFoto ? `<div class="photo-slot" id="dFoto"><span class="reading"><span class="spin"></span>Cargando comprobante…</span></div>` : ''}
@@ -933,7 +948,7 @@ function mostrarFormulario(s, alertas){
   segmentado('gPago', PAGOS, d.formaPago, v => d.formaPago = v);
   $('gAlertas').innerHTML = (alertas||[]).map(a => `<div class="alert ${a.grave?'grave':''}">${esc(a.texto)}</div>`).join('');
   S.cap.partidas = (s.conceptos || []).map(c => ({ descripcion: c.descripcion || '', codigo: c.codigo || '', cantidad: c.cantidad ?? null,
-    precioUnitario: c.precioUnitario ?? null, importe: c.importe ?? null, categoria: c.categoria || d.categoria }));
+    precioUnitario: c.precioUnitario ?? null, importe: c.importe ?? null, categoria: c.categoria || d.categoria, paga: c.paga === 'PERSONAL' ? 'PERSONAL' : 'CAJA' }));
   $('gArtWrap').classList.toggle('hidden', !!S.cap.sin);
   pintarArticulos();
   $('capForm').classList.remove('hidden'); $('capFoot').classList.remove('hidden');
@@ -950,11 +965,12 @@ function pintarArticulos(){
   const cats = (S.resumen?.categorias || []).map(c => c.nombre);
   const P = S.cap.partidas || [];
   $('gArts').innerHTML = P.length ? P.map((p, i) => `
-    <div class="art" data-i="${i}">
+    <div class="art${p.paga === 'PERSONAL' ? ' per' : ''}" data-i="${i}">
       <input class="art-d" data-k="descripcion" value="${esc(p.descripcion)}" placeholder="Artículo">
       <div class="art-r">
         <select data-k="categoria">${cats.map(c => `<option${c === p.categoria ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
         <input data-k="importe" inputmode="decimal" class="num" value="${esc(dec2(p.importe))}" placeholder="$">
+        <button type="button" class="art-p" data-per="${i}">${p.paga === 'PERSONAL' ? 'Personal' : 'Caja'}</button>
         <button type="button" class="art-x" data-del="${i}" aria-label="Quitar">✕</button>
       </div>
       ${p.cantidad || p.codigo ? `<small>${p.cantidad ? esc(p.cantidad) + (p.precioUnitario ? ' × ' + money(p.precioUnitario) : '') : ''}${p.codigo ? ' · ' + esc(p.codigo) : ''}</small>` : ''}
@@ -972,13 +988,40 @@ function actualizarCuadre(){
   el.textContent = ok ? `suman ${money(suma)} ✓` : `suman ${money(suma)} · ${dif > 0 ? 'faltan ' + money(dif) : 'sobran ' + money(-dif)}`;
   el.className = 'cuadre ' + (ok ? 'ok' : 'no');
   $('gArtHelp').classList.toggle('hidden', ok || !total);
+  actualizarPersonal();
+}
+/** Lo que paga la caja: la parte de los artículos de la clínica, con cupones y descuentos en proporción (igual que el servidor). */
+function montoCaja(){
+  const total = numIn($('gTotal').value) || 0;
+  const P = (!S.cap || S.cap.sin) ? [] : (S.cap.partidas || []);
+  const per = P.filter(p => p.paga === 'PERSONAL');
+  if (!per.length || !total) return { total, caja: total, personal: 0 };
+  const todo = P.reduce((s, p) => s + (numIn(p.importe) || 0), 0);
+  const deCaja = P.filter(p => p.paga !== 'PERSONAL').reduce((s, p) => s + (numIn(p.importe) || 0), 0);
+  const caja = todo > 0 ? Math.round(total * deCaja / todo * 100) / 100 : 0;
+  return { total, caja, personal: Math.round((total - caja) * 100) / 100 };
+}
+function actualizarPersonal(){
+  const m = montoCaja(), el = $('gPersonal');
+  el.classList.toggle('hidden', !m.personal);
+  if (m.personal) el.innerHTML = `Ticket ${money(m.total)} · personal ${money(m.personal)} · <b>a caja ${money(m.caja)}</b>`;
+  actualizarBotonGuardar();
 }
 $('gArts').addEventListener('input', e => {
   const box = e.target.closest('.art'), k = e.target.dataset.k; if (!box || !k) return;
   S.cap.partidas[+box.dataset.i][k] = k === 'importe' ? numIn(e.target.value) : e.target.value;
   if (k === 'importe') actualizarCuadre();
 });
-$('gArts').addEventListener('click', e => { const b = e.target.closest('[data-del]'); if (!b) return; S.cap.partidas.splice(+b.dataset.del, 1); pintarArticulos(); });
+$('gArts').addEventListener('click', e => {
+  const b = e.target.closest('[data-del]'); if (b){ S.cap.partidas.splice(+b.dataset.del, 1); pintarArticulos(); return; }
+  const t = e.target.closest('[data-per]'); if (!t) return;
+  const P = S.cap.partidas, i = +t.dataset.per;
+  const nuevo = P[i].paga === 'PERSONAL' ? 'CAJA' : 'PERSONAL';
+  P[i].paga = nuevo;
+  // los cupones y descuentos (importe negativo) que siguen a un producto se van con él
+  if ((numIn(P[i].importe) || 0) > 0) for (let j = i + 1; j < P.length && (numIn(P[j].importe) || 0) < 0; j++) P[j].paga = nuevo;
+  pintarArticulos();
+});
 $('gReleer').onclick = async () => {
   const b = $('gReleer'); if (b.disabled) return;
   b.disabled = true; b.textContent = 'Leyendo el ticket otra vez…';
@@ -986,7 +1029,7 @@ $('gReleer').onclick = async () => {
     const r = await api('releerRecibo', { folio:S.cap.folio });
     if (!r.conceptos.length) toast('No se encontraron artículos en la foto', true);
     else {
-      S.cap.partidas = r.conceptos.map(c => ({ descripcion:c.descripcion, codigo:c.codigo, cantidad:c.cantidad, precioUnitario:c.precioUnitario, importe:c.importe, categoria:c.categoria || S.cap.datos.categoria }));
+      S.cap.partidas = r.conceptos.map(c => ({ descripcion:c.descripcion, codigo:c.codigo, cantidad:c.cantidad, precioUnitario:c.precioUnitario, importe:c.importe, categoria:c.categoria || S.cap.datos.categoria, paga:'CAJA' }));
       if (r.subtotal && !$('gSub').value) $('gSub').value = r.subtotal;
       pintarArticulos();
       toast(r.cuadre.ok ? `${r.conceptos.length} artículos · ya cuadra ✓` : `${r.conceptos.length} artículos leídos · revisa los que faltan`, !r.cuadre.ok);
@@ -994,11 +1037,11 @@ $('gReleer').onclick = async () => {
   } catch(e){ toast(e.message, true); }
   finally { b.disabled = false; b.textContent = '↻ Volver a leer el ticket'; }
 };
-$('gArtAdd').onclick = () => { (S.cap.partidas = S.cap.partidas || []).push({ descripcion:'', codigo:'', cantidad:null, precioUnitario:null, importe:null, categoria:S.cap.datos.categoria || '' }); pintarArticulos(); };
+$('gArtAdd').onclick = () => { (S.cap.partidas = S.cap.partidas || []).push({ descripcion:'', codigo:'', cantidad:null, precioUnitario:null, importe:null, categoria:S.cap.datos.categoria || '', paga:'CAJA' }); pintarArticulos(); };
 function actualizarBotonGuardar(){
   const i = $('gTotal'); i.style.width = Math.max(2.5, (i.value || i.placeholder).length * 0.62 + 0.6) + 'em';
-  const t = numIn(i.value);
-  $('capGuardar').textContent = (S.cap?.folio ? 'Guardar corrección' : 'Registrar gasto') + (t ? ' · ' + money(t) : '');
+  const m = montoCaja();
+  $('capGuardar').textContent = (S.cap?.folio ? (m.personal ? 'Guardar' : 'Guardar corrección') : (m.personal ? 'Registrar' : 'Registrar gasto')) + (m.caja ? ' · ' + money(m.caja) + (m.personal ? ' a caja' : '') : '');
 }
 
 $('capGuardar').onclick = async () => {
@@ -1016,7 +1059,8 @@ $('capGuardar').onclick = async () => {
   if (datos.comprobante === 'SIN_COMPROBANTE' && datos.notas.length < 10) return toast('Explica en notas por qué no hay comprobante', true);
   const partidas = S.cap.sin ? [] : (S.cap.partidas || []).filter(p => String(p.descripcion || '').trim() && numIn(p.importe) !== null)
     .map(p => ({ descripcion: String(p.descripcion).trim(), codigo: p.codigo || '', cantidad: p.cantidad, precioUnitario: p.precioUnitario,
-      importe: numIn(p.importe), categoria: p.categoria || d.categoria }));
+      importe: numIn(p.importe), categoria: p.categoria || d.categoria, paga: p.paga === 'PERSONAL' ? 'PERSONAL' : 'CAJA' }));
+  if (partidas.length && partidas.every(p => p.paga === 'PERSONAL')) return toast('Todo quedó como personal: no hay nada que pagar con la caja', true);
   const btn = $('capGuardar'); btn.disabled = true;
   try {
     if (S.cap.folio){
@@ -1036,7 +1080,7 @@ function abrirCorreccion(m){
   $('capTitulo').textContent = 'Corregir ' + m.folio;
   $('capShot').innerHTML = `<div class="pdf" style="color:#fff">${esc(m.folio)}${m.motivo?' · '+esc(m.motivo):''}</div>`;
   abrirHoja('shCaptura');
-  mostrarFormulario({ total:m.total, proveedor:m.proveedor, concepto:m.concepto, fecha:m.fecha, iva:m.iva, subtotal:m.subtotal,
+  mostrarFormulario({ total:m.totalTicket || m.total, proveedor:m.proveedor, concepto:m.concepto, fecha:m.fecha, iva:m.iva, subtotal:m.subtotal,
     rfc:m.rfc, uuid:m.uuid, folioTicket:m.folioTicket, notas:m.notas, categoria:m.categoria, comprobante:m.comprobante, formaPago:m.formaPago,
     conceptos:(m.partidas || []).filter(p => p.origen !== 'AUTO') }, []);
 }
@@ -1159,8 +1203,9 @@ function imprimirRelacion(r){
     <h2 style="font-size:14px;margin-top:22px">Desglose por ticket</h2>
     ${tablaTicketsPrint(r.movimientos.map(m => { const arts = (m.partidas || []).filter(p => p.origen !== 'AUTO');
       const suma = Math.round(arts.reduce((s, p) => s + (Number(p.importe) || 0), 0) * 100) / 100;
-      const ok = !arts.length ? null : (Math.abs(suma - m.total) <= 1 || (m.subtotal && Math.abs(suma - m.subtotal) <= 1));
-      return Object.assign({}, m, { partidas: arts, cuadre: { suma, ok, diferencia: Math.round((m.total - suma) * 100) / 100 } }); }))}
+      const tt = m.totalTicket || m.total;
+      const ok = !arts.length ? null : (Math.abs(suma - tt) <= 1 || (m.subtotal && Math.abs(suma - m.subtotal) <= 1));
+      return Object.assign({}, m, { partidas: arts, cuadre: { suma, ok, diferencia: Math.round((tt - suma) * 100) / 100 } }); }))}
     <div class="firmas"><div>Custodio del fondo</div><div>Revisó</div><div>Autorizó y entregó</div></div>`;
   window.print();
 }
@@ -1249,7 +1294,7 @@ async function cargarReporte(){
     box.innerHTML = `
       <div class="rp-res">
         <div><b class="num">${r.tickets.length}</b><span>Tickets</span></div>
-        <div><b class="num">${money(r.total)}</b><span>Total pagado</span></div>
+        <div><b class="num">${money(r.total)}</b><span>Pagado con la caja${r.personal ? ' · ' + money(r.personal) + ' personal aparte' : ''}</span></div>
         <div><b class="num" style="color:${r.sinCuadrar?'var(--warn)':'inherit'}">${r.sinCuadrar}</b><span>No cuadran con sus artículos</span></div>
         <div><b class="num">${r.sinComprobante}</b><span>Sin comprobante</span></div>
       </div>
@@ -1259,8 +1304,9 @@ async function cargarReporte(){
         <div class="tk-h"><div><div class="t">${esc(t.proveedor)}</div>
           <div class="s">${esc(t.folio)} · ${esc(fechaLarga(t.fecha))} · ${esc(t.registradoNombre.split(' ')[0])}</div></div>
           <div class="amt num">${money(t.total)}<br><span class="pill p-${t.estado}">${ESTADO_TXT[t.estado]||t.estado}</span></div></div>
-        ${t.partidas.length ? `<table class="tk-t">${t.partidas.map((p, i) => `<tr><td class="i">${i+1}</td>
-          <td>${esc(p.descripcion)}<small>${esc(p.categoria)}${cantTxt(p) ? ' · ' + esc(cantTxt(p)) : ''}</small></td>
+        ${t.personal ? `<div class="sub" style="margin-top:6px">Ticket ${money(t.totalTicket)} · personal ${money(t.personal)} · <b>a caja ${money(t.total)}</b></div>` : ''}
+        ${t.partidas.length ? `<table class="tk-t">${t.partidas.map((p, i) => `<tr class="${p.paga === 'PERSONAL' ? 'per' : ''}"><td class="i">${i+1}</td>
+          <td>${esc(p.descripcion)}${p.paga === 'PERSONAL' ? '<span class="tag-per">personal</span>' : ''}<small>${esc(p.categoria)}${cantTxt(p) ? ' · ' + esc(cantTxt(p)) : ''}</small></td>
           <td class="n">${money(p.importe)}</td></tr>`).join('')}</table>` :
           `<p class="sub" style="margin:10px 0 0">${t.comprobante === 'SIN_COMPROBANTE' ? 'Motivo: ' + esc(t.notas || '—') : esc(t.concepto)}</p>`}
         <div class="tk-f"><span class="${cl}">${tx}</span>
@@ -1277,10 +1323,11 @@ async function aprobarDesdeReporte(folio){
 }
 function tablaTicketsPrint(lista){
   return lista.map(t => { const [cl, tx] = cuadreTxt(t); const arts = t.partidas || []; return `
-    <div class="ptk"><h3><span>${esc(t.folio)} · ${esc(t.fecha)} · ${esc(t.proveedor)}</span><span>${money(t.total)}</span></h3>
+    <div class="ptk"><h3><span>${esc(t.folio)} · ${esc(t.fecha)} · ${esc(t.proveedor)}</span><span>${money(t.total)}${t.personal ? ' a caja' : ''}</span></h3>
+      ${t.personal ? `<div class="m"><b>Ticket ${money(t.totalTicket)} · personal ${money(t.personal)} (no sale de caja) · a caja ${money(t.total)}</b></div>` : ''}
       <div class="m">${ESTADO_TXT[t.estado]||t.estado} · ${esc(String(t.comprobante||'').replace('_',' ').toLowerCase())} · registró ${esc(t.registradoNombre)}${t.revisadoPor ? ' · revisó ' + esc(t.revisadoPor) : ''}${t.rfc ? ' · RFC ' + esc(t.rfc) : ''}</div>
       ${arts.length ? `<table><thead><tr><th>#</th><th>Artículo</th><th>Categoría</th><th class="n">Cant. × P.U.</th><th class="n">Importe</th></tr></thead><tbody>
-        ${arts.map((p, i) => `<tr><td>${i+1}</td><td>${esc(p.descripcion)}</td><td>${esc(p.categoria)}</td><td class="n">${esc(cantTxt(p))}</td><td class="n">${money(p.importe)}</td></tr>`).join('')}
+        ${arts.map((p, i) => `<tr${p.paga === 'PERSONAL' ? ' style="color:#888"' : ''}><td>${i+1}</td><td>${esc(p.descripcion)}${p.paga === 'PERSONAL' ? ' <i>(personal)</i>' : ''}</td><td>${esc(p.categoria)}</td><td class="n">${esc(cantTxt(p))}</td><td class="n">${p.paga === 'PERSONAL' ? '(' + money(p.importe) + ')' : money(p.importe)}</td></tr>`).join('')}
         <tr><td colspan="4" style="text-align:right">Suman${t.subtotal ? ' (subtotal ' + money(t.subtotal) + (t.iva ? ', IVA ' + money(t.iva) : '') + ')' : ''}</td><td class="n"><b>${money(t.cuadre ? t.cuadre.suma : 0)}</b></td></tr></tbody></table>`
         : `<div class="m">${t.comprobante === 'SIN_COMPROBANTE' ? 'Sin comprobante · motivo: ' + esc(t.notas || '—') : 'Sin desglose · ' + esc(t.concepto)}</div>`}
       ${t.cuadre && t.cuadre.ok !== null ? `<div class="m ${cl === 'tk-no' ? 'warn' : ''}">${tx}</div>` : ''}
