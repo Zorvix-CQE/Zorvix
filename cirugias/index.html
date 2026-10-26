@@ -1307,7 +1307,20 @@ async function cargaCasos(){
 
   const c = $('lista-casos');
   if (!CASOS.length){ c.innerHTML = '<div class="vacio">Todavía no hay casos.</div>'; return; }
-  CASOS.sort((a,b) => String(a.Fecha_Cirugia).localeCompare(String(b.Fecha_Cirugia)));
+  /* De lo más reciente a lo más viejo. Esta lista se abre para ver lo que
+     sigue o lo que acaba de pasar, no para repasar el año: lo útil queda
+     arriba y lo viejo se hunde solo conforme pasa el tiempo.
+
+     Se desempata por hora dentro del mismo día, cosa que antes no se hacía:
+     por eso las 09:00 salían antes que las 07:30 del mismo 12 de octubre
+     —no estaba ordenado por hora, era el orden en que venían de la base—.
+     Un caso sin fecha se va hasta el final: no compite con los que sí la
+     tienen. */
+  CASOS.sort(function(a, b){
+    const fa = String(a.Fecha_Cirugia || ''), fb = String(b.Fecha_Cirugia || '');
+    if (fa !== fb) return fb.localeCompare(fa);
+    return String(b.Hora_Inicio || '').localeCompare(String(a.Hora_Inicio || ''));
+  });
   c.innerHTML = CASOS.map(function(x){
     const est = String(x.Estatus_Agenda||'');
     const clase = est === 'Confirmado' ? 'ok' : (est === 'Preaparto' ? 'warn' : '');
