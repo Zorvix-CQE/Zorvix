@@ -1144,6 +1144,7 @@ $('btnArqueoMas').onclick = () => ir('arqueo');
  * ================================================================ */
 async function cargarMas(){
   const u = S.usuario;
+  if (u.admin && !S.resumen){ try { S.resumen = await api('resumen'); } catch(e){ toast(e.message, true); } }
   if (u.admin && S.resumen){
     const f = S.resumen.fondo;
     $('cfNombre').value = f.nombre; $('cfActual').textContent = money(f.montoFijo || 0); $('cfMonto').value = '';
@@ -1217,7 +1218,8 @@ S.cfSigno = 1;
 $('cfMov').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.cfSigno = Number(b.dataset.v);
   $('cfMov').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
 $('cfGuardar').onclick = async () => {
-  const ant = S.resumen?.fondo?.montoFijo || 0;
+  if (!S.resumen?.fondo?.id){ toast('Cargando el fondo… intenta de nuevo en un momento', true); cargarMas(); return; }
+  const ant = S.resumen.fondo.montoFijo || 0;
   const cambio = Math.abs(numIn($('cfMonto').value) || 0) * S.cfSigno;
   const nuevo = Math.round((ant + cambio) * 100) / 100;
   if (nuevo < 0) return toast('El fondo no puede quedar en negativo', true);
