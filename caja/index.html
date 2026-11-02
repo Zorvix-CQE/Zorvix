@@ -739,6 +739,7 @@ async function cargarRevisar(){
           ${m.alertas ? `<div class="sub" style="color:var(--warn);margin-top:4px">⚑ ${esc(alertasTxt(m.alertas))}</div>` : ''}
           ${m.editados ? `<div class="sub" style="margin-top:4px">✎ ${esc(m.editados)}</div>` : ''}
           ${m.estado==='OBSERVADO' ? `<div class="sub" style="color:var(--info);margin-top:4px">Observado: ${esc(m.motivo)} — esperando corrección</div>` : ''}
+          ${m.estado==='PENDIENTE' && /^Validación automática/.test(m.motivo||'') ? `<div class="sub" style="color:var(--warn);margin-top:4px">${esc(m.motivo)}</div>` : ''}
           <div class="r" style="display:flex;gap:8px;margin-top:10px">
             <button class="btn sec sm" data-mov="${esc(m.folio)}" style="flex:1">Ver artículos</button>
             ${m.puedoRevisar ? `<button class="btn ok sm" style="flex:1" onclick="revisar('${esc(m.folio)}','APROBADO')">Aprobar</button>` : `<span class="sub" style="align-self:center">Lo registraste tú</span>`}
@@ -762,6 +763,17 @@ async function revisar(folio, decision){
   } catch(e){ toast(e.message, true); }
 }
 
+async function regresarRevision(folio){
+  const motivo = prompt('¿Qué no cuadra? Regresa a quien lo registró para que lo corrija.');
+  if (!motivo) return;
+  try {
+    await api('regresarRevision', { folio, motivo });
+    toast('Regresado a revisión');
+    cerrarHoja('shDetalle'); S.resumen = null;
+    if (S.vista === 'revisar') cargarRevisar(); else ir(S.vista);
+  } catch(e){ toast(e.message, true); }
+}
+
 /* ---------------- detalle ---------------- */
 async function abrirDetalle(folio){
   $('dTitulo').textContent = folio;
@@ -781,6 +793,7 @@ async function abrirDetalle(folio){
     const puedeCorregir = m.tipo==='GASTO' && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO') && (m.esMio || u.aprueba);
     const puedeAnular = m.tipo==='GASTO' && m.estado!=='ANULADO' && !m.reposicion && ((m.esMio && (m.estado==='PENDIENTE'||m.estado==='OBSERVADO')) || u.aprueba);
     const puedeReintegro = u.aprueba && m.estado==='NO_PROCEDENTE' && !m.reintegro;
+    const puedeRegresar = u.aprueba && m.estado==='APROBADO' && (m.tipo==='GASTO'||m.tipo==='AJUSTE') && !m.reposicion;
     const kv = [
       ['Tipo', TIPO_TXT[m.tipo]], ['Estado', `<span class="pill p-${m.estado}">${ESTADO_TXT[m.estado]||m.estado}</span>`],
       [m.personal ? 'Paga la caja' : 'Total', `<span class="num">${money(m.total)}</span>`],
@@ -793,7 +806,7 @@ async function abrirDetalle(folio){
       m.formaPago?['Pago', esc(m.formaPago)]:null, m.rfc?['RFC', esc(m.rfc)]:null, m.uuid?['UUID', `<span style="font-size:12px">${esc(m.uuid)}</span>`]:null,
       m.folioTicket?['Folio ticket', esc(m.folioTicket)]:null,
       ['Registró', esc(m.registradoNombre)+'<br><span class="sub">'+esc(m.registradoEn)+'</span>'],
-      m.revisadoPor?['Revisó', esc(m.revisadoPor)+'<br><span class="sub">'+esc(m.revisadoEn)+'</span>']:null,
+      m.revisadoPor?['Revisó', (m.revisadoPor==='validacion.automatica'?'Validación automática':esc(m.revisadoPor))+'<br><span class="sub">'+esc(m.revisadoEn)+'</span>']:null,
       m.reposicion?['Reposición', esc(m.reposicion)]:null, m.reintegro?['Reintegro', esc(m.reintegro)]:null,
       m.relacionado?['Relacionado', esc(m.relacionado)]:null,
       m.confianza!==null?['Lectura automática', Math.round(m.confianza*100)+'%']:null
@@ -815,6 +828,7 @@ async function abrirDetalle(folio){
           <div class="r"><button class="btn info" onclick="revisar('${esc(m.folio)}','OBSERVADO')">Observar</button><button class="btn bad" onclick="revisar('${esc(m.folio)}','NO_PROCEDENTE')">No procede</button></div>` : ''}
         ${puedeCorregir ? `<button class="btn sec" id="dCorregir">Corregir datos</button>` : ''}
         ${puedeReintegro ? `<button class="btn sec" onclick="reintegro('${esc(m.folio)}',${m.total})">Registrar reintegro de ${money(m.total)}</button>` : ''}
+        ${puedeRegresar ? `<button class="btn info" onclick="regresarRevision('${esc(m.folio)}')">Regresar a revisión</button>` : ''}
         ${puedeAnular ? `<button class="link" style="color:var(--bad)" onclick="anular('${esc(m.folio)}')">Anular (capturado por error)</button>` : ''}
       </div>`;
     if (puedeCorregir) $('dCorregir').onclick = () => { cerrarHoja('shDetalle'); abrirCorreccion(m); };
