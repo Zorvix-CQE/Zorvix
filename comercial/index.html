@@ -528,6 +528,23 @@ td.num,th.num{text-align:right}
 .concepto-fila{display:grid;grid-template-columns:1fr 170px auto;gap:12px;align-items:end;margin-bottom:10px}
 @media (max-width:620px){.concepto-fila{grid-template-columns:1fr auto}.concepto-fila>div:first-child{grid-column:1/-1}}
 
+/* Cámara para el voucher */
+.boton-camara{display:inline-flex;align-items:center;gap:8px;cursor:pointer;border:1px solid var(--zx-borde-fuerte);
+  border-radius:var(--r-sm);padding:9px 14px;font-size:13px;font-weight:600;color:#fff;
+  background:linear-gradient(140deg,var(--zx-violeta-500),var(--zx-violeta-800));box-shadow:var(--zx-glow-boton)}
+.boton-camara svg{width:16px;height:16px}
+.foto .subir{font-size:12.5px}
+#camara{position:fixed;inset:0;z-index:75;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(8,5,18,.82);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#camara.on{display:flex}
+#camara .caja{width:100%;max-width:760px;background:var(--papel);border-radius:var(--r-lg);padding:20px;box-shadow:var(--sombra-3)}
+#camara h3{font-size:18px;margin-bottom:4px}
+#camara p{color:var(--tinta2);font-size:13px;margin:0 0 12px}
+#camara .pantalla{position:relative;background:#000;border-radius:var(--r);overflow:hidden;aspect-ratio:4/3}
+#camara video,#camara img{width:100%;height:100%;object-fit:contain;display:block}
+#camara .guia{position:absolute;inset:9% 12%;border:2px dashed rgba(255,255,255,.55);border-radius:12px;pointer-events:none}
+#camara select{margin-top:12px}
+
 /* Modal propio: nada de prompt() del navegador */
 #modal{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(12,8,24,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
@@ -962,6 +979,26 @@ html[data-tema="oscuro"] .vista-doc{background:#fff;color:#1C1B22}
     <div class="fila">
       <button class="btn" type="button" id="mo-si">Aceptar</button>
       <button class="btn sec" type="button" id="mo-no">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="camara" role="dialog" aria-modal="true" aria-labelledby="cam-titulo">
+  <div class="caja">
+    <h3 id="cam-titulo">Foto del voucher</h3>
+    <p id="cam-texto">Ponga el voucher o el comprobante dentro del recuadro, bien iluminado y sin reflejos.</p>
+    <div class="pantalla">
+      <video id="cam-video" autoplay playsinline muted></video>
+      <img id="cam-foto" class="oculto" alt="Foto tomada">
+      <div class="guia" id="cam-guia"></div>
+    </div>
+    <select id="cam-dispositivo" class="oculto" aria-label="Cámara"></select>
+    <div id="cam-aviso"></div>
+    <div class="fila">
+      <button class="btn" type="button" id="cam-tomar">Tomar foto</button>
+      <button class="btn oculto" type="button" id="cam-usar">Usar esta foto</button>
+      <button class="btn sec oculto" type="button" id="cam-repetir">Repetir</button>
+      <button class="btn sec" type="button" id="cam-cancelar">Cancelar</button>
     </div>
   </div>
 </div>
@@ -1612,9 +1649,13 @@ function pintaLineasEn(cfg){
         (l.moneda === 'USD' ? '<div><label>Tipo de cambio</label><input data-k="tc" type="number" min="0" step="0.0001" inputmode="decimal" value="' + esc(l.tc) + '" placeholder="0.0000"></div>' : '') +
         (l.metodo !== 'Efectivo' ? '<div><label>Referencia / autorización</label><input data-k="referencia" maxlength="120" value="' + esc(l.referencia) + '" placeholder="Últimos dígitos, clave de rastreo…"></div>' : '') +
       '</div>' +
-      (pideFoto ? '<div class="foto"><label class="boton-foto ' + (l.foto ? 'listo' : 'falta') + '">' +
-          (l.foto ? '✓ Voucher adjunto · cambiar' : 'Tomar foto del voucher') +
-          '<input type="file" accept="image/*,application/pdf" capture="environment" data-foto="' + i + '"></label>' +
+      (pideFoto ? '<div class="foto">' +
+          '<button class="boton-camara" type="button" data-camara="' + i + '">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>' +
+            (l.foto ? 'Volver a tomar foto' : 'Tomar foto con la cámara') + '</button>' +
+          '<label class="boton-foto subir ' + (l.foto ? 'listo' : 'falta') + '">' +
+          (l.foto ? '✓ Voucher adjunto · cambiar archivo' : 'o subir archivo') +
+          '<input type="file" accept="image/*,application/pdf" data-foto="' + i + '"></label>' +
           (l.vista ? '<img src="' + l.vista + '" alt="Voucher">' : (l.foto && l.foto.mime === 'application/pdf' ? '<span class="suave chico">PDF adjunto</span>' : '')) +
           '<span class="suave chico">' + (l.foto ? '' : 'Obligatorio para ' + esc(metTxt(l.metodo).toLowerCase())) + '</span></div>' : '') +
     '</div>';
@@ -1631,6 +1672,18 @@ function pintaLineasEn(cfg){
     });
   });
   cont.querySelectorAll('[data-quitar]').forEach(b => { b.onclick = () => { L.splice(+b.dataset.quitar, 1); cfg.repinta(); }; });
+  cont.querySelectorAll('[data-camara]').forEach(function(b){
+    b.onclick = async function(){
+      try{
+        const r = await tomaFotoCamara();
+        if (!r) return;
+        const i = +b.dataset.camara;
+        L[i].foto = {b64: r.b64, mime: r.mime};
+        L[i].vista = r.vista;
+        cfg.repinta();
+      }catch(e){ aviso(cfg.aviso,'malo', e.message); }
+    };
+  });
   cont.querySelectorAll('[data-foto]').forEach(function(inp){
     inp.onchange = async function(){
       const f = inp.files && inp.files[0]; if (!f) return;
@@ -2240,6 +2293,93 @@ async function cargaLibresRecientes(){
     });
   }catch(e){ aviso('cl-aviso','malo', e.message); }
 }
+
+/* ═══════════════════════ CÁMARA ═══════════════════════
+   El atributo capture="environment" sólo abre la cámara en el celular; en la
+   computadora el navegador siempre muestra el selector de archivos. Por eso la
+   cámara se abre aquí mismo con getUserMedia: funciona igual con la cámara de
+   la laptop, una webcam USB o la del celular (prefiere la trasera). La foto se
+   reduce a 1600 px en JPEG, igual que las que se suben como archivo. */
+let CAM_FLUJO = null, CAM_RES = null, CAM_DATO = null;
+
+function camaraApagar(){
+  if (CAM_FLUJO){ CAM_FLUJO.getTracks().forEach(t => t.stop()); CAM_FLUJO = null; }
+  $('cam-video').srcObject = null;
+}
+async function camaraEncender(deviceId){
+  camaraApagar();
+  const video = deviceId ? {deviceId: {exact: deviceId}, width: {ideal: 1920}, height: {ideal: 1080}}
+                         : {facingMode: {ideal: 'environment'}, width: {ideal: 1920}, height: {ideal: 1080}};
+  CAM_FLUJO = await navigator.mediaDevices.getUserMedia({video: video, audio: false});
+  $('cam-video').srcObject = CAM_FLUJO;
+  /* Si hay más de una cámara (laptop + webcam USB), se deja elegir. Los
+     nombres sólo aparecen después de dar permiso, por eso se piden aquí. */
+  try{
+    const lista = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    const sel = $('cam-dispositivo');
+    if (lista.length > 1){
+      const actual = CAM_FLUJO.getVideoTracks()[0].getSettings().deviceId;
+      sel.innerHTML = lista.map((d, n) => '<option value="' + esc(d.deviceId) + '"' + (d.deviceId === actual ? ' selected' : '') + '>' +
+        esc(d.label || ('Cámara ' + (n + 1))) + '</option>').join('');
+      sel.classList.remove('oculto');
+    } else sel.classList.add('oculto');
+  }catch(e){}
+}
+function camaraModo(tomada){
+  $('cam-video').classList.toggle('oculto', tomada);
+  $('cam-guia').classList.toggle('oculto', tomada);
+  $('cam-foto').classList.toggle('oculto', !tomada);
+  $('cam-tomar').classList.toggle('oculto', tomada);
+  $('cam-usar').classList.toggle('oculto', !tomada);
+  $('cam-repetir').classList.toggle('oculto', !tomada);
+}
+function camaraCerrar(valor){
+  camaraApagar();
+  $('camara').classList.remove('on');
+  const r = CAM_RES; CAM_RES = null; CAM_DATO = null;
+  if (r) r(valor);
+}
+function tomaFotoCamara(){
+  return new Promise(async function(res, rej){
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+      return rej(new Error('Este navegador no permite usar la cámara. Use "subir archivo".'));
+    }
+    CAM_RES = res; CAM_DATO = null;
+    aviso('cam-aviso','','');
+    camaraModo(false);
+    $('camara').classList.add('on');
+    try{ await camaraEncender(); }
+    catch(e){
+      const negado = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+      const sinCam = e && (e.name === 'NotFoundError' || e.name === 'OverconstrainedError');
+      aviso('cam-aviso','malo', negado
+        ? 'El navegador no tiene permiso para usar la cámara. Toque el ícono de la cámara (o del candado) junto a la dirección, elija "Permitir" y vuelva a intentarlo.'
+        : (sinCam ? 'No se encontró ninguna cámara conectada.' : 'No se pudo abrir la cámara: ' + (e && e.message || e)));
+      $('cam-tomar').classList.add('oculto');
+    }
+  });
+}
+$('cam-dispositivo').onchange = async function(){
+  try{ await camaraEncender(this.value); }catch(e){ aviso('cam-aviso','malo','No se pudo cambiar de cámara.'); }
+};
+$('cam-tomar').onclick = function(){
+  const v = $('cam-video');
+  if (!v.videoWidth){ aviso('cam-aviso','warn','La cámara todavía no da imagen; espere un segundo.'); return; }
+  const max = 1600, k = Math.min(1, max / Math.max(v.videoWidth, v.videoHeight));
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
+  cv.getContext('2d').drawImage(v, 0, 0, cv.width, cv.height);
+  const data = cv.toDataURL('image/jpeg', 0.85);
+  CAM_DATO = {b64: data.split(',')[1], mime: 'image/jpeg', vista: data};
+  $('cam-foto').src = data;
+  camaraModo(true);
+};
+$('cam-repetir').onclick = function(){ CAM_DATO = null; camaraModo(false); };
+$('cam-usar').onclick = function(){ camaraCerrar(CAM_DATO); };
+$('cam-cancelar').onclick = function(){ camaraCerrar(null); };
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && $('camara').classList.contains('on')) camaraCerrar(null);
+});
 </script>
 </body>
 </html>
