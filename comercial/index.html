@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Zorvix · Cobros</title><!-- v1.2 -->
+<title>Zorvix · Cobros</title><!-- v1.3 -->
 <meta name="description" content="Cobros de Zorvix · Centro Quirúrgico Especializado">
 <meta name="theme-color" content="#7B5DC2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16131F" media="(prefers-color-scheme: dark)">
@@ -841,6 +841,18 @@ html[data-tema="oscuro"] .vista-doc{background:#fff;color:#1C1B22}
         </div>
         <div id="cl-pac-elegido" class="oculto"></div>
 
+        <h3 class="grupo">Fecha del cobro</h3>
+        <div class="rejilla">
+          <div><label for="cl-fecha">Día en que se cobró</label><input type="date" id="cl-fecha"></div>
+          <div><label for="cl-hora">Hora (opcional)</label><input type="time" id="cl-hora"></div>
+        </div>
+        <div id="cl-fecha-nota" class="suave chico" style="margin-top:8px"></div>
+        <label class="opcion-compartida oculto" id="cl-entregado-caja" style="margin-top:10px">
+          <input type="checkbox" id="cl-entregado" checked>
+          <span>El efectivo de este cobro ya se contó y se entregó en su momento: <b>no entra al corte de caja</b>.
+          Desmárquelo sólo si ese efectivo sigue físicamente en la caja.</span>
+        </label>
+
         <h3 class="grupo">Conceptos</h3>
         <div id="cl-conceptos"></div>
         <button class="btn txt" type="button" id="cl-otro-concepto">+ Otro concepto</button>
@@ -888,7 +900,7 @@ html[data-tema="oscuro"] .vista-doc{background:#fff;color:#1C1B22}
 
       <div class="tarjeta">
         <h2>Cobros libres recientes</h2>
-        <p class="sub">Los últimos 30 días. Toque el folio para reimprimir el recibo.</p>
+        <p class="sub">Los últimos 90 días, por fecha real del cobro. Toque el folio para reimprimir el recibo.</p>
         <div id="cl-recientes"></div>
       </div>
     </section>
@@ -1653,11 +1665,11 @@ function pintaLineasEn(cfg){
           '<button class="boton-camara" type="button" data-camara="' + i + '">' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>' +
             (l.foto ? 'Volver a tomar foto' : 'Tomar foto con la cámara') + '</button>' +
-          '<label class="boton-foto subir ' + (l.foto ? 'listo' : 'falta') + '">' +
+          '<label class="boton-foto subir ' + (l.foto ? 'listo' : (cfg.fotoOpcional ? '' : 'falta')) + '">' +
           (l.foto ? '✓ Voucher adjunto · cambiar archivo' : 'o subir archivo') +
           '<input type="file" accept="image/*,application/pdf" data-foto="' + i + '"></label>' +
           (l.vista ? '<img src="' + l.vista + '" alt="Voucher">' : (l.foto && l.foto.mime === 'application/pdf' ? '<span class="suave chico">PDF adjunto</span>' : '')) +
-          '<span class="suave chico">' + (l.foto ? '' : 'Obligatorio para ' + esc(metTxt(l.metodo).toLowerCase())) + '</span></div>' : '') +
+          '<span class="suave chico">' + (l.foto ? '' : (cfg.fotoOpcional ? 'Opcional en cobros con fecha anterior' : 'Obligatorio para ' + esc(metTxt(l.metodo).toLowerCase()))) + '</span></div>' : '') +
     '</div>';
   }).join('');
   cont.querySelectorAll('.linea-pago').forEach(function(box){
@@ -1871,6 +1883,7 @@ function docReciboLibre(r){
     '</tbody></table>' +
     '<div class="doc-total"><div>Total pagado <b>' + dinero(r.total_mxn) + '</b></div></div>' +
     (r.notas ? '<div class="chico">Notas: ' + esc(r.notas) + '</div>' : '') +
+    (r.retroactivo && r.registrado_en ? '<div class="chico suave">Cobro del ' + esc(fechaCorta(r.fecha)) + ', capturado en el sistema el ' + esc(fechaCorta(r.registrado_en)) + '.</div>' : '') +
     '<div class="firmas"><div>Recibió · ' + esc(r.registrado_por) + '</div><div>Paciente o responsable</div></div>' +
     '<div class="leyenda">Este recibo no es un comprobante fiscal. Si requiere factura, solicítela con sus datos fiscales; ' +
       'se emite a nombre del paciente o de quien él indique.</div></div>';
@@ -2087,7 +2100,7 @@ function pintaReporte(){
         '<td class="concepto">' + esc(p.paciente) + '<small>' + (p.momento === 'Libre' ? 'Cobro libre · ' + esc(p.concepto || p.procedimiento) : esc(p.folio_caso) + ' · ' + esc(p.momento === 'Devolucion' ? 'Devolución' : p.momento)) + '</small></td>' +
         '<td class="concepto">' + esc(metTxt(p.metodo)) + '<small>' + esc(p.cuenta) + (p.referencia ? ' · ' + esc(p.referencia) : '') + '</small></td>' +
         '<td class="num">' + (signo(p) < 0 ? '−' : '') + dinero(p.monto_mxn) + '</td>' +
-        '<td class="acc">' + (p.metodo === 'Efectivo' ? '<span class="suave chico">' + (p.corte ? esc(p.corte) : 'sin corte') + '</span>'
+        '<td class="acc">' + (p.metodo === 'Efectivo' ? '<span class="suave chico">' + (p.corte === 'PREVIO-AL-SISTEMA' ? 'entregado antes' : (p.corte ? esc(p.corte) : 'sin corte')) + '</span>'
           : (conc && p.estado === 'Vigente' ? '<input type="checkbox" style="width:auto" data-conc="' + esc(p.id) + '"' + (p.conciliado ? ' checked' : '') + ' data-orig="' + (p.conciliado ? 1 : 0) + '">'
              : (p.conciliado ? '✓' : '—'))) + '</td></tr>').join('') + '</tbody></table></div>'
     : '<div class="vacio">Sin movimientos en este periodo.</div>';
@@ -2123,6 +2136,22 @@ $('rp-csv').onclick = function(){
    total de los conceptos: un cobro libre no deja saldo pendiente. */
 let CL = {pac:null, conceptos:[], lineas:[], txn:null}, CL_BUSCA = null, CL_REG = false;
 
+function esRetroLibre(){ const f = $('cl-fecha').value; return !!f && f < hoyYMD(); }
+function pintaFechaLibre(){
+  const retro = esRetroLibre();
+  const conEfectivo = CL.lineas.some(l => l.metodo === 'Efectivo');
+  $('cl-entregado-caja').classList.toggle('oculto', !(retro && conEfectivo));
+  $('cl-fecha').disabled = !YO.autoriza;
+  $('cl-fecha-nota').innerHTML = !YO.autoriza
+    ? 'Sólo dirección o finanzas pueden registrar cobros con fecha anterior.'
+    : (retro ? '<b>Cobro con fecha anterior</b> (' + esc(fechaLarga($('cl-fecha').value)) + '): queda con esa fecha en reportes y en el recibo, y se guarda aparte cuándo se capturó. La foto del voucher es opcional.'
+             : 'Para capturar un cobro de días pasados, cambie la fecha.');
+}
+$('cl-fecha').onchange = function(){
+  if (this.value > hoyYMD()) this.value = hoyYMD();
+  pintaLineasLibre();
+};
+
 function abreLibre(){
   if (!CL.conceptos.length) limpiaLibre();
   cargaLibresRecientes();
@@ -2134,6 +2163,8 @@ function limpiaLibre(){
   $('cl-factura').value = 'No'; $('cl-fact-datos').classList.add('oculto');
   ['cl-rfc','cl-razon','cl-correo','cl-notas'].forEach(id => { $(id).value = ''; });
   $('cl-regimen').value = '';
+  $('cl-fecha').value = hoyYMD(); $('cl-fecha').max = hoyYMD(); $('cl-hora').value = '';
+  $('cl-entregado').checked = true;
   aviso('cl-aviso','','');
   pintaPacLibre(); pintaConceptos(); if (CAT) pintaLineasLibre();
 }
@@ -2206,7 +2237,9 @@ function pintaConceptos(){
   sumaLibre();
 }
 function pintaLineasLibre(){
-  pintaLineasEn({cont:'cl-lineas', arr: CL.lineas, dev:false, aviso:'cl-aviso', suma: sumaLibre, repinta: pintaLineasLibre});
+  pintaLineasEn({cont:'cl-lineas', arr: CL.lineas, dev:false, aviso:'cl-aviso', suma: sumaLibre, repinta: pintaLineasLibre,
+    fotoOpcional: esRetroLibre()});
+  pintaFechaLibre();
 }
 function sumaLibre(){
   const total = totalLibre();
@@ -2238,7 +2271,11 @@ $('cl-registrar').onclick = async function(){
   const conceptos = CL.conceptos.filter(c => c.concepto.trim() || Number(c.importe));
   if (!conceptos.length) return falla('Escriba al menos un concepto con su importe.');
   if (conceptos.some(c => !c.concepto.trim() || !(Number(c.importe) > 0))) return falla('Cada concepto necesita descripción e importe mayor a cero.');
-  const faltaFoto = CL.lineas.findIndex(l => (metodoDe(l.metodo) || {}).voucher && !l.foto);
+  const fecha = $('cl-fecha').value || hoyYMD();
+  if (fecha > hoyYMD()) return falla('La fecha del cobro no puede ser posterior a hoy.');
+  const retro = fecha < hoyYMD();
+  if (retro && !YO.autoriza) return falla('Sólo dirección o finanzas pueden registrar cobros con fecha anterior.');
+  const faltaFoto = retro ? -1 : CL.lineas.findIndex(l => (metodoDe(l.metodo) || {}).voucher && !l.foto);
   if (faltaFoto >= 0) return falla('Falta la foto del voucher en la forma de pago ' + (faltaFoto + 1) + '. Sin voucher no se registra.');
   const total = totalLibre();
   const suma = r2(CL.lineas.reduce((a, l) => a + Number(l.monto || 0) * (l.moneda === 'USD' ? Number(l.tc || 0) : 1), 0));
@@ -2251,6 +2288,7 @@ $('cl-registrar').onclick = async function(){
       conceptos: conceptos.map(c => ({concepto: c.concepto.trim(), importe: c.importe})),
       lineas: CL.lineas.map(l => ({metodo:l.metodo, cuenta_id:l.cuenta_id, moneda:l.moneda, monto:l.monto, tc:l.tc, referencia:l.referencia, foto:l.foto})),
       notas: $('cl-notas').value,
+      fecha_cobro: fecha, hora_cobro: $('cl-hora').value || '', efectivo_entregado: $('cl-entregado').checked,
       factura: {requiere: $('cl-factura').value === 'Si', rfc: $('cl-rfc').value, razon_social: $('cl-razon').value,
                 regimen: $('cl-regimen').value, uso: $('cl-uso').value, correo: $('cl-correo').value}
     });
@@ -2268,7 +2306,7 @@ async function cargaLibresRecientes(){
       ? '<div class="tabla-scroll"><table class="tabla-cuenta"><thead><tr><th>Recibo</th><th>Fecha</th><th>Paciente</th><th>Forma de pago</th><th class="num">Total</th><th></th></tr></thead><tbody>' +
         r.cobros.map(c => '<tr class="' + (c.anulado ? 'anulado' : '') + '">' +
           '<td><button class="btn txt mono" type="button" data-recibo="' + esc(c.folio) + '">' + esc(c.folio) + '</button></td>' +
-          '<td class="chico">' + esc(fechaCorta(c.fecha)) + ' ' + esc(horaDe(c.fecha)) + '</td>' +
+          '<td class="chico">' + esc(fechaCorta(c.fecha)) + ' ' + esc(horaDe(c.fecha)) + (c.retro ? '<br><span class="suave">capturado después</span>' : '') + '</td>' +
           '<td class="concepto">' + esc(c.paciente) + '<small>' + esc(c.concepto) + '</small></td>' +
           '<td class="chico">' + c.metodos.map(metTxt).map(esc).join(' + ') + '</td>' +
           '<td class="num">' + dinero(c.total) + '</td>' +
