@@ -511,6 +511,23 @@ td.num,th.num{text-align:right}
 .col2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
 .col2 .tarjeta{margin-bottom:0}
 
+/* Cobro libre: buscador de pacientes y conceptos */
+.buscador-pac{position:relative}
+.resultados{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;background:var(--papel);
+  border:1px solid var(--zx-borde-fuerte);border-radius:var(--r);box-shadow:var(--sombra-3);max-height:330px;overflow:auto}
+.resultados button{display:block;width:100%;text-align:left;border:none;background:none;padding:11px 15px;cursor:pointer;
+  border-bottom:1px solid var(--linea-2);font:inherit;color:var(--tinta)}
+.resultados button:hover,.resultados button:focus{background:var(--zx-hover);outline:none}
+.resultados button b{font-weight:600}
+.resultados button small{display:block;color:var(--tinta3);font-size:12px;margin-top:2px}
+.resultados .nada{padding:13px 15px;color:var(--tinta3);font-size:13.5px}
+.pac-elegido{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+  border:1px solid var(--zx-borde-fuerte);background:var(--zx-acento-tenue);border-radius:var(--r);padding:14px 18px}
+.pac-elegido .nom{font-family:var(--zx-display);font-size:19px;font-weight:500}
+.pac-elegido .meta{color:var(--tinta2);font-size:13px;margin-top:2px}
+.concepto-fila{display:grid;grid-template-columns:1fr 170px auto;gap:12px;align-items:end;margin-bottom:10px}
+@media (max-width:620px){.concepto-fila{grid-template-columns:1fr auto}.concepto-fila>div:first-child{grid-column:1/-1}}
+
 /* Modal propio: nada de prompt() del navegador */
 #modal{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(12,8,24,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
@@ -785,6 +802,77 @@ html[data-tema="oscuro"] .vista-doc{background:#fff;color:#1C1B22}
       <div class="fila" style="margin:0 0 30px">
         <button class="btn sec" type="button" id="k-imprimir">Imprimir estado de cuenta</button>
         <button class="btn sec escritura" type="button" id="k-cerrar">Cerrar cuenta</button>
+      </div>
+    </section>
+
+    <!-- COBRO LIBRE -->
+    <section id="vista-libre" class="vista oculto">
+      <div class="tarjeta">
+        <h2>Cobro libre</h2>
+        <p class="sub">Para cualquier ingreso que no cuelga de una cirugía agendada: se busca al paciente, se escriben
+          los conceptos, se cobra y se imprime el recibo. Entra al corte de caja, a facturas y a reportes como cualquier cobro.</p>
+
+        <h3 class="grupo">Paciente</h3>
+        <div id="cl-pac-buscar">
+          <div class="buscador buscador-pac">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+            <input type="search" id="cl-buscar" placeholder="Escriba 2 o 3 letras del nombre, el expediente o el teléfono…" autocomplete="off">
+            <div class="resultados oculto" id="cl-resultados"></div>
+          </div>
+          <div class="suave chico" style="margin-top:8px">¿No está dado de alta en Zorvix?
+            <button class="btn txt" type="button" id="cl-libre-nombre">Usar el nombre escrito tal cual →</button></div>
+        </div>
+        <div id="cl-pac-elegido" class="oculto"></div>
+
+        <h3 class="grupo">Conceptos</h3>
+        <div id="cl-conceptos"></div>
+        <button class="btn txt" type="button" id="cl-otro-concepto">+ Otro concepto</button>
+        <div class="totales-pago"><div><span>Total a cobrar</span><b id="cl-total">$0.00</b></div></div>
+
+        <h3 class="grupo">Formas de pago</h3>
+        <div id="cl-lineas"></div>
+        <button class="btn txt" type="button" id="cl-otra-forma">+ Otra forma de pago (pago mixto)</button>
+        <div class="totales-pago">
+          <div><span>Total a cobrar</span><b id="cl-saldo">$0.00</b></div>
+          <div><span>Este recibo</span><b id="cl-suma">$0.00</b></div>
+          <div id="cl-dif-caja"><span id="cl-dif-etq">Cuadra</span><b id="cl-dif">$0.00</b></div>
+        </div>
+
+        <h3 class="grupo">Facturación</h3>
+        <div class="rejilla">
+          <div><label for="cl-factura">¿Requiere factura?</label><select id="cl-factura"><option value="No">No</option><option value="Si">Sí</option></select></div>
+        </div>
+        <div class="rejilla oculto" id="cl-fact-datos" style="margin-top:14px">
+          <div><label for="cl-rfc">RFC</label><input id="cl-rfc" maxlength="13" style="text-transform:uppercase"></div>
+          <div style="grid-column:span 2"><label for="cl-razon">Razón social (como en su constancia)</label><input id="cl-razon" maxlength="200" style="text-transform:uppercase"></div>
+          <div><label for="cl-regimen">Régimen fiscal</label>
+            <select id="cl-regimen">
+              <option value="">— elegir —</option>
+              <option>605 · Sueldos y salarios</option><option>612 · Personas físicas con actividad empresarial</option>
+              <option>626 · Régimen simplificado de confianza</option><option>606 · Arrendamiento</option>
+              <option>616 · Sin obligaciones fiscales</option><option>601 · General de ley personas morales</option>
+              <option>603 · Personas morales con fines no lucrativos</option>
+            </select></div>
+          <div><label for="cl-uso">Uso de CFDI</label>
+            <select id="cl-uso">
+              <option>D01 · Honorarios médicos, dentales y gastos hospitalarios</option>
+              <option>G03 · Gastos en general</option><option>S01 · Sin efectos fiscales</option>
+            </select></div>
+          <div><label for="cl-correo">Correo para la factura</label><input id="cl-correo" type="email" maxlength="120"></div>
+        </div>
+
+        <div style="margin-top:16px"><label for="cl-notas">Notas del recibo (opcional)</label><input id="cl-notas" maxlength="300"></div>
+        <div id="cl-aviso"></div>
+        <div class="fila escritura">
+          <button class="btn" type="button" id="cl-registrar">Registrar cobro</button>
+          <button class="btn sec" type="button" id="cl-limpiar">Limpiar</button>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Cobros libres recientes</h2>
+        <p class="sub">Los últimos 30 días. Toque el folio para reimprimir el recibo.</p>
+        <div id="cl-recientes"></div>
       </div>
     </section>
 
@@ -1123,6 +1211,7 @@ async function entro(resp, silencioso){
 /* ── Navegación ─────────────────────────────────────────────── */
 const VISTAS = {
   mostrador: {tab:'Mostrador',        el:'vista-mostrador'},
+  libre:     {tab:'Cobro libre',      el:'vista-libre'},
   corte:     {tab:'Corte de caja',    el:'vista-corte'},
   facturas:  {tab:'Facturas',         el:'vista-facturas'},
   reportes:  {tab:'Reportes',         el:'vista-reportes'}
@@ -1147,6 +1236,7 @@ function muestra(k){
   if (k === 'corte') cargaCorte();
   if (k === 'facturas') cargaFacturas();
   if (k === 'reportes' && !REPORTE) rango('hoy');
+  if (k === 'libre') abreLibre();
 }
 /* Quien sólo tiene lectura ve todo, pero no los botones que escriben. */
 function aplicaPermisos(){
@@ -1494,15 +1584,21 @@ function abrePanelPago(devolucion){
   $('panel-pago').classList.remove('oculto');
   $('panel-pago').scrollIntoView({behavior:'smooth', block:'start'});
 }
+/* Las líneas de pago se pintan igual en la cuenta del caso y en el cobro
+   libre; cada pantalla dice dónde dibujarlas y qué hacer al cambiar. */
 function pintaLineas(){
-  const dev = $('pp-momento').value === 'Devolucion';
-  $('pp-lineas').innerHTML = LINEAS.map(function(l, i){
+  pintaLineasEn({cont:'pp-lineas', arr: LINEAS, dev: $('pp-momento').value === 'Devolucion',
+    aviso:'pp-aviso', suma: sumaPago, repinta: pintaLineas});
+}
+function pintaLineasEn(cfg){
+  const L = cfg.arr, dev = !!cfg.dev, cont = $(cfg.cont);
+  cont.innerHTML = L.map(function(l, i){
     const met = metodoDe(l.metodo) || {};
     const ctas = cuentasPara(l.metodo);
     const pideFoto = met.voucher && !dev;
     return '<div class="linea-pago" data-i="' + i + '">' +
       '<span class="num-linea">Forma de pago ' + (i + 1) + '</span>' +
-      (LINEAS.length > 1 ? '<button class="mini quitar" type="button" data-quitar="' + i + '">Quitar</button>' : '') +
+      (L.length > 1 ? '<button class="mini quitar" type="button" data-quitar="' + i + '">Quitar</button>' : '') +
       '<div class="rejilla">' +
         '<div><label>Método</label><select data-k="metodo">' + (CAT.metodos || []).map(m =>
           '<option value="' + esc(m.metodo) + '"' + (m.metodo === l.metodo ? ' selected' : '') + '>' + esc(metTxt(m.metodo)) + '</option>').join('') + '</select></div>' +
@@ -1523,31 +1619,31 @@ function pintaLineas(){
           '<span class="suave chico">' + (l.foto ? '' : 'Obligatorio para ' + esc(metTxt(l.metodo).toLowerCase())) + '</span></div>' : '') +
     '</div>';
   }).join('');
-  $('pp-lineas').querySelectorAll('.linea-pago').forEach(function(box){
+  cont.querySelectorAll('.linea-pago').forEach(function(box){
     const i = +box.dataset.i;
     box.querySelectorAll('[data-k]').forEach(function(el){
       el.oninput = el.onchange = function(){
         const k = el.dataset.k;
-        LINEAS[i][k] = el.value;
-        if (k === 'metodo'){ const c = cuentasPara(el.value); LINEAS[i].cuenta_id = c[0] ? c[0].id : ''; }
-        if (k === 'metodo' || k === 'moneda') pintaLineas(); else sumaPago();
+        L[i][k] = el.value;
+        if (k === 'metodo'){ const c = cuentasPara(el.value); L[i].cuenta_id = c[0] ? c[0].id : ''; }
+        if (k === 'metodo' || k === 'moneda') cfg.repinta(); else cfg.suma();
       };
     });
   });
-  $('pp-lineas').querySelectorAll('[data-quitar]').forEach(b => { b.onclick = () => { LINEAS.splice(+b.dataset.quitar, 1); pintaLineas(); }; });
-  $('pp-lineas').querySelectorAll('[data-foto]').forEach(function(inp){
+  cont.querySelectorAll('[data-quitar]').forEach(b => { b.onclick = () => { L.splice(+b.dataset.quitar, 1); cfg.repinta(); }; });
+  cont.querySelectorAll('[data-foto]').forEach(function(inp){
     inp.onchange = async function(){
       const f = inp.files && inp.files[0]; if (!f) return;
       try{
         const i = +inp.dataset.foto;
         const r = await preparaArchivo(f);
-        LINEAS[i].foto = {b64: r.b64, mime: r.mime};
-        LINEAS[i].vista = r.vista;
-        pintaLineas();
-      }catch(e){ aviso('pp-aviso','malo', e.message); }
+        L[i].foto = {b64: r.b64, mime: r.mime};
+        L[i].vista = r.vista;
+        cfg.repinta();
+      }catch(e){ aviso(cfg.aviso,'malo', e.message); }
     };
   });
-  sumaPago();
+  cfg.suma();
 }
 function sumaPago(){
   const suma = r2(LINEAS.reduce((a, l) => a + Number(l.monto || 0) * (l.moneda === 'USD' ? Number(l.tc || 0) : 1), 0));
@@ -1669,10 +1765,11 @@ function muestraRecibo(msg){
   $('vista-recibo').classList.remove('oculto');
   aviso('r-aviso', msg ? 'warn' : 'ok', msg || 'Pago registrado. Imprima el recibo y entrégueselo al paciente.');
   if (RECIBO.anulado) aviso('r-aviso', 'malo', 'Este recibo está anulado.');
+  $('r-volver').textContent = RECIBO.libre ? '← Cobro libre' : '← Volver a la cuenta';
   $('r-area').innerHTML = docRecibo(RECIBO);
   window.scrollTo({top:0, behavior:'smooth'});
 }
-$('r-volver').onclick = () => abreCuenta(RECIBO.caso_id);
+$('r-volver').onclick = () => RECIBO.libre ? muestra('libre') : abreCuenta(RECIBO.caso_id);
 $('r-mostrador').onclick = () => muestra('mostrador');
 $('r-imprimir').onclick = () => imprime(docRecibo(RECIBO));
 
@@ -1682,6 +1779,7 @@ function cabDoc(titulo, folio){
     '<div class="doc-tit"><h2>' + esc(titulo) + '</h2><div class="f">' + esc(folio) + '</div></div></div>';
 }
 function docRecibo(r){
+  if (r.libre) return docReciboLibre(r);
   const dev = r.momento === 'Devolucion';
   return '<div class="doc">' + cabDoc(dev ? 'Comprobante de devolución' : 'Recibo de pago', r.folio) +
     (r.anulado ? '<div class="sello-anulado">ANULADO</div>' : '') +
@@ -1703,6 +1801,26 @@ function docRecibo(r){
       '<div>' + (dev ? 'Entregó · ' + esc(r.registrado_por) : 'Paciente o responsable') + '</div></div>' +
     '<div class="leyenda">Este recibo no es un comprobante fiscal. Si requiere factura, solicítela con sus datos fiscales; ' +
       'se emite a nombre del paciente o de quien él indique. Los honorarios médicos y de anestesia se liquidan directamente con cada médico.</div></div>';
+}
+function docReciboLibre(r){
+  return '<div class="doc">' + cabDoc('Recibo de pago', r.folio) +
+    (r.anulado ? '<div class="sello-anulado">ANULADO</div>' : '') +
+    '<div class="doc-datos">' +
+      '<div><span>Paciente</span>' + esc(r.paciente) + '</div><div><span>Fecha</span>' + esc(fechaCorta(r.fecha)) + ' · ' + esc(horaDe(r.fecha)) + '</div>' +
+      (r.factura ? '<div><span>Facturar a</span>' + esc(r.factura.razon_social) + ' · ' + esc(r.factura.rfc) + '</div>' : '') +
+    '</div>' +
+    '<table><thead><tr><th>Concepto</th><th class="num">Importe</th></tr></thead><tbody>' +
+      (r.conceptos || []).map(c => '<tr><td>' + esc(c.concepto) + '</td><td class="num">' + dinero(c.importe) + '</td></tr>').join('') +
+    '</tbody></table>' +
+    '<table><thead><tr><th>Forma de pago</th><th>Cuenta</th><th>Referencia</th><th class="num">Monto</th></tr></thead><tbody>' +
+      r.lineas.map(l => '<tr><td>' + esc(metTxt(l.metodo)) + '</td><td>' + esc(l.cuenta) + '</td><td>' + esc(l.referencia || '—') + '</td>' +
+        '<td class="num">' + (l.moneda === 'USD' ? usd(l.monto) + ' × ' + l.tc + ' = ' + dinero(l.monto_mxn) : dinero(l.monto)) + '</td></tr>').join('') +
+    '</tbody></table>' +
+    '<div class="doc-total"><div>Total pagado <b>' + dinero(r.total_mxn) + '</b></div></div>' +
+    (r.notas ? '<div class="chico">Notas: ' + esc(r.notas) + '</div>' : '') +
+    '<div class="firmas"><div>Recibió · ' + esc(r.registrado_por) + '</div><div>Paciente o responsable</div></div>' +
+    '<div class="leyenda">Este recibo no es un comprobante fiscal. Si requiere factura, solicítela con sus datos fiscales; ' +
+      'se emite a nombre del paciente o de quien él indique.</div></div>';
 }
 function docEstadoCuenta(){
   const c = CUENTA.caso, s = CUENTA.saldos;
@@ -1892,6 +2010,7 @@ function pintaReporte(){
     ['', recibos, 'Recibos'],
     ['', dinero(r2(vivos.filter(p => p.momento === 'Ingreso').reduce((a, p) => a + p.monto_mxn, 0))), 'Ingresos · paquete'],
     ['', dinero(r2(vivos.filter(p => p.momento === 'Egreso').reduce((a, p) => a + p.monto_mxn, 0))), 'Excedentes'],
+    ['', dinero(r2(vivos.filter(p => p.momento === 'Libre').reduce((a, p) => a + p.monto_mxn, 0))), 'Cobros libres'],
     [desc ? 'wa' : '', dinero(desc), 'Descuentos otorgados'],
     [anulados.length ? 'wa' : '', new Set(anulados.map(p => p.recibo)).size, 'Recibos anulados'],
     [pendConc ? 'wa' : 'ok', pendConc, 'Sin conciliar']
@@ -1903,8 +2022,8 @@ function pintaReporte(){
   $('rp-graficas').innerHTML =
     barras('Por forma de pago', agrupa(vivos, p => metTxt(p.metodo))) +
     barras('Por cuenta', porCuenta, totalComision ? '<div class="aviso warn" style="margin-top:16px">Comisión bancaria estimada: ' + dinero(totalComision) + '</div>' : '') +
-    barras('Por cirujano', agrupa(vivos, p => p.cirujano)) +
-    barras('Por procedimiento', agrupa(vivos, p => p.procedimiento).slice(0, 10));
+    barras('Por cirujano', agrupa(vivos.filter(p => p.momento !== 'Libre'), p => p.cirujano)) +
+    barras('Por procedimiento o concepto', agrupa(vivos, p => p.procedimiento).slice(0, 10));
 
   const conc = YO.autoriza && YO.nivel === 'escritura';
   $('rp-conc-sub').textContent = conc ? 'Marque lo que ya vio reflejado en el estado de cuenta del banco.' : 'Detalle de cada movimiento del periodo.';
@@ -1912,7 +2031,7 @@ function pintaReporte(){
     ? '<div class="tabla-scroll"><table class="tabla-cuenta"><thead><tr><th>Recibo</th><th>Fecha</th><th>Paciente</th><th>Forma · cuenta</th><th class="num">Monto</th><th>Conciliado</th></tr></thead><tbody>' +
       R.pagos.map(p => '<tr class="' + (p.estado === 'Anulado' ? 'anulado' : '') + '"><td class="mono">' + esc(p.recibo) + '</td>' +
         '<td class="chico">' + esc(fechaCorta(p.timestamp)) + ' ' + esc(horaDe(p.timestamp)) + '</td>' +
-        '<td class="concepto">' + esc(p.paciente) + '<small>' + esc(p.folio_caso) + ' · ' + esc(p.momento === 'Devolucion' ? 'Devolución' : p.momento) + '</small></td>' +
+        '<td class="concepto">' + esc(p.paciente) + '<small>' + (p.momento === 'Libre' ? 'Cobro libre · ' + esc(p.concepto || p.procedimiento) : esc(p.folio_caso) + ' · ' + esc(p.momento === 'Devolucion' ? 'Devolución' : p.momento)) + '</small></td>' +
         '<td class="concepto">' + esc(metTxt(p.metodo)) + '<small>' + esc(p.cuenta) + (p.referencia ? ' · ' + esc(p.referencia) : '') + '</small></td>' +
         '<td class="num">' + (signo(p) < 0 ? '−' : '') + dinero(p.monto_mxn) + '</td>' +
         '<td class="acc">' + (p.metodo === 'Efectivo' ? '<span class="suave chico">' + (p.corte ? esc(p.corte) : 'sin corte') + '</span>'
@@ -1944,6 +2063,183 @@ $('rp-csv').onclick = function(){
   document.body.appendChild(a); a.click(); a.remove();
 };
 
+
+/* ═══════════════════════ COBRO LIBRE ═══════════════════════
+   Igual que la ventanilla del consultorio: paciente de la base, conceptos,
+   formas de pago y recibo. La suma de las formas de pago debe ser igual al
+   total de los conceptos: un cobro libre no deja saldo pendiente. */
+let CL = {pac:null, conceptos:[], lineas:[], txn:null}, CL_BUSCA = null, CL_REG = false;
+
+function abreLibre(){
+  if (!CL.conceptos.length) limpiaLibre();
+  cargaLibresRecientes();
+}
+function limpiaLibre(){
+  CL = {pac:null, conceptos:[{concepto:'', importe:''}], lineas:[], txn:null};
+  CL.lineas = CAT ? [nuevaLinea('')] : [];
+  $('cl-buscar').value = ''; $('cl-resultados').classList.add('oculto');
+  $('cl-factura').value = 'No'; $('cl-fact-datos').classList.add('oculto');
+  ['cl-rfc','cl-razon','cl-correo','cl-notas'].forEach(id => { $(id).value = ''; });
+  $('cl-regimen').value = '';
+  aviso('cl-aviso','','');
+  pintaPacLibre(); pintaConceptos(); if (CAT) pintaLineasLibre();
+}
+function pintaPacLibre(){
+  const p = CL.pac;
+  $('cl-pac-buscar').classList.toggle('oculto', !!p);
+  $('cl-pac-elegido').classList.toggle('oculto', !p);
+  if (!p) return;
+  $('cl-pac-elegido').innerHTML = '<div class="pac-elegido"><div><div class="nom">' + esc(p.nombre) + '</div>' +
+    '<div class="meta">' + (p.id ? [p.expediente, p.telefono, p.correo].filter(Boolean).map(esc).join(' · ') || 'Paciente de la base' :
+      'No registrado en Zorvix · nombre escrito a mano') + '</div></div>' +
+    '<button class="btn sec" type="button" id="cl-cambiar">Cambiar</button></div>';
+  $('cl-cambiar').onclick = function(){ CL.pac = null; pintaPacLibre(); $('cl-buscar').focus(); };
+}
+$('cl-buscar').oninput = function(){
+  clearTimeout(CL_BUSCA);
+  const q = this.value.trim();
+  if (q.length < 2){ $('cl-resultados').classList.add('oculto'); return; }
+  CL_BUSCA = setTimeout(async function(){
+    try{
+      const r = await api('buscarPacientes', {q: q}, true);
+      if ($('cl-buscar').value.trim() !== q) return;
+      const box = $('cl-resultados');
+      box.innerHTML = r.pacientes.length
+        ? r.pacientes.map((p, i) => '<button type="button" data-i="' + i + '"><b>' + esc(p.nombre) + '</b><small>' +
+            [p.expediente, p.telefono].filter(Boolean).map(esc).join(' · ') + '</small></button>').join('') +
+          (r.total > r.pacientes.length ? '<div class="nada">Hay ' + r.total + ' coincidencias; escriba más letras para acotar.</div>' : '')
+        : '<div class="nada">No encontré a nadie con «' + esc(q) + '». Revise la escritura o use el nombre tal cual.</div>';
+      box.classList.remove('oculto');
+      box.querySelectorAll('[data-i]').forEach(function(b){
+        b.onclick = function(){ CL.pac = r.pacientes[+b.dataset.i]; box.classList.add('oculto'); pintaPacLibre(); };
+      });
+    }catch(e){ aviso('cl-aviso','malo', e.message); }
+  }, 300);
+};
+document.addEventListener('click', function(e){
+  if (!e.target.closest('.buscador-pac')) $('cl-resultados').classList.add('oculto');
+});
+$('cl-libre-nombre').onclick = function(){
+  const n = $('cl-buscar').value.trim();
+  if (n.length < 5) return aviso('cl-aviso','warn','Escriba el nombre completo del paciente en el buscador y vuelva a tocar esta opción.');
+  aviso('cl-aviso','','');
+  CL.pac = {id:'', nombre:n}; $('cl-resultados').classList.add('oculto'); pintaPacLibre();
+};
+
+function totalLibre(){ return r2(CL.conceptos.reduce((a, c) => a + Number(c.importe || 0), 0)); }
+function pintaConceptos(){
+  $('cl-conceptos').innerHTML = CL.conceptos.map((c, i) =>
+    '<div class="concepto-fila" data-i="' + i + '">' +
+      '<div><label>Concepto ' + (i + 1) + '</label><input data-k="concepto" maxlength="200" value="' + esc(c.concepto) + '" placeholder="Ej. Renta de quirófano, noche de hospitalización, curación…"></div>' +
+      '<div><label>Importe (MXN)</label><input data-k="importe" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(c.importe) + '" placeholder="0.00"></div>' +
+      '<div>' + (CL.conceptos.length > 1 ? '<button class="mini" type="button" data-quitar="' + i + '" style="margin-bottom:10px">Quitar</button>' : '') + '</div>' +
+    '</div>').join('');
+  $('cl-conceptos').querySelectorAll('.concepto-fila').forEach(function(f){
+    const i = +f.dataset.i;
+    f.querySelectorAll('[data-k]').forEach(function(el){
+      el.oninput = function(){
+        CL.conceptos[i][el.dataset.k] = el.value;
+        /* Con una sola forma de pago, su monto sigue al total: es el caso común
+           y ahorra teclear la misma cifra dos veces. */
+        if (el.dataset.k === 'importe' && CL.lineas.length === 1 && CL.lineas[0].moneda === 'MXN'){
+          CL.lineas[0].monto = totalLibre() || '';
+          const m = document.querySelector('#cl-lineas [data-k="monto"]'); if (m) m.value = CL.lineas[0].monto;
+        }
+        sumaLibre();
+      };
+    });
+  });
+  $('cl-conceptos').querySelectorAll('[data-quitar]').forEach(b => { b.onclick = () => { CL.conceptos.splice(+b.dataset.quitar, 1); pintaConceptos(); }; });
+  sumaLibre();
+}
+function pintaLineasLibre(){
+  pintaLineasEn({cont:'cl-lineas', arr: CL.lineas, dev:false, aviso:'cl-aviso', suma: sumaLibre, repinta: pintaLineasLibre});
+}
+function sumaLibre(){
+  const total = totalLibre();
+  const suma = r2(CL.lineas.reduce((a, l) => a + Number(l.monto || 0) * (l.moneda === 'USD' ? Number(l.tc || 0) : 1), 0));
+  const dif = r2(total - suma);
+  $('cl-total').textContent = dinero(total);
+  $('cl-saldo').textContent = dinero(total);
+  $('cl-suma').textContent = dinero(suma);
+  $('cl-dif').textContent = dinero(Math.abs(dif));
+  $('cl-dif-etq').textContent = dif > 0.005 ? 'Falta por cubrir' : (dif < -0.005 ? 'Sobra' : 'Cuadra');
+  $('cl-dif-caja').className = Math.abs(dif) <= 0.005 ? 'dif-ok' : 'dif-mal';
+}
+$('cl-otro-concepto').onclick = function(){ CL.conceptos.push({concepto:'', importe:''}); pintaConceptos(); };
+$('cl-otra-forma').onclick = function(){
+  const suma = CL.lineas.reduce((a, l) => a + Number(l.monto || 0) * (l.moneda === 'USD' ? Number(l.tc || 0) : 1), 0);
+  CL.lineas.push(nuevaLinea(Math.max(0, totalLibre() - suma)));
+  pintaLineasLibre();
+};
+$('cl-factura').onchange = function(){
+  $('cl-fact-datos').classList.toggle('oculto', this.value !== 'Si');
+  if (this.value === 'Si' && CL.pac && CL.pac.correo && !$('cl-correo').value) $('cl-correo').value = CL.pac.correo;
+};
+$('cl-limpiar').onclick = limpiaLibre;
+$('cl-registrar').onclick = async function(){
+  if (CL_REG) return;
+  aviso('cl-aviso','','');
+  const falla = (t) => { aviso('cl-aviso','malo', t); $('cl-aviso').scrollIntoView({behavior:'smooth', block:'center'}); };
+  if (!CL.pac) return falla('Elija al paciente.');
+  const conceptos = CL.conceptos.filter(c => c.concepto.trim() || Number(c.importe));
+  if (!conceptos.length) return falla('Escriba al menos un concepto con su importe.');
+  if (conceptos.some(c => !c.concepto.trim() || !(Number(c.importe) > 0))) return falla('Cada concepto necesita descripción e importe mayor a cero.');
+  const faltaFoto = CL.lineas.findIndex(l => (metodoDe(l.metodo) || {}).voucher && !l.foto);
+  if (faltaFoto >= 0) return falla('Falta la foto del voucher en la forma de pago ' + (faltaFoto + 1) + '. Sin voucher no se registra.');
+  const total = totalLibre();
+  const suma = r2(CL.lineas.reduce((a, l) => a + Number(l.monto || 0) * (l.moneda === 'USD' ? Number(l.tc || 0) : 1), 0));
+  if (Math.abs(total - suma) > 0.01) return falla('Las formas de pago suman ' + dinero(suma) + ' y el total es ' + dinero(total) + '. Deben ser iguales.');
+  if (!CL.txn) CL.txn = 'tl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+  CL_REG = true; const b = $('cl-registrar'); b.disabled = true;
+  try{
+    const r = await api('cobroLibre', {
+      txn_id: CL.txn, paciente_id: CL.pac.id || '', paciente_nombre: CL.pac.nombre,
+      conceptos: conceptos.map(c => ({concepto: c.concepto.trim(), importe: c.importe})),
+      lineas: CL.lineas.map(l => ({metodo:l.metodo, cuenta_id:l.cuenta_id, moneda:l.moneda, monto:l.monto, tc:l.tc, referencia:l.referencia, foto:l.foto})),
+      notas: $('cl-notas').value,
+      factura: {requiere: $('cl-factura').value === 'Si', rfc: $('cl-rfc').value, razon_social: $('cl-razon').value,
+                regimen: $('cl-regimen').value, uso: $('cl-uso').value, correo: $('cl-correo').value}
+    });
+    RECIBO = r.recibo;
+    CL.conceptos = [];        /* la próxima vez que se abra, arranca limpio */
+    muestraRecibo(r.repetido ? 'Este cobro ya estaba registrado; no se cobró dos veces.' : '');
+  }catch(e){ falla(e.message); }
+  finally{ CL_REG = false; b.disabled = false; }
+};
+
+async function cargaLibresRecientes(){
+  try{
+    const r = await api('cobrosLibres', {}, true);
+    $('cl-recientes').innerHTML = r.cobros.length
+      ? '<div class="tabla-scroll"><table class="tabla-cuenta"><thead><tr><th>Recibo</th><th>Fecha</th><th>Paciente</th><th>Forma de pago</th><th class="num">Total</th><th></th></tr></thead><tbody>' +
+        r.cobros.map(c => '<tr class="' + (c.anulado ? 'anulado' : '') + '">' +
+          '<td><button class="btn txt mono" type="button" data-recibo="' + esc(c.folio) + '">' + esc(c.folio) + '</button></td>' +
+          '<td class="chico">' + esc(fechaCorta(c.fecha)) + ' ' + esc(horaDe(c.fecha)) + '</td>' +
+          '<td class="concepto">' + esc(c.paciente) + '<small>' + esc(c.concepto) + '</small></td>' +
+          '<td class="chico">' + c.metodos.map(metTxt).map(esc).join(' + ') + '</td>' +
+          '<td class="num">' + dinero(c.total) + '</td>' +
+          '<td class="acc">' + (!c.anulado && !c.corte && YO.autoriza && YO.nivel === 'escritura'
+            ? '<button class="mini" type="button" data-anular="' + esc(c.folio) + '">Anular</button>' : '') + '</td></tr>').join('') +
+        '</tbody></table></div>'
+      : '<div class="vacio">Aún no hay cobros libres.</div>';
+    $('cl-recientes').querySelectorAll('[data-recibo]').forEach(function(b){
+      b.onclick = async function(){
+        try{ RECIBO = (await api('recibo', {folio: b.dataset.recibo})).recibo; muestraRecibo('Reimpresión del recibo ' + RECIBO.folio + '.'); }
+        catch(e){ aviso('cl-aviso','malo', e.message); }
+      };
+    });
+    $('cl-recientes').querySelectorAll('[data-anular]').forEach(function(b){
+      b.onclick = async function(){
+        const m = await pide('Anular recibo ' + b.dataset.anular, 'Se anula el cobro completo. Queda en la lista, tachado y con su motivo.',
+          {campo:true, placeholder:'Motivo de la anulación', boton:'Anular recibo'});
+        if (!m) return;
+        try{ await api('anularPago', {folio: b.dataset.anular, motivo: m}); toast('Recibo anulado'); cargaLibresRecientes(); }
+        catch(e){ aviso('cl-aviso','malo', e.message); }
+      };
+    });
+  }catch(e){ aviso('cl-aviso','malo', e.message); }
+}
 </script>
 </body>
 </html>
