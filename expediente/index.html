@@ -352,37 +352,55 @@ table.serie th:first-child,table.serie td:first-child{position:sticky;left:0;bac
      Probado con Chromium contra este mismo CSS: antes se encimaba en la hoja 2,
      después no, y el número de hojas no cambia. */
   .imp-pliego{width:100%;border-collapse:collapse}
-  .imp-pliego>thead>tr>td{padding:14mm 14mm 10px}
+  .imp-pliego>thead>tr>td{padding:12mm 14mm 8px}
   .imp-pliego>tbody>tr>td{padding:0 14mm;vertical-align:top}
-  /* El margen de abajo. Va vacío a propósito: si llevara texto, ese texto se
-     repetiría en todas las hojas. */
-  .imp-pliego>tfoot>tr>td{height:15mm;padding:0;border:0}
+
+  /* EL PIE LLEVA LA NOTA DE PROCEDENCIA, y eso resolvió una queja de verdad:
+     una nota de tamaño normal se iba a dos hojas y la segunda traía nada más
+     la rayita de la firma.
+
+     Medido con Chromium: el margen de abajo reservaba 15 mm EN BLANCO en cada
+     hoja, mientras la nota de procedencia —documento, versión, quién capturó,
+     la leyenda de conservación— ocupaba otros 16 mm dentro del contenido. Eran
+     31 mm por hoja para decir dos cosas que caben en una. Mudando la nota a
+     este pie ocupa el espacio que ya estaba apartado y el contenido recupera
+     ~25 mm por hoja: una nota que antes necesitaba dos hojas ahora cabe en una.
+
+     Que se repita en cada hoja no es efecto colateral, es lo correcto, y por
+     la misma razón que el correlativo del encabezado: en papel las hojas se
+     sueltan, y cada una tiene que poder decir de qué documento es y de dónde
+     salió. */
+  .imp-pliego>tfoot>tr>td{padding:6px 14mm 10mm;border:0;vertical-align:bottom}
   .imp-corre{font-size:8pt;font-family:system-ui,sans-serif;
     color:#333;border-bottom:.5pt solid #999;padding-bottom:3px}
 
-  .imp-membrete{border-bottom:1.5pt solid #000;padding-bottom:5px;margin-bottom:10px}
+  /* Los huecos de abajo salieron de medir, no de gusto: cada milímetro que se
+     recorta aquí es contenido que no se va a una hoja nueva. */
+  .imp-membrete{border-bottom:1.5pt solid #000;padding-bottom:4px;margin-bottom:7px}
   .imp-membrete .n{font-size:13pt;font-weight:700;letter-spacing:.01em}
   .imp-membrete .d{font-size:8.5pt;font-family:system-ui,sans-serif;color:#222}
   .imp-titulo{display:flex;justify-content:space-between;align-items:baseline;
     font-size:12pt;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}
   .imp-titulo span{font-size:9pt;font-weight:400;text-transform:none;letter-spacing:0}
   .imp-id{display:grid;grid-template-columns:1fr 1fr;gap:1px 20px;font-size:9.5pt;
-    border-bottom:.5pt solid #000;padding-bottom:8px;margin-bottom:12px}
+    border-bottom:.5pt solid #000;padding-bottom:6px;margin-bottom:9px}
   .imp-id div{break-inside:avoid}
   .imp-id b{font-weight:700}
-  .imp-grupo{font-size:11pt;font-weight:700;margin:14px 0 6px;border-bottom:.5pt solid #000;
+  .imp-grupo{font-size:11pt;font-weight:700;margin:9px 0 5px;border-bottom:.5pt solid #000;
     padding-bottom:2px;break-after:avoid}
-  .imp-campo{margin:0 0 9px;break-inside:avoid}
+  .imp-campo{margin:0 0 7px;break-inside:avoid}
   .imp-campo .e{font-weight:700;font-size:9.5pt;font-family:system-ui,sans-serif}
   .imp-campo .v{white-space:pre-wrap;margin-top:1px}
-  .imp-vitales{font-size:10.5pt;margin:0 0 9px}
+  .imp-vitales{font-size:10.5pt;margin:0 0 7px}
   .imp-tabla{width:100%;border-collapse:collapse;font-size:9pt;margin-top:3px}
   .imp-tabla th,.imp-tabla td{border:.5pt solid #666;padding:2px 4px;text-align:left}
-  .imp-firma{margin-top:30px;break-inside:avoid}
-  .imp-firma .linea{border-bottom:.75pt solid #000;height:34px;margin-bottom:3px}
+  /* Indivisible a propósito: una rayita de firma partida entre dos hojas no
+     sirve para firmar. */
+  .imp-firma{margin-top:16px;break-inside:avoid}
+  .imp-firma .linea{border-bottom:.75pt solid #000;height:26px;margin-bottom:3px}
   .imp-firma .pie{font-size:9pt;font-family:system-ui,sans-serif}
-  .imp-nota{font-size:8pt;font-family:system-ui,sans-serif;color:#444;margin-top:14px;
-    border-top:.5pt solid #bbb;padding-top:4px}
+  .imp-nota{font-size:8pt;font-family:system-ui,sans-serif;color:#444;margin-top:0;
+    border-top:.5pt solid #bbb;padding-top:3px}
 
   /* Hoja de identificación: frente arriba, reverso abajo, en una sola carta.
      Cada lado cabe en media hoja; no se fuerza tamaño real porque una foto
@@ -3007,16 +3025,19 @@ function armaImpresion(){
         (cedEsp ? ' · Cédula de especialidad '+esc(cedEsp) : '')+
         '<br>Firma autógrafa del médico tratante</div>'+
     '</div>' +
-    '<div class="imp-nota">Documento '+esc(DOC.Doc_ID || '(sin guardar)')+
-      ' · versión '+esc(String(DOC.Version || 1))+
-      ' · capturó '+esc(YO.correo || '')+
-      (firma.correo && String(firma.correo).toLowerCase() !== String(YO.correo||'').toLowerCase()
-        ? ' por cuenta de '+esc(firma.correo) : '')+
-      '. El expediente es propiedad del establecimiento y se conserva cinco años '+
-      'contados desde el último acto médico (NOM-004-SSA3-2012, 5.4).</div>' +
     '</td></tr></tbody>' +
-    /* El margen de abajo de cada hoja. Ver el CSS de .imp-pliego>tfoot. */
-    '<tfoot><tr><td></td></tr></tfoot></table>';
+    /* La nota de procedencia va en el PIE, no en el cuerpo: ocupa el margen
+       que de todos modos estaba reservado en blanco, y así se repite en cada
+       hoja. Ver el CSS de .imp-pliego>tfoot. */
+    '<tfoot><tr><td>' +
+      '<div class="imp-nota">Documento '+esc(DOC.Doc_ID || '(sin guardar)')+
+        ' · versión '+esc(String(DOC.Version || 1))+
+        ' · capturó '+esc(YO.correo || '')+
+        (firma.correo && String(firma.correo).toLowerCase() !== String(YO.correo||'').toLowerCase()
+          ? ' por cuenta de '+esc(firma.correo) : '')+
+        '. El expediente es propiedad del establecimiento y se conserva cinco años '+
+        'contados desde el último acto médico (NOM-004-SSA3-2012, 5.4).</div>' +
+    '</td></tr></tfoot></table>';
 }
 
 function nuevoDocumento(tipo){
@@ -5346,17 +5367,18 @@ async function imprimeProgramacionDelDia(boton){
         '<div class="pie"><b>' + esc(quien || '______________________________') + '</b>' +
           '<br>Responsable del registro</div>' +
       '</div>' +
-      '<div class="imp-nota">' +
-        (completo
-          ? 'Registro diario de pacientes del establecimiento. '
-          : 'ALCANCE PARCIAL: esta hoja sólo contiene los casos en los que ' +
-            'participa quien la imprimió, no todos los del establecimiento. ') +
-        'Impresa' + (quien ? ' por ' + esc(quien) : '') + ' el ' + progCuandoAhora() +
-        '. Se arma al momento con lo que la base de datos tiene de esa fecha. ' +
-        'El expediente es propiedad del establecimiento y se conserva cinco años ' +
-        'contados desde el último acto médico (NOM-004-SSA3-2012, 5.4).</div>' +
       '</td></tr></tbody>' +
-      '<tfoot><tr><td></td></tr></tfoot></table>';
+      '<tfoot><tr><td>' +
+        '<div class="imp-nota">' +
+          (completo
+            ? 'Registro diario de pacientes del establecimiento. '
+            : 'ALCANCE PARCIAL: esta hoja sólo contiene los casos en los que ' +
+              'participa quien la imprimió, no todos los del establecimiento. ') +
+          'Impresa' + (quien ? ' por ' + esc(quien) : '') + ' el ' + progCuandoAhora() +
+          '. Se arma al momento con lo que la base de datos tiene de esa fecha. ' +
+          'El expediente es propiedad del establecimiento y se conserva cinco años ' +
+          'contados desde el último acto médico (NOM-004-SSA3-2012, 5.4).</div>' +
+      '</td></tr></tfoot></table>';
 
     window.print();
     aviso('agenda-sub', 'ok', 'Programación del ' + progFechaLarga(dia) + ': ' +
